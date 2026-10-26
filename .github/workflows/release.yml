@@ -9,7 +9,7 @@ permissions:
   contents: read
 jobs:
   validate:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - env:
           VERSION: ${{ inputs.version }}
@@ -19,7 +19,7 @@ jobs:
     strategy:
       matrix:
         include:
-          - os: ubuntu-latest
+          - os: ubuntu-24.04
             rid: linux-x64
           - os: windows-latest
             rid: win-x64
@@ -48,7 +48,7 @@ jobs:
           path: artifacts/${{ matrix.rid }}/
   draft:
     needs: build
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     permissions:
       contents: write
     steps:
@@ -65,7 +65,7 @@ jobs:
           gh release create "$VERSION" artifacts/*.tar.gz --draft --prerelease --title "$VERSION" --notes 'Early alpha. Install FFprobe separately; see bundled release notes. Not a stable release.'
   docker:
     needs: [validate, build]
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     permissions:
       packages: write
       contents: read
