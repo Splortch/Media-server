@@ -1,0 +1,30 @@
+# Foundation validation
+
+Validation performed in a Linux x64 workspace on 2026-10-26. This record distinguishes local checks from GitHub-hosted results.
+
+| Check | Observed result |
+|---|---|
+| Backend solution build | Passed, zero warnings/errors |
+| Backend API/security/database tests | 7 passed |
+| React production build | Passed |
+| Frontend component tests | 2 passed |
+| ESLint | Passed |
+| Prettier | Passed |
+| CSharpier | Passed |
+| NuGet direct/transitive vulnerability audit | Zero reported vulnerable packages |
+| npm dependency audit | Zero reported vulnerabilities |
+| Browser-to-real-backend integration | Passed in Chromium using generated VP9/Opus WebM |
+| Self-contained Linux x64 publish | Passed |
+| Self-contained Windows x64 cross-publish | Passed; Windows executable not run in Linux |
+| Workflow YAML, shell and bootstrap syntax | Parsed/checked locally |
+| Docker image build/runtime | Not run locally: Docker is unavailable; hosted CI includes build and startup smoke checks |
+| GitHub-hosted CI | Configured; local results do not establish hosted workflow success |
+| Release workflow | Not dispatched; no official release published |
+
+The browser integration creates a fresh SQLite database, completes setup/login through the real UI, adds a media directory, scans using real FFprobe, opens the discovered video, verifies actual browser playback, saves progress, checks a 206 byte-range response and reloads to verify resume. Responsive screenshots are inspected internally using synthetic test data.
+
+Backend tests additionally cover anonymous/private endpoint separation, setup token and antiforgery requirements, repeated setup rejection, salted Argon2id verification, allowed-root/traversal/symlink rejection, idempotent scanning with an unreadable-media case, unchanged source bytes, suffix/unsatisfiable ranges, missing sources, SQLite persistence/migrations, role denial, copied-cookie revocation on logout and authentication throttling.
+
+Dependency audits describe advisory-feed results at validation time, not proof that the application is vulnerability-free. Public remote-access deployment, malicious local filesystem races, broad codec/device compatibility and packaged Windows execution require further validation. See SECURITY.md and the roadmap.
+
+Repository visibility, description, Discussions, private vulnerability reporting, branch protection and organization Projects require repository-administration operations not exposed by the connected GitHub tools used for this foundation. `scripts/configure-repository.py` provides a reviewable follow-up using an authenticated GitHub CLI. Its existence does not mean those settings have been applied.

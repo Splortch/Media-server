@@ -1,0 +1,4 @@
+Media Server
+Copyright 2026 Media Server contributors
+Licensed under the Apache License, Version 2.0.
+Third-party libraries retain their respective licenses. FFprobe/FFmpeg is a separately installed dependency for native builds. Container distributions include the distribution's FFmpeg package; consult docs/deployment/RELEASE-NOTES.md before redistributing images.

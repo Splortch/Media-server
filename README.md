@@ -1,1 +1,91 @@
-# Media-server
+# Media Server
+
+A modern, open-source, self-hosted media server focused on performance, simplicity, and a seamless streaming experience.
+
+**Early alpha foundation.** Independent of Jellyfin, Plex and Emby. No cloud account, subscription, advertising or telemetry. Host only media you are entitled to use. Apache-2.0; see [LICENSE](LICENSE) and [NOTICE](NOTICE).
+
+## What works
+
+| Capability | Status | Scope |
+|---|---|---|
+| First-run setup and login | Implemented | One local administrator; Argon2id, revocable cookie sessions, CSRF |
+| Libraries and scanning | Implemented | Explicit allowed roots, background jobs, FFprobe metadata, idempotent updates |
+| Media browsing | Implemented | Responsive React UI, search, technical details, honest empty states |
+| Direct Play | Implemented | Authenticated byte ranges; browser-native controls and resume |
+| Continue Watching | Implemented | Per-user persisted position; completed titles excluded |
+| SQLite schema migrations | Implemented | Versioned EF Core migration, applied at startup |
+| REST/OpenAPI and scan status | Implemented | Protected OpenAPI; scan polling and SignalR event transport |
+| Automated quality checks | Implemented configuration | Backend, frontend, browser integration, audits and Docker build |
+| Native alpha releases | Implemented workflow | Self-contained Windows/Linux builds, bundled web UI, draft prereleases |
+| Hardware acceleration / HLS / transcoding | Planned | Direct Play only in this alpha |
+| Artwork / online metadata / TV matching | Planned | Current titles derive from filenames; no fabricated posters |
+| Multi-user administration / parental controls | Planned | Role authorization exists; no account-management UI yet |
+| Native clients / plugins / secure remote streaming | Planned | Browser client only; localhost deployment by default |
+
+Verification results and environment limits are recorded in [VALIDATION.md](docs/development/VALIDATION.md). Workflow presence is not a claim that hosted CI passed.
+
+## Quick start: local development
+
+Install the .NET SDK selected in `global.json`, Node.js 24, and FFprobe (usually supplied with FFmpeg). Git and npm are required. Ensure `dotnet`, `node`, `npm`, `ffprobe` are on PATH.
+
+From the repository root, on Linux/macOS:
+
+```bash
+export MediaServer__DataDirectory="$HOME/.local/share/media-server-dev"
+export MediaServer__AllowedRoots__0="/absolute/path/to/media"
+dotnet restore MediaServer.sln --locked-mode
+dotnet run --project backend/src/Api
+```
+
+The default `data/` directory is ignored. Keep the database, setup token and key ring private and outside source control.
+
+In another terminal:
+
+```bash
+cd frontend
+npm ci
+npm run dev
+```
+
+Open **http://127.0.0.1:5173**. Read `setup-token` in the configured data directory, create an administrator with a password of at least 12 characters, and sign in. In Settings add an absolute media directory under an allowed root, then choose **Scan library**. Open Library, select a compatible video and play it. A VP9/Opus WebM or H.264/AAC MP4 is a useful starting point; actual support depends on the browser and OS.
+
+The backend listens on **127.0.0.1:5050**. Vite proxies `/api` and `/hubs` to it; no permissive CORS is required. Environment variables use .NET's `__` nesting. `.env` files are **not** automatically read by native .NET processes.
+
+For PowerShell and deployment instructions see [development](docs/development/SETUP.md) and [deployment](docs/deployment/DEPLOYMENT.md).
+
+## Docker
+
+```bash
+cp .env.example .env
+# Set MEDIA_PATH in .env to an existing absolute media directory.
+docker compose up --build -d
+docker compose exec media-server cat /data/setup-token
+```
+
+Open **http://127.0.0.1:5050**. Inside Settings use `/media` (the container path), not your host path. The media mount is read-only; database and keys live in a named volume. Do not publish this alpha directly to the internet. [Remote access and threat model](docs/architecture/SECURITY.md).
+
+## Check your changes
+
+```bash
+dotnet build MediaServer.sln
+dotnet test MediaServer.sln
+dotnet tool restore
+dotnet csharpier check backend
+python3 scripts/audit.py
+cd frontend
+npm ci
+npm run build
+npm test
+npm run lint
+npm run format:check
+npm audit --audit-level=moderate
+npx playwright install chromium
+cd ..
+bash scripts/e2e.sh
+```
+
+The browser test starts a fresh API database and generates its own short test video using FFmpeg. It never needs personal media. Port 5050 must be free. See [API](docs/api/README.md), [architecture](docs/architecture/README.md), [contributing](CONTRIBUTING.md), and the [prioritized roadmap](docs/ROADMAP.md).
+
+## Two-maintainer workflow
+
+One maintainer can own backend/media and the other frontend/experience. Share security-sensitive API and playback reviews. Use focused issues, feature branches, Conventional Commits and pull requests. Require CI; one review is recommended with an administrator bypass for urgent fixes or an unavailable teammate. No bureaucracy collection minigame required.

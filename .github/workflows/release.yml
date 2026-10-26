@@ -1,0 +1,84 @@
+name: Alpha release
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Prerelease tag, e.g. v0.1.0-alpha.1'
+        required: true
+permissions:
+  contents: read
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - env:
+          VERSION: ${{ inputs.version }}
+        run: '[[ "$VERSION" =~ ^v[0-9]+\.[0-9]+\.[0-9]+-alpha\.[0-9]+$ ]]'
+  build:
+    needs: validate
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-latest
+            rid: linux-x64
+          - os: windows-latest
+            rid: win-x64
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - run: npm ci --prefix frontend
+      - run: npm run build --prefix frontend
+      - run: npm test --prefix frontend
+      - run: dotnet restore --locked-mode
+      - run: dotnet test MediaServer.sln -c Release
+      - run: dotnet publish backend/src/Api -c Release -r ${{ matrix.rid }} --self-contained true -o artifacts/${{ matrix.rid }}
+      - shell: bash
+        run: |
+          cp -r frontend/dist artifacts/${{ matrix.rid }}/wwwroot
+          cp LICENSE NOTICE docs/deployment/RELEASE-NOTES.md artifacts/${{ matrix.rid }}/
+      - uses: actions/upload-artifact@v4
+        with:
+          name: media-server-${{ matrix.rid }}
+          path: artifacts/${{ matrix.rid }}/
+  draft:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+      - env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          VERSION: ${{ inputs.version }}
+        run: |
+          chmod +x artifacts/media-server-linux-x64/Api
+          for artifact in artifacts/*; do tar -czf "$artifact.tar.gz" -C "$artifact" .; done
+          gh release create "$VERSION" artifacts/*.tar.gz --draft --prerelease --title "$VERSION" --notes 'Early alpha. Install FFprobe separately; see bundled release notes. Not a stable release.'
+  docker:
+    needs: [validate, build]
+    runs-on: ubuntu-latest
+    permissions:
+      packages: write
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - env:
+          VERSION: ${{ inputs.version }}
+        run: |
+          IMAGE="ghcr.io/${GITHUB_REPOSITORY,,}:$VERSION"
+          docker build -f docker/Dockerfile -t "$IMAGE" .
+          docker push "$IMAGE"
