@@ -1,0 +1,22 @@
+name: Client milestones and roadmap
+on:
+  push:
+    branches: [feat/client-api-windows-alpha]
+    paths: ['docs/clients/roadmap.json', 'scripts/github-bootstrap.cjs', '.github/workflows/client-roadmap.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+  issues: write
+concurrency:
+  group: client-roadmap
+  cancel-in-progress: false
+jobs:
+  seed:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/github-script@v7
+        with:
+          script: |
+            const bootstrap = require('./scripts/github-bootstrap.cjs');
+            await bootstrap({github, context, core}, 'docs/clients/roadmap.json');

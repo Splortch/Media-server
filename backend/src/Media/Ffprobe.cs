@@ -24,7 +24,7 @@ public sealed class Ffprobe(string executable) : IMediaProbe
                 "-protocol_whitelist",
                 "file",
                 "-show_entries",
-                "format=duration,format_name:stream=codec_type,codec_name",
+                "format=duration,format_name:stream=index,codec_type,codec_name:stream_tags=language,title",
                 "-of",
                 "json",
                 path,
@@ -69,9 +69,25 @@ public sealed class Ffprobe(string executable) : IMediaProbe
             double.IsFinite(duration) ? Math.Max(0, duration) : 0,
             format.GetProperty("format_name").GetString() ?? "",
             Codec("video"),
-            Codec("audio")
+            Codec("audio"),
+            streams
+                .Select(x => new MediaTrack(
+                    x.GetProperty("index").GetInt32(),
+                    x.GetProperty("codec_type").GetString() ?? "unknown",
+                    x.TryGetProperty("codec_name", out var c)
+                        ? c.GetString() ?? "unknown"
+                        : "unknown",
+                    Tag(x, "language"),
+                    Tag(x, "title")
+                ))
+                .ToArray()
         );
     }
+
+    private static string? Tag(JsonElement stream, string name) =>
+        stream.TryGetProperty("tags", out var tags) && tags.TryGetProperty(name, out var value)
+            ? value.GetString()
+            : null;
 
     private static async Task<string> ReadBounded(StreamReader reader, CancellationToken ct)
     {

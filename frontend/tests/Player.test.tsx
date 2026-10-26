@@ -28,7 +28,9 @@ it('saves real playback progress with an antiforgery token', async () => {
   const fetch = vi
     .spyOn(globalThis, 'fetch')
     .mockResolvedValueOnce(new Response(JSON.stringify({ token: 'test-csrf' })))
-    .mockResolvedValueOnce(new Response(null, { status: 204 }));
+    .mockResolvedValueOnce(
+      new Response(JSON.stringify({ revision: 1 }), { status: 200 }),
+    );
   render(
     <Player
       item={{
@@ -51,10 +53,14 @@ it('saves real playback progress with an antiforgery token', async () => {
   fireEvent.pause(video);
   await waitFor(() =>
     expect(fetch).toHaveBeenCalledWith(
-      '/api/media/4/progress',
+      '/api/v1/media/4/progress-sync',
       expect.objectContaining({
         method: 'PUT',
-        body: JSON.stringify({ seconds: 25 }),
+        body: JSON.stringify({
+          seconds: 25,
+          completed: false,
+          expectedRevision: 0,
+        }),
         headers: expect.objectContaining({ 'X-CSRF-TOKEN': 'test-csrf' }),
       }),
     ),

@@ -1,0 +1,570 @@
+use axum::{
+    body::Body,
+    extract::{Path, State},
+    http::{HeaderMap, Method, StatusCode},
+    response::Response,
+    routing::get,
+    Router,
+};
+use futures_util::{StreamExt, TryStreamExt};
+use reqwest::cookie::{CookieStore, Jar};
+use serde::Serialize;
+use serde_json::{json, Value};
+#[cfg(windows)]
+use sha2::{Digest, Sha256};
+use std::{sync::Arc, time::Duration};
+use tokio::sync::Mutex;
+use tokio_util::sync::CancellationToken;
+use url::Url;
+use zeroize::Zeroize;
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ClientError {
+    pub code: &'static str,
+    pub message: &'static str,
+    pub status: Option<u16>,
+    pub current: Option<Value>,
+}
+impl ClientError {
+    fn new(code: &'static str, message: &'static str) -> Self {
+        Self {
+            code,
+            message,
+            status: None,
+            current: None,
+        }
+    }
+}
+type Result<T> = std::result::Result<T, ClientError>;
+pub trait CredentialStore: Send + Sync {
+    fn load(&self, server: &str) -> Result<Option<String>>;
+    fn save(&self, server: &str, cookies: &str) -> Result<()>;
+    fn delete(&self, server: &str) -> Result<()>;
+}
+pub struct WindowsVault;
+#[cfg(windows)]
+fn entry(server: &str) -> Result<keyring::Entry> {
+    let key = format!("{:x}", Sha256::digest(server.as_bytes()));
+    keyring::Entry::new("org.splortch.media-server.windows", &key)
+        .map_err(|_| ClientError::new("VAULT", "Windows Credential Manager is unavailable."))
+}
+impl CredentialStore for WindowsVault {
+    fn load(&self, server: &str) -> Result<Option<String>> {
+        #[cfg(windows)]
+        {
+            match entry(server)?.get_password() {
+                Ok(s) => Ok(Some(s)),
+                Err(keyring::Error::NoEntry) => Ok(None),
+                Err(_) => Err(ClientError::new(
+                    "VAULT",
+                    "Saved session cannot be read from Windows Credential Manager.",
+                )),
+            }
+        }
+        #[cfg(not(windows))]
+        {
+            let _ = server;
+            Ok(None)
+        }
+    }
+    fn save(&self, server: &str, cookies: &str) -> Result<()> {
+        #[cfg(windows)]
+        {
+            entry(server)?.set_password(cookies).map_err(|_| {
+                ClientError::new(
+                    "VAULT",
+                    "Session could not be protected by Windows Credential Manager.",
+                )
+            })
+        }
+        #[cfg(not(windows))]
+        {
+            let _ = (server, cookies);
+            Err(ClientError::new(
+                "VAULT",
+                "Persistent sessions are supported only on Windows.",
+            ))
+        }
+    }
+    fn delete(&self, server: &str) -> Result<()> {
+        #[cfg(windows)]
+        {
+            match entry(server)?.delete_credential() {
+                Ok(()) | Err(keyring::Error::NoEntry) => Ok(()),
+                Err(_) => Err(ClientError::new(
+                    "VAULT",
+                    "Saved credentials could not be removed.",
+                )),
+            }
+        }
+        #[cfg(not(windows))]
+        {
+            let _ = server;
+            Ok(())
+        }
+    }
+}
+pub fn validate_server(input: &str) -> Result<Url> {
+    let mut url = Url::parse(input.trim())
+        .map_err(|_| ClientError::new("URL", "Enter an absolute HTTPS server address."))?;
+    if url.host_str().is_none()
+        || !url.username().is_empty()
+        || url.password().is_some()
+        || url.query().is_some()
+        || url.fragment().is_some()
+        || url.path() != "/"
+    {
+        return Err(ClientError::new(
+            "URL",
+            "Use a server origin without credentials, path, query or fragment.",
+        ));
+    }
+    let local = match url.host() {
+        Some(url::Host::Domain("localhost")) => true,
+        Some(url::Host::Ipv4(ip)) => ip.is_loopback(),
+        Some(url::Host::Ipv6(ip)) => ip.is_loopback(),
+        _ => false,
+    };
+    if url.scheme() != "https" && !(url.scheme() == "http" && local) {
+        return Err(ClientError::new("INSECURE","Remote servers require HTTPS. HTTP is allowed only on this computer's loopback address."));
+    }
+    url.set_path("/");
+    Ok(url)
+}
+#[derive(Clone)]
+struct Connection {
+    base: Url,
+    jar: Arc<Jar>,
+    http: reqwest::Client,
+    remember: bool,
+    cancel: CancellationToken,
+}
+impl Connection {
+    fn new(base: Url, remember: bool) -> Result<Self> {
+        let jar = Arc::new(Jar::default());
+        let http = reqwest::Client::builder()
+            .cookie_provider(jar.clone())
+            .redirect(reqwest::redirect::Policy::none())
+            .connect_timeout(Duration::from_secs(10))
+            .read_timeout(Duration::from_secs(45))
+            .no_proxy()
+            .build()
+            .map_err(|_| ClientError::new("NETWORK", "Cannot initialize secure networking."))?;
+        Ok(Self {
+            base,
+            jar,
+            http,
+            remember,
+            cancel: CancellationToken::new(),
+        })
+    }
+    async fn json(&self, method: Method, path: &str, body: Option<Value>) -> Result<Value> {
+        let url = self
+            .base
+            .join(path)
+            .map_err(|_| ClientError::new("URL", "Invalid API path."))?;
+        let mut request = self
+            .http
+            .request(method.clone(), url)
+            .timeout(Duration::from_secs(15));
+        if method != Method::GET && method != Method::HEAD {
+            let response = self
+                .http
+                .get(self.base.join("/api/v1/auth/csrf").unwrap())
+                .timeout(Duration::from_secs(15))
+                .send()
+                .await
+                .map_err(|_| {
+                    ClientError::new(
+                        "NETWORK",
+                        "Server unavailable while establishing a secure session.",
+                    )
+                })?;
+            let token = bounded_json(response)
+                .await?
+                .get("token")
+                .and_then(Value::as_str)
+                .filter(|s| s.len() < 8192)
+                .ok_or_else(|| ClientError::new("PROTOCOL", "Invalid antiforgery response."))?
+                .to_owned();
+            request = request.header("X-CSRF-TOKEN", token);
+        }
+        if let Some(body) = body {
+            request = request.json(&body);
+        }
+        let response = request.send().await.map_err(|_| {
+            ClientError::new(
+                "NETWORK",
+                "Cannot reach the server. Check the connection and TLS certificate.",
+            )
+        })?;
+        bounded_json(response).await
+    }
+}
+async fn bounded_json(response: reqwest::Response) -> Result<Value> {
+    let status = response.status();
+    if response
+        .content_length()
+        .is_some_and(|n| n > 2 * 1024 * 1024)
+    {
+        return Err(ClientError::new(
+            "PROTOCOL",
+            "Server response exceeded the client limit.",
+        ));
+    }
+    let mut bytes = Vec::new();
+    let mut stream = response.bytes_stream();
+    while let Some(chunk) = stream.next().await {
+        let chunk =
+            chunk.map_err(|_| ClientError::new("NETWORK", "Server response was interrupted."))?;
+        if bytes.len() + chunk.len() > 2 * 1024 * 1024 {
+            return Err(ClientError::new(
+                "PROTOCOL",
+                "Server response exceeded the client limit.",
+            ));
+        }
+        bytes.extend_from_slice(&chunk);
+    }
+    let value = if bytes.is_empty() {
+        Value::Null
+    } else {
+        serde_json::from_slice(&bytes).map_err(|_| {
+            ClientError::new("PROTOCOL", "Server returned an invalid JSON response.")
+        })?
+    };
+    if status.is_success() {
+        return Ok(value);
+    }
+    let (code, message) = match status.as_u16() {
+        401 => ("AUTH", "Your session expired or sign-in was rejected."),
+        403 => ("FORBIDDEN", "This account does not have permission."),
+        409 => (
+            "CONFLICT",
+            "Progress changed on another device. Reopen this video before saving again.",
+        ),
+        429 => (
+            "RATE_LIMIT",
+            "Too many requests. Wait a minute before trying again.",
+        ),
+        _ => ("SERVER", "The server could not complete the request."),
+    };
+    Err(ClientError {
+        code,
+        message,
+        status: Some(status.as_u16()),
+        current: if status.as_u16() == 409 {
+            Some(value)
+        } else {
+            None
+        },
+    })
+}
+#[derive(Clone)]
+pub struct DesktopClient {
+    connection: Arc<Mutex<Option<Connection>>>,
+    vault: Arc<dyn CredentialStore>,
+    proxy: String,
+    secret: Arc<str>,
+}
+impl DesktopClient {
+    pub async fn start(vault: Arc<dyn CredentialStore>) -> Result<Self> {
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0")
+            .await
+            .map_err(|_| ClientError::new("PROXY", "Cannot start the local video bridge."))?;
+        let proxy = format!(
+            "http://127.0.0.1:{}",
+            listener
+                .local_addr()
+                .map_err(|_| ClientError::new("PROXY", "No local bridge address."))?
+                .port()
+        );
+        let client = Self {
+            connection: Arc::new(Mutex::new(None)),
+            vault,
+            proxy,
+            secret: uuid::Uuid::new_v4().simple().to_string().into(),
+        };
+        let router = Router::new()
+            .route("/{secret}/media/{id}", get(stream_media))
+            .with_state(client.clone());
+        tokio::spawn(async move {
+            let _ = axum::serve(listener, router).await;
+        });
+        Ok(client)
+    }
+    pub async fn connect(&self, address: &str, remember: bool) -> Result<Value> {
+        let base = validate_server(address)?;
+        let connection = Connection::new(base, remember)?;
+        let info = connection
+            .json(Method::GET, "/api/v1/server-info", None)
+            .await?;
+        if info.get("apiVersion").and_then(Value::as_u64) != Some(1)
+            || info
+                .get("minimumClientApiVersion")
+                .and_then(Value::as_u64)
+                .is_none_or(|n| n > 1)
+        {
+            return Err(ClientError::new(
+                "INCOMPATIBLE",
+                "This server uses an incompatible client API. Update the server or client.",
+            ));
+        }
+        if remember {
+            if let Some(mut cookies) = self.vault.load(connection.base.as_str())? {
+                for cookie in cookies.split(';') {
+                    let flags = if connection.base.scheme() == "https" {
+                        "; Secure; HttpOnly; Path=/"
+                    } else {
+                        "; HttpOnly; Path=/"
+                    };
+                    connection
+                        .jar
+                        .add_cookie_str(&format!("{}{flags}", cookie.trim()), &connection.base);
+                }
+                cookies.zeroize();
+            }
+        }
+        if let Some(old) = self.connection.lock().await.replace(connection) {
+            old.cancel.cancel();
+        }
+        Ok(info)
+    }
+    async fn current(&self) -> Result<Connection> {
+        self.connection
+            .lock()
+            .await
+            .clone()
+            .ok_or_else(|| ClientError::new("DISCONNECTED", "Connect to a server first."))
+    }
+    pub async fn login(&self, name: String, mut password: String) -> Result<Value> {
+        let c = self.current().await?;
+        let result = c
+            .json(
+                Method::POST,
+                "/api/v1/auth/login",
+                Some(json!({"name":name,"password":password,"deviceName":"Windows client"})),
+            )
+            .await;
+        password.zeroize();
+        let result = result?;
+        if c.remember {
+            let mut cookies = c
+                .jar
+                .cookies(&c.base)
+                .and_then(|h| h.to_str().ok().map(str::to_owned))
+                .ok_or_else(|| {
+                    ClientError::new("PROTOCOL", "Server did not establish a session.")
+                })?;
+            let save = self.vault.save(c.base.as_str(), &cookies);
+            cookies.zeroize();
+            if let Err(e) = save {
+                let _ = c.json(Method::POST, "/api/v1/auth/logout", None).await;
+                self.clear(&c).await?;
+                return Err(e);
+            }
+        }
+        Ok(result)
+    }
+    async fn clear(&self, c: &Connection) -> Result<()> {
+        let mut active = self.connection.lock().await;
+        if !active
+            .as_ref()
+            .is_some_and(|current| Arc::ptr_eq(&current.jar, &c.jar))
+        {
+            return Ok(());
+        }
+        c.cancel.cancel();
+        let deletion = self.vault.delete(c.base.as_str());
+        let replacement = Connection::new(c.base.clone(), c.remember)?;
+        *active = Some(replacement);
+        deletion
+    }
+    pub async fn logout(&self) -> Result<Value> {
+        let c = self.current().await?;
+        let result = c.json(Method::POST, "/api/v1/auth/logout", None).await;
+        self.clear(&c).await?;
+        result
+    }
+    pub async fn request(&self, method: &str, path: &str, body: Option<Value>) -> Result<Value> {
+        if !allowed_request(method, path) {
+            return Err(ClientError::new(
+                "PATH",
+                "This API operation is not available to the desktop renderer.",
+            ));
+        }
+        let c = self.current().await?;
+        let method = Method::from_bytes(method.as_bytes())
+            .map_err(|_| ClientError::new("PATH", "Invalid operation."))?;
+        let result = c.json(method, path, body).await;
+        if result.as_ref().is_err_and(|e| e.status == Some(401)) {
+            self.clear(&c).await?;
+        }
+        result
+    }
+    pub async fn stream_url(&self, id: u64) -> Result<String> {
+        if id == 0 {
+            return Err(ClientError::new("PATH", "Invalid media ID."));
+        }
+        let _ = self.current().await?;
+        Ok(format!("{}/{}/media/{id}", self.proxy, self.secret))
+    }
+}
+fn allowed_request(method: &str, path: &str) -> bool {
+    if path.len() > 1024 || path.contains('#') || path.contains('\\') {
+        return false;
+    }
+    let Ok(url) = Url::parse(&format!("http://local.invalid{path}")) else {
+        return false;
+    };
+    if url.host_str() != Some("local.invalid") || !path.starts_with("/api/v1/") {
+        return false;
+    }
+    let p = url.path().strip_prefix("/api/v1/").unwrap_or("");
+    let parts = p.split('/').collect::<Vec<_>>();
+    if method == "GET"
+        && matches!(
+            p,
+            "auth/me" | "media" | "progress" | "continue-watching" | "sessions" | "status"
+        )
+    {
+        return url.query().is_none() || p == "media";
+    }
+    if url.query().is_some() {
+        return false;
+    }
+    if method == "PUT" && p == "capabilities" {
+        return true;
+    }
+    if method == "DELETE" && parts.len() == 2 && parts[0] == "sessions" {
+        return parts[1].len() == 32 && parts[1].chars().all(|c| c.is_ascii_hexdigit());
+    }
+    if parts.len() >= 2 && parts[0] == "media" && parts[1].parse::<u64>().is_ok_and(|n| n > 0) {
+        return matches!(
+            (method, parts.len(), parts.get(2).copied()),
+            ("GET", 2, _)
+                | ("GET", 3, Some("progress" | "tracks"))
+                | ("PUT", 3, Some("progress-sync"))
+                | ("POST", 3, Some("playback-errors"))
+        );
+    }
+    false
+}
+async fn stream_media(
+    State(client): State<DesktopClient>,
+    Path((secret, id)): Path<(String, u64)>,
+    method: Method,
+    headers: HeaderMap,
+) -> Response {
+    let denied = || {
+        Response::builder()
+            .status(StatusCode::NOT_FOUND)
+            .body(Body::empty())
+            .unwrap()
+    };
+    if secret.as_str() != client.secret.as_ref() || id == 0 {
+        return denied();
+    }
+    if let Some(origin) = headers.get("origin").and_then(|v| v.to_str().ok()) {
+        if !matches!(
+            origin,
+            "http://tauri.localhost" | "tauri://localhost" | "http://127.0.0.1:1420"
+        ) {
+            return denied();
+        }
+    }
+    let Ok(c) = client.current().await else {
+        return denied();
+    };
+    let mut request = c.http.request(
+        method,
+        c.base.join(&format!("/api/v1/media/{id}/stream")).unwrap(),
+    );
+    for name in ["range", "if-range"] {
+        if let Some(value) = headers.get(name) {
+            request = request.header(name, value);
+        }
+    }
+    let Ok(response) = request.send().await else {
+        return Response::builder().status(502).body(Body::empty()).unwrap();
+    };
+    let mut builder = Response::builder()
+        .status(response.status())
+        .header("Cache-Control", "no-store")
+        .header("X-Content-Type-Options", "nosniff");
+    if let Some(kind) = response
+        .headers()
+        .get("content-type")
+        .and_then(|v| v.to_str().ok())
+    {
+        if !kind.starts_with("video/")
+            && !kind.starts_with("audio/")
+            && kind != "application/octet-stream"
+        {
+            return Response::builder()
+                .status(response.status())
+                .body(Body::empty())
+                .unwrap();
+        }
+    }
+    for name in [
+        "content-type",
+        "content-length",
+        "content-range",
+        "accept-ranges",
+        "etag",
+        "last-modified",
+    ] {
+        if let Some(value) = response.headers().get(name) {
+            builder = builder.header(name, value);
+        }
+    }
+    let body = response
+        .bytes_stream()
+        .take_until(c.cancel.cancelled_owned())
+        .map_err(std::io::Error::other);
+    builder.body(Body::from_stream(body)).unwrap()
+}
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn validates_origins() {
+        for address in [
+            "https://example.org:8920",
+            "http://127.0.0.1:5050",
+            "http://[::1]:5050",
+        ] {
+            assert!(validate_server(address).is_ok());
+        }
+        for address in [
+            "http://192.168.1.2:5050",
+            "http://example.org",
+            "file:///etc/passwd",
+            "https://user:pass@example.org",
+            "https://example.org/path",
+            "https://example.org/?token=x",
+            "javascript:alert(1)",
+        ] {
+            assert!(validate_server(address).is_err(), "{address}");
+        }
+    }
+    #[test]
+    fn renderer_requests_are_scoped() {
+        for (method, path) in [
+            ("GET", "/api/v1/media?search=test"),
+            ("PUT", "/api/v1/media/4/progress-sync"),
+        ] {
+            assert!(allowed_request(method, path));
+        }
+        for (method, path) in [
+            ("GET", "//evil.example/api/v1/media"),
+            ("POST", "/api/v1/setup"),
+            ("GET", "/api/v1/media/../../auth/csrf"),
+            ("GET", "/api/v1/media/4/stream"),
+            ("GET", "/api/v1/media#x"),
+        ] {
+            assert!(!allowed_request(method, path));
+        }
+    }
+}

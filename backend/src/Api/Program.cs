@@ -14,6 +14,9 @@ using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
 builder.WebHost.UseUrls(builder.Configuration["Urls"] ?? "http://127.0.0.1:5050");
+builder.Services.ConfigureHttpJsonOptions(o =>
+    o.SerializerOptions.NumberHandling = System.Text.Json.Serialization.JsonNumberHandling.Strict
+);
 builder.Logging.ClearProviders();
 builder.Logging.AddJsonConsole();
 var data = Path.GetFullPath(builder.Configuration["MediaServer:DataDirectory"] ?? "data");
@@ -119,7 +122,8 @@ builder.Services.AddRateLimiter(o =>
             )
     );
 });
-builder.Services.AddOpenApi();
+builder.Services.AddOpenApi("v1", o => o.ShouldInclude = _ => true);
+builder.Services.AddOpenApi("client-v1", o => o.ShouldInclude = d => d.GroupName == "client-v1");
 builder.Services.AddSignalR();
 builder.Services.AddSingleton<IScanEvents, StatusEvents>();
 var dummyHash = await Passwords.Hash("dummy-password-value");
@@ -186,286 +190,306 @@ app.Use(
     }
 );
 app.MapGet("/health", () => Results.Ok(new { status = "ok" }));
-app.MapGet(
-    "/api/auth/csrf",
-    (HttpContext ctx, IAntiforgery csrf) =>
-        Results.Ok(new { token = csrf.GetAndStoreTokens(ctx).RequestToken })
-);
-app.MapGet(
-    "/api/setup",
-    async (MediaDb db) => Results.Ok(new { required = !await db.Users.AnyAsync() })
-);
-app.MapPost(
-        "/api/setup",
-        async (SetupRequest input, MediaDb db) =>
-        {
-            if (await db.Users.AnyAsync())
-                return Results.Conflict(new { message = "Server is already configured." });
-            var expectedToken = await File.ReadAllTextAsync(setupPath);
-            if (
-                input.Token is null
-                || !CryptographicOperations.FixedTimeEquals(
-                    System.Text.Encoding.UTF8.GetBytes(input.Token),
-                    System.Text.Encoding.UTF8.GetBytes(expectedToken)
+MapApi(app.MapGroup("/api"));
+MapApi(app.MapGroup("/api/v1").WithGroupName("client-v1"));
+app.MapClientV1();
+void MapApi(RouteGroupBuilder root)
+{
+    root.MapGet(
+        "/auth/csrf",
+        (HttpContext ctx, IAntiforgery csrf) =>
+            Results.Ok(new CsrfToken(csrf.GetAndStoreTokens(ctx).RequestToken!))
+    );
+    root.MapGet(
+        "/setup",
+        async (MediaDb db) => Results.Ok(new { required = !await db.Users.AnyAsync() })
+    );
+    root.MapPost(
+            "/setup",
+            async (SetupRequest input, MediaDb db) =>
+            {
+                if (await db.Users.AnyAsync())
+                    return Results.Conflict(new { message = "Server is already configured." });
+                var expectedToken = await File.ReadAllTextAsync(setupPath);
+                if (
+                    input.Token is null
+                    || !CryptographicOperations.FixedTimeEquals(
+                        System.Text.Encoding.UTF8.GetBytes(input.Token),
+                        System.Text.Encoding.UTF8.GetBytes(expectedToken)
+                    )
                 )
-            )
-                return Results.Unauthorized();
-            ValidateCredentials(input.Name, input.Password);
-            db.Users.Add(
-                new User
+                    return Results.Unauthorized();
+                ValidateCredentials(input.Name, input.Password);
+                db.Users.Add(
+                    new User
+                    {
+                        Name = input.Name.Trim(),
+                        PasswordHash = await Passwords.Hash(input.Password),
+                    }
+                );
+                try
                 {
-                    Name = input.Name.Trim(),
-                    PasswordHash = await Passwords.Hash(input.Password),
+                    await db.SaveChangesAsync();
                 }
-            );
+                catch (DbUpdateException)
+                {
+                    return Results.Conflict();
+                }
+                return Results.Created(
+                    "/auth/me",
+                    new { message = "Administrator created. Sign in to continue." }
+                );
+            }
+        )
+        .RequireRateLimiting("auth");
+    root.MapPost(
+            "/auth/login",
+            async (LoginRequest input, MediaDb db, HttpContext ctx) =>
+            {
+                ValidateCredentials(input.Name, input.Password);
+                var user = await db.Users.SingleOrDefaultAsync(x => x.Name == input.Name);
+                // Derive even for unknown usernames to avoid a cheap account enumeration timing signal.
+                var valid = await Passwords.Verify(input.Password, user?.PasswordHash ?? dummyHash);
+                if (user is null || !valid)
+                    return Results.Unauthorized();
+                await db.Sessions.Where(x => x.ExpiresAt <= DateTime.UtcNow).ExecuteDeleteAsync();
+                if (input.DeviceName is { Length: > 64 })
+                    throw new ArgumentException("Device name is too long.");
+                var session = new Session
+                {
+                    Id = Convert.ToHexString(RandomNumberGenerator.GetBytes(32)),
+                    UserId = user.Id,
+                    DeviceName = input.DeviceName ?? "Web browser",
+                    ExpiresAt = DateTime.UtcNow.AddDays(7),
+                };
+                db.Sessions.Add(session);
+                await db.SaveChangesAsync();
+                var claims = new[]
+                {
+                    new Claim(
+                        ClaimTypes.NameIdentifier,
+                        user.Id.ToString(CultureInfo.InvariantCulture)
+                    ),
+                    new Claim(ClaimTypes.Name, user.Name),
+                    new Claim(ClaimTypes.Role, user.Role),
+                    new Claim("sid", session.Id),
+                };
+                await ctx.SignInAsync(
+                    CookieAuthenticationDefaults.AuthenticationScheme,
+                    new ClaimsPrincipal(
+                        new ClaimsIdentity(
+                            claims,
+                            CookieAuthenticationDefaults.AuthenticationScheme
+                        )
+                    )
+                );
+                return Results.Ok(new UserIdentity(user.Name, user.Role));
+            }
+        )
+        .Produces<UserIdentity>()
+        .RequireRateLimiting("auth");
+    root.MapPost(
+            "/auth/logout",
+            async (HttpContext ctx, MediaDb db) =>
+            {
+                var id = ctx.User.FindFirstValue("sid");
+                await db.Sessions.Where(x => x.Id == id).ExecuteDeleteAsync();
+                await ctx.SignOutAsync();
+                return Results.NoContent();
+            }
+        )
+        .RequireAuthorization();
+    root.MapGet(
+            "/auth/me",
+            (ClaimsPrincipal u) =>
+                new UserIdentity(u.Identity!.Name!, u.FindFirstValue(ClaimTypes.Role)!)
+        )
+        .RequireAuthorization();
+    var api = root.MapGroup("").RequireAuthorization();
+    api.MapGet(
+        "/status",
+        async (MediaDb db) =>
+            new
+            {
+                version = ClientV1.ServerVersion,
+                mediaCount = await db.Items.CountAsync(),
+                libraryCount = await db.Libraries.CountAsync(),
+                streaming = "Direct Play",
+                transcoding = false,
+            }
+    );
+    api.MapGet(
+            "/libraries",
+            async (MediaDb db) => await db.Libraries.OrderBy(x => x.Name).ToListAsync()
+        )
+        .RequireAuthorization("admin");
+    api.MapPost(
+            "/libraries",
+            async (LibraryRequest input, MediaDb db, PathPolicy policy) =>
+            {
+                if (string.IsNullOrWhiteSpace(input.Name) || input.Name.Length > 100)
+                    throw new ArgumentException("Library name must be 1–100 characters.");
+                var path = policy.ValidateDirectory(input.Path);
+                if (await db.Libraries.AnyAsync(x => x.Path == path))
+                    return Results.Conflict(new { message = "Directory already configured." });
+                var library = new Library { Name = input.Name.Trim(), Path = path };
+                db.Libraries.Add(library);
+                await db.SaveChangesAsync();
+                return Results.Created($"/api/libraries/{library.Id}", library);
+            }
+        )
+        .RequireAuthorization("admin");
+    api.MapPost(
+            "/libraries/{id:int}/scan",
+            async (int id, MediaDb db, ScanQueue queue) =>
+            {
+                if (!await db.Libraries.AnyAsync(x => x.Id == id))
+                    return Results.NotFound();
+                if (
+                    await db.Jobs.AnyAsync(x =>
+                        x.LibraryId == id && (x.State == "queued" || x.State == "running")
+                    )
+                )
+                    return Results.Conflict(new { message = "A scan is already pending." });
+                var job = new ScanJob { LibraryId = id };
+                db.Jobs.Add(job);
+                await db.SaveChangesAsync();
+                if (!queue.Channel.Writer.TryWrite(job.Id))
+                {
+                    job.State = "rejected";
+                    await db.SaveChangesAsync();
+                    return Results.StatusCode(503);
+                }
+                return Results.Accepted($"/api/scans/{job.Id}", new { job.Id });
+            }
+        )
+        .RequireAuthorization("admin");
+    api.MapGet(
+            "/scans/{id:int}",
+            async (int id, MediaDb db) =>
+                await db.Jobs.FindAsync(id) is { } job ? Results.Ok(job) : Results.NotFound()
+        )
+        .RequireAuthorization("admin");
+    api.MapGet(
+            "/media",
+            async (MediaDb db, int? offset, int? limit, string? search, int? libraryId) =>
+                Results.Ok(
+                    await db
+                        .Items.AsNoTracking()
+                        .Where(x =>
+                            (
+                                string.IsNullOrEmpty(search)
+                                || x.Title.ToLower().Contains(search.ToLower())
+                            ) && (!libraryId.HasValue || x.LibraryId == libraryId)
+                        )
+                        .OrderBy(x => x.Title)
+                        .ThenBy(x => x.Id)
+                        .Skip(Math.Max(0, offset ?? 0))
+                        .Take(Math.Clamp(limit ?? 100, 1, 200))
+                        .Select(x => new MediaSummary(
+                            x.Id,
+                            x.Title,
+                            x.Duration,
+                            x.VideoCodec,
+                            x.AudioCodec,
+                            x.Container,
+                            x.Size,
+                            x.LibraryId
+                        ))
+                        .ToListAsync()
+                )
+        )
+        .Produces<MediaSummary[]>();
+    api.MapGet(
+            "/media/{id:int}",
+            async (int id, MediaDb db, IPlaybackPlanner planner) =>
+                await db.Items.FindAsync(id) is { } item
+                    ? Results.Ok(
+                        new MediaDetails(
+                            item.Id,
+                            item.Title,
+                            item.Duration,
+                            item.VideoCodec,
+                            item.AudioCodec,
+                            item.Container,
+                            item.Size,
+                            planner.Plan(item)
+                        )
+                    )
+                    : Results.NotFound()
+        )
+        .Produces<MediaDetails>();
+    api.MapMethods(
+        "/media/{id:int}/stream",
+        ["GET", "HEAD"],
+        async (int id, MediaDb db, PathPolicy policy, IPlaybackPlanner planner) =>
+        {
+            var item = await db.Items.FindAsync(id);
+            if (item is null)
+                return Results.NotFound();
+            var library = await db.Libraries.FindAsync(item.LibraryId);
+            if (library is null)
+                return Results.NotFound();
             try
             {
-                await db.SaveChangesAsync();
+                var path = policy.Resolve(library.Path, item.RelativePath);
+                var stream = new FileStream(
+                    path,
+                    FileMode.Open,
+                    FileAccess.Read,
+                    FileShare.Read,
+                    65536,
+                    FileOptions.Asynchronous | FileOptions.RandomAccess
+                );
+                return Results.File(
+                    stream,
+                    planner.Plan(item).MimeType,
+                    enableRangeProcessing: true,
+                    lastModified: File.GetLastWriteTimeUtc(path)
+                );
             }
-            catch (DbUpdateException)
+            catch (Exception ex)
+                when (ex is IOException or UnauthorizedAccessException or ArgumentException)
             {
-                return Results.Conflict();
+                return Results.NotFound();
             }
-            return Results.Created(
-                "/api/auth/me",
-                new { message = "Administrator created. Sign in to continue." }
+        }
+    );
+    api.MapGet(
+        "/progress",
+        async (MediaDb db, ClaimsPrincipal u) =>
+        {
+            var uid = UserId(u);
+            return Results.Ok(
+                await db
+                    .Progress.Where(x => x.UserId == uid)
+                    .OrderByDescending(x => x.UpdatedAt)
+                    .ToListAsync()
             );
         }
-    )
-    .RequireRateLimiting("auth");
-app.MapPost(
-        "/api/auth/login",
-        async (LoginRequest input, MediaDb db, HttpContext ctx) =>
+    );
+    api.MapPut(
+        "/media/{id:int}/progress",
+        async (int id, ProgressRequest input, MediaDb db, ClaimsPrincipal u) =>
         {
-            ValidateCredentials(input.Name, input.Password);
-            var user = await db.Users.SingleOrDefaultAsync(x => x.Name == input.Name);
-            // Derive even for unknown usernames to avoid a cheap account enumeration timing signal.
-            var valid = await Passwords.Verify(input.Password, user?.PasswordHash ?? dummyHash);
-            if (user is null || !valid)
-                return Results.Unauthorized();
-            await db.Sessions.Where(x => x.ExpiresAt <= DateTime.UtcNow).ExecuteDeleteAsync();
-            var session = new Session
-            {
-                Id = Convert.ToHexString(RandomNumberGenerator.GetBytes(32)),
-                UserId = user.Id,
-                ExpiresAt = DateTime.UtcNow.AddDays(7),
-            };
-            db.Sessions.Add(session);
-            await db.SaveChangesAsync();
-            var claims = new[]
-            {
-                new Claim(
-                    ClaimTypes.NameIdentifier,
-                    user.Id.ToString(CultureInfo.InvariantCulture)
-                ),
-                new Claim(ClaimTypes.Name, user.Name),
-                new Claim(ClaimTypes.Role, user.Role),
-                new Claim("sid", session.Id),
-            };
-            await ctx.SignInAsync(
-                CookieAuthenticationDefaults.AuthenticationScheme,
-                new ClaimsPrincipal(
-                    new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme)
-                )
-            );
-            return Results.Ok(new { user.Name, user.Role });
-        }
-    )
-    .RequireRateLimiting("auth");
-app.MapPost(
-        "/api/auth/logout",
-        async (HttpContext ctx, MediaDb db) =>
-        {
-            var id = ctx.User.FindFirstValue("sid");
-            await db.Sessions.Where(x => x.Id == id).ExecuteDeleteAsync();
-            await ctx.SignOutAsync();
-            return Results.NoContent();
-        }
-    )
-    .RequireAuthorization();
-app.MapGet(
-        "/api/auth/me",
-        (ClaimsPrincipal u) =>
-            new { name = u.Identity!.Name, role = u.FindFirstValue(ClaimTypes.Role) }
-    )
-    .RequireAuthorization();
-var api = app.MapGroup("/api").RequireAuthorization();
-api.MapGet(
-    "/status",
-    async (MediaDb db) =>
-        new
-        {
-            version = "0.1.0-alpha",
-            mediaCount = await db.Items.CountAsync(),
-            libraryCount = await db.Libraries.CountAsync(),
-            streaming = "Direct Play",
-            transcoding = false,
-        }
-);
-api.MapGet(
-        "/libraries",
-        async (MediaDb db) => await db.Libraries.OrderBy(x => x.Name).ToListAsync()
-    )
-    .RequireAuthorization("admin");
-api.MapPost(
-        "/libraries",
-        async (LibraryRequest input, MediaDb db, PathPolicy policy) =>
-        {
-            if (string.IsNullOrWhiteSpace(input.Name) || input.Name.Length > 100)
-                throw new ArgumentException("Library name must be 1–100 characters.");
-            var path = policy.ValidateDirectory(input.Path);
-            if (await db.Libraries.AnyAsync(x => x.Path == path))
-                return Results.Conflict(new { message = "Directory already configured." });
-            var library = new Library { Name = input.Name.Trim(), Path = path };
-            db.Libraries.Add(library);
-            await db.SaveChangesAsync();
-            return Results.Created($"/api/libraries/{library.Id}", library);
-        }
-    )
-    .RequireAuthorization("admin");
-api.MapPost(
-        "/libraries/{id:int}/scan",
-        async (int id, MediaDb db, ScanQueue queue) =>
-        {
-            if (!await db.Libraries.AnyAsync(x => x.Id == id))
+            var item = await db.Items.FindAsync(id);
+            if (item is null)
                 return Results.NotFound();
             if (
-                await db.Jobs.AnyAsync(x =>
-                    x.LibraryId == id && (x.State == "queued" || x.State == "running")
-                )
+                !double.IsFinite(input.Seconds)
+                || input.Seconds < 0
+                || (item.Duration > 0 && input.Seconds > item.Duration + 2)
             )
-                return Results.Conflict(new { message = "A scan is already pending." });
-            var job = new ScanJob { LibraryId = id };
-            db.Jobs.Add(job);
-            await db.SaveChangesAsync();
-            if (!queue.Channel.Writer.TryWrite(job.Id))
-            {
-                job.State = "rejected";
-                await db.SaveChangesAsync();
-                return Results.StatusCode(503);
-            }
-            return Results.Accepted($"/api/scans/{job.Id}", new { job.Id });
-        }
-    )
-    .RequireAuthorization("admin");
-api.MapGet(
-        "/scans/{id:int}",
-        async (int id, MediaDb db) =>
-            await db.Jobs.FindAsync(id) is { } job ? Results.Ok(job) : Results.NotFound()
-    )
-    .RequireAuthorization("admin");
-api.MapGet(
-    "/media",
-    async (MediaDb db, int? offset, int? limit) =>
-        Results.Ok(
-            await db
-                .Items.AsNoTracking()
-                .OrderBy(x => x.Title)
-                .Skip(Math.Max(0, offset ?? 0))
-                .Take(Math.Clamp(limit ?? 100, 1, 200))
-                .Select(x => new
-                {
-                    x.Id,
-                    x.Title,
-                    x.Duration,
-                    x.VideoCodec,
-                    x.AudioCodec,
-                    x.Container,
-                    x.Size,
-                    x.LibraryId,
-                })
-                .ToListAsync()
-        )
-);
-api.MapGet(
-    "/media/{id:int}",
-    async (int id, MediaDb db, IPlaybackPlanner planner) =>
-        await db.Items.FindAsync(id) is { } item
-            ? Results.Ok(
-                new
-                {
-                    item.Id,
-                    item.Title,
-                    item.Duration,
-                    item.VideoCodec,
-                    item.AudioCodec,
-                    item.Container,
-                    item.Size,
-                    playback = planner.Plan(item),
-                }
-            )
-            : Results.NotFound()
-);
-api.MapMethods(
-    "/media/{id:int}/stream",
-    ["GET", "HEAD"],
-    async (int id, MediaDb db, PathPolicy policy, IPlaybackPlanner planner) =>
-    {
-        var item = await db.Items.FindAsync(id);
-        if (item is null)
-            return Results.NotFound();
-        var library = await db.Libraries.FindAsync(item.LibraryId);
-        if (library is null)
-            return Results.NotFound();
-        try
-        {
-            var path = policy.Resolve(library.Path, item.RelativePath);
-            var stream = new FileStream(
-                path,
-                FileMode.Open,
-                FileAccess.Read,
-                FileShare.Read,
-                65536,
-                FileOptions.Asynchronous | FileOptions.RandomAccess
+                throw new ArgumentException("Invalid playback position.");
+            var uid = UserId(u);
+            var updated = DateTime.UtcNow;
+            await db.Database.ExecuteSqlInterpolatedAsync(
+                $"INSERT INTO Progress (UserId, MediaItemId, Seconds, UpdatedAt, Revision, Completed) VALUES ({uid}, {id}, {input.Seconds}, {updated}, 1, {item.Duration > 0 && input.Seconds >= item.Duration * .95}) ON CONFLICT(UserId, MediaItemId) DO UPDATE SET Seconds=excluded.Seconds, UpdatedAt=excluded.UpdatedAt, Revision=Progress.Revision+1, Completed=excluded.Completed"
             );
-            return Results.File(
-                stream,
-                planner.Plan(item).MimeType,
-                enableRangeProcessing: true,
-                lastModified: File.GetLastWriteTimeUtc(path)
-            );
+            return Results.NoContent();
         }
-        catch (Exception ex)
-            when (ex is IOException or UnauthorizedAccessException or ArgumentException)
-        {
-            return Results.NotFound();
-        }
-    }
-);
-api.MapGet(
-    "/progress",
-    async (MediaDb db, ClaimsPrincipal u) =>
-    {
-        var uid = UserId(u);
-        return Results.Ok(
-            await db
-                .Progress.Where(x => x.UserId == uid)
-                .OrderByDescending(x => x.UpdatedAt)
-                .ToListAsync()
-        );
-    }
-);
-api.MapPut(
-    "/media/{id:int}/progress",
-    async (int id, ProgressRequest input, MediaDb db, ClaimsPrincipal u) =>
-    {
-        var item = await db.Items.FindAsync(id);
-        if (item is null)
-            return Results.NotFound();
-        if (
-            !double.IsFinite(input.Seconds)
-            || input.Seconds < 0
-            || (item.Duration > 0 && input.Seconds > item.Duration + 2)
-        )
-            throw new ArgumentException("Invalid playback position.");
-        var uid = UserId(u);
-        var updated = DateTime.UtcNow;
-        await db.Database.ExecuteSqlInterpolatedAsync(
-            $"INSERT INTO Progress (UserId, MediaItemId, Seconds, UpdatedAt) VALUES ({uid}, {id}, {input.Seconds}, {updated}) ON CONFLICT(UserId, MediaItemId) DO UPDATE SET Seconds=excluded.Seconds, UpdatedAt=excluded.UpdatedAt"
-        );
-        return Results.NoContent();
-    }
-);
+    );
+}
 app.MapOpenApi().RequireAuthorization("admin");
 app.MapHub<StatusHub>("/hubs/status").RequireAuthorization("admin");
 app.UseDefaultFiles();
@@ -488,7 +512,7 @@ static void ValidateCredentials(string name, string password)
 
 public record SetupRequest(string Name, string Password, string Token);
 
-public record LoginRequest(string Name, string Password);
+public record LoginRequest(string Name, string Password, string? DeviceName = null);
 
 public record LibraryRequest(string Name, string Path);
 
