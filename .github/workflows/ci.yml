@@ -20,7 +20,19 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
-      - run: sudo apt-get update && sudo apt-get install -y ffmpeg
+      - name: Ensure FFmpeg tools
+        timeout-minutes: 5
+        shell: bash
+        run: |
+          if command -v ffmpeg >/dev/null && command -v ffprobe >/dev/null; then
+            ffmpeg -version
+          else
+            apt_options=(-o Acquire::Retries=2 -o Acquire::http::Timeout=20 -o Acquire::https::Timeout=20 -o DPkg::Lock::Timeout=60)
+            sudo apt-get "${apt_options[@]}" install -y --no-install-recommends ffmpeg || {
+              sudo apt-get "${apt_options[@]}" update
+              sudo apt-get "${apt_options[@]}" install -y --no-install-recommends ffmpeg
+            }
+          fi
       - run: dotnet build MediaServer.sln
       - name: Verify generated API contract
         run: |
