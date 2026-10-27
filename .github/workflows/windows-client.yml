@@ -71,8 +71,17 @@ jobs:
         run: cargo clippy --locked --manifest-path clients/windows/native/Cargo.toml --all-targets -- -D warnings
       - if: steps.changes.outputs.changed == 'true'
         run: cargo test --locked --manifest-path clients/windows/native/Cargo.toml
-      - if: steps.changes.outputs.changed == 'true'
-        run: choco install ffmpeg -y --no-progress
+      - name: Cache pinned FFmpeg archive
+        if: steps.changes.outputs.changed == 'true'
+        uses: actions/cache@v4
+        with:
+          path: ${{ runner.temp }}/ffmpeg-8.1.2-essentials_build.zip
+          key: windows-ffmpeg-8.1.2-db580001caa24ac104c8cb856cd113a87b0a443f7bdf47d8c12b1d740584a2ec
+      - name: Install and verify FFmpeg and FFprobe
+        if: steps.changes.outputs.changed == 'true'
+        timeout-minutes: 10
+        shell: pwsh
+        run: ./scripts/setup-ffmpeg.ps1
       - if: steps.changes.outputs.changed == 'true'
         run: dotnet build MediaServer.sln
       - if: steps.changes.outputs.changed == 'true'
