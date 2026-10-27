@@ -10,10 +10,10 @@ No arbitrary file URL is accepted. Stream IDs resolve to database paths and are 
 
 ## Remaining risks and limitations
 
-- Path checks followed by file opening are not a defense against a malicious local user swapping directories concurrently. Keep media directories controlled by trusted users and mounted read-only in the server/container. Strong no-follow descriptor-based traversal is future hardening.
+- Streaming uses no-follow Linux descriptor traversal and Windows validated file handles. Scanning still probes by pathname and is not safe against malicious local writers. Keep media directories controlled by trusted users and mounted read-only. See [hardening and recovery](HARDENING.md) for guarantees and platform limitations.
 - Loopback HTTP cookies are not forced Secure. HTTPS deployment must explicitly set secure cookies. The local data key ring is protected by OS permissions, not an application-managed external key vault. Windows operators must set restrictive ACLs themselves.
 - A database copy contains salted password hashes and watch history. A key-ring copy plus cookies compromises sessions. Encrypt backups and protect the whole data directory.
-- No MFA, password reset UI, account management, device/session-management UI or remote-access support is provided. Session rows are revoked by logout and expire after seven days.
+- Settings supports authenticated password changes; local operators have an offline recovery command. Both revoke all affected sessions. No MFA, remote password reset, account-management UI or supported public remote-access deployment is provided. Session rows also expire after seven days.
 - Login is throttled by source IP; no distributed protection is claimed. Don't disable the limits to resolve a proxy configuration issue.
 - Scan errors intentionally avoid printing private filenames or raw FFprobe output. Request traces identify unexpected failures without echoing credentials. Avoid debug EF sensitive-data logging.
 - Release artifacts and images need independent operational/security review. No stable support claim is made.
@@ -25,3 +25,4 @@ Prefer a private authenticated VPN to a public port. Keep the server bound to lo
 ## Dependencies
 
 CI audits direct/transitive NuGet packages and npm packages and fails on reported vulnerabilities. Dependabot covers NuGet, npm, Actions and Docker. Audits are point-in-time checks rather than a security guarantee. Initial dependency upgrades resolved the NuGet advisories encountered during restore; see the validation record for actual commands and results.
+

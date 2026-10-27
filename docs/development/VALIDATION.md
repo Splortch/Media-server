@@ -28,3 +28,26 @@ Backend tests additionally cover anonymous/private endpoint separation, setup to
 Dependency audits describe advisory-feed results at validation time, not proof that the application is vulnerability-free. Public remote-access deployment, malicious local filesystem races, broad codec/device compatibility and packaged Windows execution require further validation. See SECURITY.md and the roadmap.
 
 Repository visibility, description, Discussions, private vulnerability reporting, branch protection and organization Projects require repository-administration operations not exposed by the connected GitHub tools used for this foundation. `scripts/configure-repository.py` provides a reviewable follow-up using an authenticated GitHub CLI. Its existence does not mean those settings have been applied.
+
+
+## Security, diagnostics and accessibility — 2026-10-28
+
+PR #42 implements the tested portions of issues #1, #3 and #15. Local .NET SDK 10.0.403 builds with
+warnings-as-errors and all 20 backend tests pass; all four player component tests, production web
+build, lint, Prettier and CSharpier checks pass. npm audit reports zero vulnerabilities. The running
+server's versioned OpenAPI was exported and TypeScript regenerated.
+
+Hosted run 40604076305 passed the 20-test backend suite on Ubuntu and Windows. Run 40604076309 passed
+Docker startup/auth/UI smoke checks and the real-backend browser flow: setup/login/library scan,
+corrupt-media diagnosis, byte-range playback, progress/resume, missing-file errors, keyboard checks
+and axe WCAG A/AA scans. Web and automation checks also passed on the implementation commit.
+
+A separate local subprocess smoke test provisioned an isolated server, logged in, stopped it,
+ran --reset-admin-password through stdin, verified no password echo and empty session storage,
+then restarted and verified old-password rejection, new-password login and closed setup. Its data
+was temporary. Local Chrome launch was blocked by the workspace's Unix-socket restriction; the
+browser result above is hosted CI, not a local browser or physical-device claim.
+
+Manual assistive-technology testing, hostile-writer-safe scan handles and independent security
+review remain outstanding. See [HARDENING.md](../architecture/HARDENING.md) and [ACCESSIBILITY.md](ACCESSIBILITY.md) for the exact limits. New CI runs
+on subsequent commits must still pass before merging; these run IDs identify the evidence checked.
