@@ -20,7 +20,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
-      - run: node --test scripts/tests/issue-to-pr.test.cjs
+      - run: node --test scripts/tests/issue-to-pr.test.cjs scripts/tests/release-plan.test.cjs
       - run: python -m unittest discover -s scripts/tests -p 'test_*.py'
   required:
     name: Agent dispatch policy

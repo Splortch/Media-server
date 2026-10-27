@@ -4,19 +4,34 @@ on:
     branches: [main]
   pull_request:
   workflow_dispatch:
+  workflow_call:
+    inputs:
+      source_sha:
+        type: string
+        required: true
+      client_version:
+        type: string
+        required: true
+      msi_version:
+        type: string
+        required: true
+      artifact_name:
+        type: string
+        default: release-windows-client
 permissions:
   contents: read
 concurrency:
-  group: windows-client-${{ github.ref }}
+  group: windows-client-${{ github.workflow }}-${{ github.ref }}-${{ inputs.artifact_name || 'ci' }}
   cancel-in-progress: true
 jobs:
   glib-security:
-    name: GLib optimized regression
+    name: ${{ inputs.client_version != '' && 'Release GLib regression' || 'GLib optimized regression' }}
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v7
         with:
+          ref: ${{ inputs.source_sha || github.sha }}
           persist-credentials: false
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
@@ -29,24 +44,39 @@ jobs:
       - name: Exercise all affected iterator operations with optimizations
         run: cargo test --release --locked --manifest-path tests/security/glib-variant-iter/Cargo.toml
   audit:
-    name: Rust dependency audit
+    name: ${{ inputs.client_version != '' && 'Release Rust audit' || 'Rust dependency audit' }}
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.source_sha || github.sha }}
+          persist-credentials: false
       - uses: taiki-e/install-action@v2
         with:
           tool: cargo-audit@0.22.2
       - run: cargo audit --deny unsound --file clients/windows/native/Cargo.lock
       - run: cargo audit --deny unsound --file clients/windows/src-tauri/Cargo.lock
   windows:
-    name: Windows client
+    name: ${{ inputs.client_version != '' && 'Release Windows client' || 'Windows client' }}
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v7
         with:
+          ref: ${{ inputs.source_sha || github.sha }}
+          persist-credentials: false
           fetch-depth: 0
       - id: changes
-        run: python scripts/component-changes.py windows
+        env:
+          RELEASE_BUILD: ${{ inputs.client_version != '' }}
+        run: |
+          if ($env:RELEASE_BUILD -eq 'true') { 'changed=true' >> $env:GITHUB_OUTPUT }
+          else { python scripts/component-changes.py windows }
+      - name: Stamp independently versioned client and MSI
+        if: inputs.client_version != ''
+        env:
+          CLIENT_VERSION: ${{ inputs.client_version }}
+          MSI_VERSION: ${{ inputs.msi_version }}
+        run: node scripts/stamp-windows-version.cjs
       - uses: actions/setup-node@v4
         if: steps.changes.outputs.changed == 'true'
         with:
@@ -119,7 +149,7 @@ jobs:
       - if: success() && steps.changes.outputs.changed == 'true'
         uses: actions/upload-artifact@v7
         with:
-          name: MediaServer-Windows-Client-v0.1.0-alpha.1-x64
+          name: ${{ inputs.artifact_name || 'MediaServer-Windows-Client-v0.1.0-alpha.1-x64' }}
           if-no-files-found: error
           path: |
             clients/windows/src-tauri/target/release/bundle/nsis/*.exe

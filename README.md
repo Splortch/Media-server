@@ -28,6 +28,14 @@ The [client ecosystem](docs/clients/README.md) adds a dedicated Windows Tauri cl
 
 Verification results and environment limits are recorded in [VALIDATION.md](docs/development/VALIDATION.md). Workflow presence is not a claim that hosted CI passed.
 
+## Download and run
+
+Automatic alpha release packaging is configured for Windows/Linux x64 servers, Windows EXE/MSI
+clients and a prebuilt Docker image. The web UI is bundled. Download from [Releases](https://github.com/Splortch/Media-server/releases),
+extract the server, and use its Start launcher. See [installation, updates and release automation](docs/deployment/RELEASES.md).
+No SDK is needed for downloaded server builds. The first publication is only available after the
+release workflow reaches main and its checks pass; workflow configuration alone is not a published build.
+
 ## Quick start: local development
 
 Install the .NET SDK selected in `global.json`, Node.js 24, and FFprobe (usually supplied with FFmpeg). Git and npm are required. Ensure `dotnet`, `node`, `npm`, `ffprobe` are on PATH.

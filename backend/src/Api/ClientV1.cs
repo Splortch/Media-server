@@ -51,7 +51,16 @@ public record TrackCatalog(
 
 public static class ClientV1
 {
-    public const string ServerVersion = "0.2.0-alpha.1";
+    public static string ServerVersion =>
+        typeof(ClientV1)
+            .Assembly.GetCustomAttributes(
+                typeof(System.Reflection.AssemblyInformationalVersionAttribute),
+                false
+            )
+            .OfType<System.Reflection.AssemblyInformationalVersionAttribute>()
+            .FirstOrDefault()
+            ?.InformationalVersion.Split('+')[0]
+        ?? "0.2.0-alpha.1";
 
     public static void MapClientV1(this WebApplication app)
     {
