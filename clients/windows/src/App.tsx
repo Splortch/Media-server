@@ -26,6 +26,39 @@ type Selection = {
   tracks: Tracks;
   writer: ProgressWriter;
 };
+function MediaCards({
+  list,
+  onOpen,
+}: {
+  list: (Media | Detail)[];
+  onOpen: (item: Media | Detail) => Promise<void>;
+}) {
+  return (
+    <div className="media-grid">
+      {list.map((m, i) => (
+        <button
+          className={`media-card desktop-card tone-${i % 4}`}
+          key={m.id}
+          onClick={() => void onOpen(m)}
+        >
+          <div className="cover">
+            <span className="monogram" aria-hidden="true">
+              {m.title[0]}
+            </span>
+            <span className="play-symbol" aria-hidden="true">
+              ▶
+            </span>
+          </div>
+          <h3>{m.title}</h3>
+          <p>
+            {duration(m.duration)} · {m.videoCodec.toUpperCase()}
+          </p>
+        </button>
+      ))}
+    </div>
+  );
+}
+
 export default function App() {
   const [address, setAddress] = useState('https://');
   const [remember, setRemember] = useState(false);
@@ -153,6 +186,7 @@ export default function App() {
   }, [selection]);
   async function attach(e: FormEvent) {
     e.preventDefault();
+    if (busy) return;
     setBusy(true);
     setError('');
     try {
@@ -181,6 +215,7 @@ export default function App() {
   }
   async function signIn(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
+    if (busy) return;
     const form = e.currentTarget;
     const data = new FormData(form);
     const password = String(data.get('password') || '');
@@ -207,6 +242,7 @@ export default function App() {
     }
   }
   async function open(item: Media | Detail) {
+    const requestVersion = loadVersion.current;
     setBusy(true);
     setError('');
     try {
@@ -216,6 +252,7 @@ export default function App() {
         api.transport.streamUrl(item.id),
         api.tracks(item.id),
       ]);
+      if (requestVersion !== loadVersion.current) return;
       setSelection({
         item: detail,
         progress,
@@ -225,9 +262,9 @@ export default function App() {
       });
       setOnline(true);
     } catch (e) {
-      failure(e);
+      if (requestVersion === loadVersion.current) failure(e);
     } finally {
-      setBusy(false);
+      if (requestVersion === loadVersion.current) setBusy(false);
     }
   }
   async function back() {
@@ -269,15 +306,16 @@ export default function App() {
     }
   }
   async function settings() {
+    const requestVersion = loadVersion.current;
     setView('settings');
     setSelection(undefined);
     setError('');
     try {
       const result = await api.sessions();
       if (!Array.isArray(result)) throw new Error('Invalid session response.');
-      setSessions(result);
+      if (requestVersion === loadVersion.current) setSessions(result);
     } catch (e) {
-      failure(e);
+      if (requestVersion === loadVersion.current) failure(e);
     }
   }
   if (!connected)
@@ -295,6 +333,7 @@ export default function App() {
               Server address
               <input
                 aria-label="Server address"
+                disabled={busy}
                 value={address}
                 onChange={(e) => setAddress(e.target.value)}
                 autoComplete="url"
@@ -305,6 +344,7 @@ export default function App() {
             <label className="check">
               <input
                 type="checkbox"
+                disabled={busy}
                 checked={remember}
                 onChange={(e) => setRemember(e.target.checked)}
               />{' '}
@@ -356,7 +396,11 @@ export default function App() {
             </label>
             <button disabled={busy}>Sign in</button>
           </form>
-          <button className="secondary" onClick={() => setConnected(false)}>
+          <button
+            className="secondary"
+            disabled={busy}
+            onClick={() => setConnected(false)}
+          >
             Change server
           </button>
           {error && (
@@ -367,30 +411,6 @@ export default function App() {
         </section>
       </main>
     );
-  const cards = (list: (Media | Detail)[]) => (
-    <div className="media-grid">
-      {list.map((m, i) => (
-        <button
-          className={`media-card desktop-card tone-${i % 4}`}
-          key={m.id}
-          onClick={() => void open(m)}
-        >
-          <div className="cover">
-            <span className="monogram" aria-hidden="true">
-              {m.title[0]}
-            </span>
-            <span className="play-symbol" aria-hidden="true">
-              ▶
-            </span>
-          </div>
-          <h3>{m.title}</h3>
-          <p>
-            {duration(m.duration)} · {m.videoCodec.toUpperCase()}
-          </p>
-        </button>
-      ))}
-    </div>
-  );
   return (
     <div className="app-shell">
       <aside>
@@ -567,7 +587,7 @@ export default function App() {
                   <div className="section-heading">
                     <h2>Continue Watching</h2>
                   </div>
-                  {cards(continueItems)}
+                  <MediaCards list={continueItems} onOpen={open} />
                 </section>
               )}
               <div className="section-heading">
@@ -583,7 +603,7 @@ export default function App() {
                   </p>
                 </div>
               ) : (
-                cards(items)
+                <MediaCards list={items} onOpen={open} />
               )}
               <div className="pagination">
                 <button
