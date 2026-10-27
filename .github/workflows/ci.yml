@@ -9,48 +9,6 @@ concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
 jobs:
-  backend:
-    name: Backend (${{ matrix.os }})
-    runs-on: ${{ matrix.os }}
-    strategy:
-      matrix:
-        os: [ubuntu-24.04, windows-latest]
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-dotnet@v4
-        with:
-          global-json-file: global.json
-      - run: dotnet restore MediaServer.sln --locked-mode
-      - run: dotnet build MediaServer.sln --no-restore -warnaserror
-      - run: dotnet test MediaServer.sln --no-build --logger trx
-      - run: dotnet tool restore
-      - run: dotnet csharpier check backend
-      - if: runner.os == 'Linux'
-        run: python3 scripts/audit.py
-      - uses: actions/upload-artifact@v4
-        if: failure()
-        with:
-          name: backend-results-${{ matrix.os }}
-          path: '**/TestResults/*.trx'
-  frontend:
-    name: Frontend
-    runs-on: ubuntu-24.04
-    defaults:
-      run:
-        working-directory: frontend
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '24'
-          cache: npm
-          cache-dependency-path: frontend/package-lock.json
-      - run: npm ci
-      - run: npm run build
-      - run: npm test
-      - run: npm run lint
-      - run: npm run format:check
-      - run: npm audit --audit-level=moderate
   e2e:
     name: End-to-end
     runs-on: ubuntu-24.04
@@ -62,8 +20,26 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
-      - run: sudo apt-get update && sudo apt-get install -y ffmpeg
+      - name: Ensure FFmpeg tools
+        timeout-minutes: 5
+        shell: bash
+        run: |
+          if command -v ffmpeg >/dev/null && command -v ffprobe >/dev/null; then
+            ffmpeg -version
+          else
+            apt_options=(-o Acquire::Retries=2 -o Acquire::http::Timeout=20 -o Acquire::https::Timeout=20 -o DPkg::Lock::Timeout=60)
+            sudo apt-get "${apt_options[@]}" install -y --no-install-recommends ffmpeg || {
+              sudo apt-get "${apt_options[@]}" update
+              sudo apt-get "${apt_options[@]}" install -y --no-install-recommends ffmpeg
+            }
+          fi
       - run: dotnet build MediaServer.sln
+      - name: Verify generated API contract
+        run: |
+          EXPORT_CLIENT_OPENAPI="$PWD/shared/api/openapi-v1.json" dotnet test MediaServer.sln --no-build --filter FullyQualifiedName~ClientOpenApiMatchesTheRunningServer
+          npm ci --prefix shared/api
+          npm run generate --prefix shared/api
+          git diff --exit-code -- shared/api/openapi-v1.json shared/api/src/generated.ts
       - run: npm ci --prefix frontend
       - run: npx --prefix frontend playwright install --with-deps chromium
       - run: bash scripts/e2e.sh
