@@ -10,7 +10,7 @@ use futures_util::{StreamExt, TryStreamExt};
 use reqwest::cookie::{CookieStore, Jar};
 use serde::Serialize;
 use serde_json::{json, Value};
-#[cfg(windows)]
+#[cfg(any(windows, test))]
 use sha2::{Digest, Sha256};
 use std::{sync::Arc, time::Duration};
 use tokio::sync::Mutex;
@@ -43,9 +43,18 @@ pub trait CredentialStore: Send + Sync {
     fn delete(&self, server: &str) -> Result<()>;
 }
 pub struct WindowsVault;
+#[cfg(any(windows, test))]
+fn credential_key(server: &str) -> String {
+    // Format bytes, not the digest array: sha2 0.11 no longer implements LowerHex
+    // on its output type. Keep the key identical so existing saved sessions survive.
+    Sha256::digest(server.as_bytes())
+        .iter()
+        .map(|byte| format!("{byte:02x}"))
+        .collect()
+}
 #[cfg(windows)]
 fn entry(server: &str) -> Result<keyring::Entry> {
-    let key = format!("{:x}", Sha256::digest(server.as_bytes()));
+    let key = credential_key(server);
     keyring::Entry::new("org.splortch.media-server.windows", &key)
         .map_err(|_| ClientError::new("VAULT", "Windows Credential Manager is unavailable."))
 }
@@ -555,6 +564,17 @@ async fn stream_media(
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn credential_keys_preserve_saved_session_addresses() {
+        assert_eq!(
+            credential_key("https://example.org:8920/"),
+            "f2a7c8b9cd4a5fbb9535af7d3643e946c4f693939a8294c01381846373dc1165"
+        );
+        assert_ne!(
+            credential_key("https://example.org:8920/"),
+            credential_key("https://other.example.org:8920/")
+        );
+    }
     #[test]
     fn validates_origins() {
         for address in [
