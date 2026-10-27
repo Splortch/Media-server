@@ -12,7 +12,11 @@ using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.EntityFrameworkCore;
 
-var builder = WebApplication.CreateBuilder(args);
+var recovery = args.Contains("--reset-admin-password", StringComparer.Ordinal);
+var builder = WebApplication.CreateBuilder(
+    args.Where(x => x != "--reset-admin-password").ToArray()
+);
+builder.WebHost.ConfigureKestrel(o => o.Limits.MaxRequestBodySize = 64 * 1024);
 builder.WebHost.UseUrls(builder.Configuration["Urls"] ?? "http://127.0.0.1:5050");
 builder.Services.ConfigureHttpJsonOptions(o =>
     o.SerializerOptions.NumberHandling = System.Text.Json.Serialization.JsonNumberHandling.Strict
@@ -27,19 +31,6 @@ if (!OperatingSystem.IsWindows())
         UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute
     );
 var setupPath = Path.Combine(data, "setup-token");
-if (!File.Exists(setupPath))
-{
-    using var tokenFile = new FileStream(
-        setupPath,
-        FileMode.CreateNew,
-        FileAccess.Write,
-        FileShare.None
-    );
-    if (!OperatingSystem.IsWindows())
-        File.SetUnixFileMode(setupPath, UnixFileMode.UserRead | UnixFileMode.UserWrite);
-    using var writer = new StreamWriter(tokenFile);
-    writer.Write(Convert.ToHexString(RandomNumberGenerator.GetBytes(32)));
-}
 builder
     .Services.AddDataProtection()
     .PersistKeysToFileSystem(new DirectoryInfo(Path.Combine(data, "keys")));
@@ -126,10 +117,47 @@ builder.Services.AddOpenApi("v1", o => o.ShouldInclude = _ => true);
 builder.Services.AddOpenApi("client-v1", o => o.ShouldInclude = d => d.GroupName == "client-v1");
 builder.Services.AddSignalR();
 builder.Services.AddSingleton<IScanEvents, StatusEvents>();
+var credentialGate = new SemaphoreSlim(1, 1);
 var dummyHash = await Passwords.Hash("dummy-password-value");
 var app = builder.Build();
 using (var scope = app.Services.CreateScope())
-    await scope.ServiceProvider.GetRequiredService<MediaDb>().Database.MigrateAsync();
+{
+    var db = scope.ServiceProvider.GetRequiredService<MediaDb>();
+    await db.Database.MigrateAsync();
+    if (recovery)
+    {
+        Console.Write("New administrator password (12–256 characters): ");
+        try
+        {
+            await CredentialRecovery.ResetAsync(db, CredentialRecovery.ReadPassword());
+            Console.WriteLine(
+                "Password changed. All administrator sessions revoked. Restart the server normally."
+            );
+        }
+        catch (Exception ex) when (ex is ArgumentException or InvalidOperationException)
+        {
+            Console.Error.WriteLine(ex.Message);
+            Environment.ExitCode = 1;
+        }
+        return;
+    }
+    if (!await db.Users.AnyAsync() && !File.Exists(setupPath))
+    {
+        var tokenOptions = new FileStreamOptions
+        {
+            Mode = FileMode.CreateNew,
+            Access = FileAccess.Write,
+            Share = FileShare.None,
+        };
+        if (!OperatingSystem.IsWindows())
+            tokenOptions.UnixCreateMode = UnixFileMode.UserRead | UnixFileMode.UserWrite;
+        using var tokenFile = new FileStream(setupPath, tokenOptions);
+        using var writer = new StreamWriter(tokenFile);
+        writer.Write(Convert.ToHexString(RandomNumberGenerator.GetBytes(32)));
+    }
+    if (await db.Users.AnyAsync() && File.Exists(setupPath))
+        File.Delete(setupPath);
+}
 app.Use(
     async (context, next) =>
     {
@@ -208,37 +236,46 @@ void MapApi(RouteGroupBuilder root)
             "/setup",
             async (SetupRequest input, MediaDb db) =>
             {
-                if (await db.Users.AnyAsync())
-                    return Results.Conflict(new { message = "Server is already configured." });
-                var expectedToken = await File.ReadAllTextAsync(setupPath);
-                if (
-                    input.Token is null
-                    || !CryptographicOperations.FixedTimeEquals(
-                        System.Text.Encoding.UTF8.GetBytes(input.Token),
-                        System.Text.Encoding.UTF8.GetBytes(expectedToken)
-                    )
-                )
-                    return Results.Unauthorized();
-                ValidateCredentials(input.Name, input.Password);
-                db.Users.Add(
-                    new User
-                    {
-                        Name = input.Name.Trim(),
-                        PasswordHash = await Passwords.Hash(input.Password),
-                    }
-                );
+                await credentialGate.WaitAsync();
                 try
                 {
-                    await db.SaveChangesAsync();
+                    if (await db.Users.AnyAsync())
+                        return Results.Conflict(new { message = "Server is already configured." });
+                    var expectedToken = await File.ReadAllTextAsync(setupPath);
+                    if (
+                        input.Token is null
+                        || !CryptographicOperations.FixedTimeEquals(
+                            System.Text.Encoding.UTF8.GetBytes(input.Token),
+                            System.Text.Encoding.UTF8.GetBytes(expectedToken)
+                        )
+                    )
+                        return Results.Unauthorized();
+                    ValidateCredentials(input.Name, input.Password);
+                    db.Users.Add(
+                        new User
+                        {
+                            Name = input.Name.Trim(),
+                            PasswordHash = await Passwords.Hash(input.Password),
+                        }
+                    );
+                    try
+                    {
+                        await db.SaveChangesAsync();
+                    }
+                    catch (DbUpdateException)
+                    {
+                        return Results.Conflict();
+                    }
+                    File.Delete(setupPath);
+                    return Results.Created(
+                        "/auth/me",
+                        new { message = "Administrator created. Sign in to continue." }
+                    );
                 }
-                catch (DbUpdateException)
+                finally
                 {
-                    return Results.Conflict();
+                    credentialGate.Release();
                 }
-                return Results.Created(
-                    "/auth/me",
-                    new { message = "Administrator created. Sign in to continue." }
-                );
             }
         )
         .RequireRateLimiting("auth");
@@ -246,44 +283,57 @@ void MapApi(RouteGroupBuilder root)
             "/auth/login",
             async (LoginRequest input, MediaDb db, HttpContext ctx) =>
             {
-                ValidateCredentials(input.Name, input.Password);
-                var user = await db.Users.SingleOrDefaultAsync(x => x.Name == input.Name);
-                // Derive even for unknown usernames to avoid a cheap account enumeration timing signal.
-                var valid = await Passwords.Verify(input.Password, user?.PasswordHash ?? dummyHash);
-                if (user is null || !valid)
-                    return Results.Unauthorized();
-                await db.Sessions.Where(x => x.ExpiresAt <= DateTime.UtcNow).ExecuteDeleteAsync();
-                if (input.DeviceName is { Length: > 64 })
-                    throw new ArgumentException("Device name is too long.");
-                var session = new Session
+                await credentialGate.WaitAsync();
+                try
                 {
-                    Id = Convert.ToHexString(RandomNumberGenerator.GetBytes(32)),
-                    UserId = user.Id,
-                    DeviceName = input.DeviceName ?? "Web browser",
-                    ExpiresAt = DateTime.UtcNow.AddDays(7),
-                };
-                db.Sessions.Add(session);
-                await db.SaveChangesAsync();
-                var claims = new[]
-                {
-                    new Claim(
-                        ClaimTypes.NameIdentifier,
-                        user.Id.ToString(CultureInfo.InvariantCulture)
-                    ),
-                    new Claim(ClaimTypes.Name, user.Name),
-                    new Claim(ClaimTypes.Role, user.Role),
-                    new Claim("sid", session.Id),
-                };
-                await ctx.SignInAsync(
-                    CookieAuthenticationDefaults.AuthenticationScheme,
-                    new ClaimsPrincipal(
-                        new ClaimsIdentity(
-                            claims,
-                            CookieAuthenticationDefaults.AuthenticationScheme
+                    ValidateCredentials(input.Name, input.Password);
+                    var user = await db.Users.SingleOrDefaultAsync(x => x.Name == input.Name);
+                    // Derive even for unknown usernames to avoid a cheap account enumeration timing signal.
+                    var valid = await Passwords.Verify(
+                        input.Password,
+                        user?.PasswordHash ?? dummyHash
+                    );
+                    if (user is null || !valid)
+                        return Results.Unauthorized();
+                    await db
+                        .Sessions.Where(x => x.ExpiresAt <= DateTime.UtcNow)
+                        .ExecuteDeleteAsync();
+                    if (input.DeviceName is { Length: > 64 })
+                        throw new ArgumentException("Device name is too long.");
+                    var session = new Session
+                    {
+                        Id = Convert.ToHexString(RandomNumberGenerator.GetBytes(32)),
+                        UserId = user.Id,
+                        DeviceName = input.DeviceName ?? "Web browser",
+                        ExpiresAt = DateTime.UtcNow.AddDays(7),
+                    };
+                    db.Sessions.Add(session);
+                    await db.SaveChangesAsync();
+                    var claims = new[]
+                    {
+                        new Claim(
+                            ClaimTypes.NameIdentifier,
+                            user.Id.ToString(CultureInfo.InvariantCulture)
+                        ),
+                        new Claim(ClaimTypes.Name, user.Name),
+                        new Claim(ClaimTypes.Role, user.Role),
+                        new Claim("sid", session.Id),
+                    };
+                    await ctx.SignInAsync(
+                        CookieAuthenticationDefaults.AuthenticationScheme,
+                        new ClaimsPrincipal(
+                            new ClaimsIdentity(
+                                claims,
+                                CookieAuthenticationDefaults.AuthenticationScheme
+                            )
                         )
-                    )
-                );
-                return Results.Ok(new UserIdentity(user.Name, user.Role));
+                    );
+                    return Results.Ok(new UserIdentity(user.Name, user.Role));
+                }
+                finally
+                {
+                    credentialGate.Release();
+                }
             }
         )
         .Produces<UserIdentity>()
@@ -305,6 +355,43 @@ void MapApi(RouteGroupBuilder root)
                 new UserIdentity(u.Identity!.Name!, u.FindFirstValue(ClaimTypes.Role)!)
         )
         .RequireAuthorization();
+    root.MapPost(
+            "/auth/password",
+            async (PasswordChange input, MediaDb db, HttpContext ctx) =>
+            {
+                ValidateCredentials(ctx.User.Identity!.Name!, input.NewPassword);
+                if (
+                    string.IsNullOrEmpty(input.CurrentPassword)
+                    || input.CurrentPassword.Length > 256
+                )
+                    throw new ArgumentException("Enter your current password.");
+                await credentialGate.WaitAsync();
+                try
+                {
+                    var uid = UserId(ctx.User);
+                    var user = await db.Users.FindAsync(uid);
+                    if (
+                        user is null
+                        || !await Passwords.Verify(input.CurrentPassword, user.PasswordHash)
+                    )
+                        return Results.Problem("Current password is incorrect.", statusCode: 400);
+                    var hash = await Passwords.Hash(input.NewPassword);
+                    await using var transaction = await db.Database.BeginTransactionAsync();
+                    user.PasswordHash = hash;
+                    await db.SaveChangesAsync();
+                    await db.Sessions.Where(x => x.UserId == uid).ExecuteDeleteAsync();
+                    await transaction.CommitAsync();
+                    await ctx.SignOutAsync();
+                    return Results.NoContent();
+                }
+                finally
+                {
+                    credentialGate.Release();
+                }
+            }
+        )
+        .RequireAuthorization()
+        .RequireRateLimiting("auth");
     var api = root.MapGroup("").RequireAuthorization();
     api.MapGet(
         "/status",
@@ -371,6 +458,59 @@ void MapApi(RouteGroupBuilder root)
         )
         .RequireAuthorization("admin");
     api.MapGet(
+            "/scans/{id:int}/issues",
+            async (int id, MediaDb db) =>
+                await db
+                    .ScanIssues.Where(x => x.ScanJobId == id)
+                    .OrderBy(x => x.Id)
+                    .Take(100)
+                    .Select(x => new ScanIssueInfo(x.FileName, x.Code, x.CorrelationId))
+                    .ToListAsync()
+        )
+        .RequireAuthorization("admin");
+    api.MapGet(
+            "/media/{id:int}/playback-info",
+            async (
+                int id,
+                MediaDb db,
+                PathPolicy policy,
+                IPlaybackPlanner planner,
+                HttpContext ctx
+            ) =>
+            {
+                var item = await db.Items.FindAsync(id);
+                if (item is null)
+                    return Results.NotFound();
+                var library = await db.Libraries.FindAsync(item.LibraryId);
+                var available = false;
+                try
+                {
+                    if (library is not null)
+                    {
+                        using var stream = policy.OpenRead(library.Path, item.RelativePath);
+                        available = true;
+                    }
+                }
+                catch (Exception ex)
+                    when (ex is IOException or UnauthorizedAccessException or ArgumentException) { }
+                if (!available)
+                    app.Logger.LogWarning(
+                        "Media {MediaId} unavailable; reference {CorrelationId}",
+                        id,
+                        ctx.TraceIdentifier
+                    );
+                return Results.Ok(
+                    new PlaybackInfo(
+                        available,
+                        available ? "ready" : "media_unavailable",
+                        ctx.TraceIdentifier,
+                        planner.Plan(item)
+                    )
+                );
+            }
+        )
+        .Produces<PlaybackInfo>();
+    api.MapGet(
             "/media",
             async (MediaDb db, int? offset, int? limit, string? search, int? libraryId) =>
                 Results.Ok(
@@ -432,20 +572,11 @@ void MapApi(RouteGroupBuilder root)
                 return Results.NotFound();
             try
             {
-                var path = policy.Resolve(library.Path, item.RelativePath);
-                var stream = new FileStream(
-                    path,
-                    FileMode.Open,
-                    FileAccess.Read,
-                    FileShare.Read,
-                    65536,
-                    FileOptions.Asynchronous | FileOptions.RandomAccess
-                );
+                var stream = policy.OpenRead(library.Path, item.RelativePath);
                 return Results.File(
                     stream,
                     planner.Plan(item).MimeType,
-                    enableRangeProcessing: true,
-                    lastModified: File.GetLastWriteTimeUtc(path)
+                    enableRangeProcessing: true
                 );
             }
             catch (Exception ex)
@@ -509,6 +640,17 @@ static void ValidateCredentials(string name, string password)
     )
         throw new ArgumentException("Username: 1–64 characters. Password: 12–256 characters.");
 }
+
+public record ScanIssueInfo(string FileName, string Code, string CorrelationId);
+
+public record PlaybackInfo(
+    bool Available,
+    string Code,
+    string CorrelationId,
+    PlaybackPlan Playback
+);
+
+public record PasswordChange(string CurrentPassword, string NewPassword);
 
 public record SetupRequest(string Name, string Password, string Token);
 

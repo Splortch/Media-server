@@ -1,7 +1,11 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import { api, type Library } from '../services/api';
+type ScanIssue = { fileName: string; code: string; correlationId: string };
 type Job = { id: number; state: string; discovered: number; failed: number };
 export default function Settings() {
+  const [issues, setIssues] = useState<Record<number, ScanIssue[]>>({});
+  const [passwordError, setPasswordError] = useState('');
+  const [passwordBusy, setPasswordBusy] = useState(false);
   const [libraries, setLibraries] = useState<Library[]>([]);
   const [name, setName] = useState('');
   const [path, setPath] = useState('');
@@ -29,7 +33,13 @@ export default function Settings() {
     const t = setTimeout(() => {
       for (const j of pending)
         api<Job>(`/scans/${j.id}`)
-          .then((x) => setJobs((old) => ({ ...old, [j.id]: x })))
+          .then(async (x) => {
+            setJobs((old) => ({ ...old, [j.id]: x }));
+            if (!['queued', 'running'].includes(x.state)) {
+              const failures = await api<ScanIssue[]>(`/scans/${j.id}/issues`);
+              setIssues((old) => ({ ...old, [j.id]: failures }));
+            }
+          })
           .catch((e) => setError(String(e.message)));
     }, 1500);
     return () => clearTimeout(t);
@@ -61,6 +71,25 @@ export default function Settings() {
       setError((e as Error).message);
     }
   }
+  async function changePassword(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const data = new FormData(event.currentTarget);
+    const form = event.currentTarget;
+    setPasswordBusy(true);
+    setPasswordError('');
+    try {
+      await api('/auth/password', 'POST', {
+        currentPassword: data.get('currentPassword'),
+        newPassword: data.get('newPassword'),
+      });
+      form.reset();
+      window.dispatchEvent(new Event('session-expired'));
+    } catch (error) {
+      setPasswordError((error as Error).message);
+    } finally {
+      setPasswordBusy(false);
+    }
+  }
   return (
     <>
       <p className="eyebrow">MAKE YOURSELF AT HOME</p>
@@ -75,7 +104,7 @@ export default function Settings() {
           Use an absolute directory inside the allowed roots configured by the
           server operator.
         </p>
-        <form onSubmit={add} className="settings-form">
+        <form onSubmit={add} className="settings-form" aria-busy={busy}>
           <label>
             Library name
             <input
@@ -116,17 +145,86 @@ export default function Settings() {
               <strong>{l.name}</strong>
               <p className="muted path">{l.path}</p>
             </div>
-            <button className="secondary" onClick={() => void scan(l.id)}>
+            <button
+              className="secondary"
+              onClick={() => void scan(l.id)}
+              aria-label={`Scan library ${l.name}`}
+            >
               Scan library
             </button>
           </div>
         ))}
         {Object.values(jobs).map((j) => (
-          <p role="status" key={j.id}>
-            Scan #{j.id}: {j.state} · {j.discovered} identified · {j.failed}{' '}
-            failed
-          </p>
+          <div key={j.id}>
+            <p role="status">
+              Scan #{j.id}: {j.state} · {j.discovered} identified · {j.failed}{' '}
+              failed
+            </p>
+            {!!issues[j.id]?.length && (
+              <details>
+                <summary>
+                  Scan #{j.id} problems ({issues[j.id].length}; up to 100 shown)
+                </summary>
+                <ul>
+                  {issues[j.id].map((issue) => (
+                    <li key={issue.correlationId}>
+                      {issue.fileName}: {scanReason(issue.code)} · Reference{' '}
+                      {issue.correlationId}
+                    </li>
+                  ))}
+                </ul>
+              </details>
+            )}
+          </div>
         ))}
+      </section>
+      <section className="panel">
+        <h2>Change password</h2>
+        <p className="muted">
+          Changing your password signs out every device, including this one.
+          Sign in again with your new password.
+        </p>
+        <form
+          className="settings-form"
+          onSubmit={(e) => void changePassword(e)}
+          aria-busy={passwordBusy}
+        >
+          <label>
+            Current password
+            <input
+              name="currentPassword"
+              type="password"
+              autoComplete="current-password"
+              required
+              maxLength={256}
+            />
+          </label>
+          <label>
+            New password
+            <input
+              name="newPassword"
+              type="password"
+              autoComplete="new-password"
+              required
+              minLength={12}
+              maxLength={256}
+              aria-describedby="password-help"
+            />
+          </label>
+          <p id="password-help" className="muted">
+            Use 12–256 characters.
+          </p>
+          {passwordError && (
+            <p role="alert" className="error">
+              {passwordError}
+            </p>
+          )}
+          <button disabled={passwordBusy}>
+            {passwordBusy
+              ? 'Changing password…'
+              : 'Change password and sign out'}
+          </button>
+        </form>
       </section>
       <section className="panel">
         <h2>Alpha capabilities</h2>
@@ -139,5 +237,23 @@ export default function Settings() {
         </p>
       </section>
     </>
+  );
+}
+
+function scanReason(code: string) {
+  return (
+    (
+      {
+        probe_unavailable: 'FFprobe is not installed or could not start.',
+        probe_timeout: 'Identification timed out.',
+        invalid_media: 'FFprobe could not read this media file.',
+        no_video: 'No video track was found.',
+        file_missing: 'The file or library is unavailable.',
+        access_denied: 'The server cannot read this file.',
+        unsafe_path: 'A symbolic link or unsafe path was rejected.',
+        probe_failed:
+          'Media identification failed. Check the server log using this reference.',
+      } as Record<string, string>
+    )[code] || 'Media identification failed.'
   );
 }

@@ -31,7 +31,16 @@ public sealed class Ffprobe(string executable) : IMediaProbe
             }
         )
             start.ArgumentList.Add(arg);
-        using var process = Process.Start(start) ?? throw new IOException("Cannot start FFprobe.");
+        Process process;
+        try
+        {
+            process = Process.Start(start) ?? throw new MediaProbeException("probe_unavailable");
+        }
+        catch (System.ComponentModel.Win32Exception)
+        {
+            throw new MediaProbeException("probe_unavailable");
+        }
+        using var ownedProcess = process;
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(ct);
         timeout.CancelAfter(TimeSpan.FromSeconds(20));
         using var kill = timeout.Token.Register(() =>
@@ -44,11 +53,33 @@ public sealed class Ffprobe(string executable) : IMediaProbe
         });
         var output = ReadBounded(process.StandardOutput, timeout.Token);
         var error = ReadBounded(process.StandardError, timeout.Token);
-        await process.WaitForExitAsync(timeout.Token);
-        var json = await output;
-        await error;
+        string json;
+        try
+        {
+            await process.WaitForExitAsync(timeout.Token);
+            json = await output;
+            await error;
+        }
+        catch (OperationCanceledException) when (!ct.IsCancellationRequested)
+        {
+            throw new MediaProbeException("probe_timeout");
+        }
+        finally
+        {
+            // Always observe bounded-reader failures, including cancelled probes.
+            try
+            {
+                process.Kill(true);
+            }
+            catch (InvalidOperationException) { }
+            try
+            {
+                await Task.WhenAll(output, error);
+            }
+            catch (Exception) { }
+        }
         if (process.ExitCode != 0)
-            throw new IOException("FFprobe could not read this media file.");
+            throw new MediaProbeException("invalid_media");
         using var doc = JsonDocument.Parse(json);
         var format = doc.RootElement.GetProperty("format");
         var duration =
@@ -64,7 +95,7 @@ public sealed class Ffprobe(string executable) : IMediaProbe
                 .FirstOrDefault()
             ?? "";
         if (Codec("video") == "")
-            throw new IOException("No video stream found.");
+            throw new MediaProbeException("no_video");
         return new ProbeResult(
             double.IsFinite(duration) ? Math.Max(0, duration) : 0,
             format.GetProperty("format_name").GetString() ?? "",

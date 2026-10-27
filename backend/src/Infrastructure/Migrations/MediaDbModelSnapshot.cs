@@ -142,6 +142,34 @@ namespace Infrastructure.Migrations
                     b.ToTable("Reports");
                 });
 
+            modelBuilder.Entity("MediaServer.Core.ScanIssue", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("CorrelationId")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("FileName")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("ScanJobId")
+                        .HasColumnType("INTEGER");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ScanJobId");
+
+                    b.ToTable("ScanIssues");
+                });
+
             modelBuilder.Entity("MediaServer.Core.ScanJob", b =>
                 {
                     b.Property<int>("Id")
@@ -257,6 +285,15 @@ namespace Infrastructure.Migrations
                     b.HasOne("MediaServer.Core.User", null)
                         .WithMany()
                         .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("MediaServer.Core.ScanIssue", b =>
+                {
+                    b.HasOne("MediaServer.Core.ScanJob", null)
+                        .WithMany()
+                        .HasForeignKey("ScanJobId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
                 });

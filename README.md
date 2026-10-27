@@ -103,3 +103,8 @@ The browser test starts a fresh API database and generates its own short test vi
 One maintainer can own backend/media and the other frontend/experience. Share security-sensitive API and playback reviews. Use focused issues, feature branches, Conventional Commits and pull requests. Require CI; one review is recommended with an administrator bypass for urgent fixes or an unavailable teammate. No bureaucracy collection minigame required.
 
 Approved AI implementation tasks use the [issue-to-PR workflow](docs/development/AUTONOMY.md): a maintainer approves one issue, Copilot proposes a tested PR, and a human reviews it. Repository configuration is required before activation; no automatic merges are enabled.
+
+
+Security and troubleshooting updates: [operator recovery and trust boundaries](docs/architecture/HARDENING.md),
+[playback diagnostics](docs/development/PLAYBACK-DIAGNOSTICS.md), and
+[accessibility validation and remaining manual checks](docs/development/ACCESSIBILITY.md).

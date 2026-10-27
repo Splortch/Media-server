@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from 'react';
+import { useEffect, useRef, useState, type FormEvent } from 'react';
 import {
   api,
   duration,
@@ -10,6 +10,8 @@ import Player from './components/Player';
 import Settings from './pages/Settings';
 type User = { name: string; role: string };
 export default function App() {
+  const mainRef = useRef<HTMLElement>(null);
+  const authHeading = useRef<HTMLHeadingElement>(null);
   const [phase, setPhase] = useState<
     'loading' | 'setup' | 'login' | 'ready' | 'offline'
   >('loading');
@@ -115,6 +117,15 @@ export default function App() {
       active = false;
     };
   }, [phase, route]);
+  useEffect(() => {
+    if (phase === 'ready' && !loading) {
+      mainRef.current?.focus();
+      document.title = `${route === 'settings' ? 'Settings' : item?.title || (route === 'library' ? 'Library' : 'Home')} · Media Server`;
+    } else if (phase === 'setup' || phase === 'login') {
+      authHeading.current?.focus();
+      document.title = `${phase === 'setup' ? 'Set up your server' : 'Sign in'} · Media Server`;
+    }
+  }, [phase, route, loading, item]);
   async function authenticate(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     const f = new FormData(e.currentTarget);
@@ -219,11 +230,17 @@ export default function App() {
           </h1>
           <p className="muted">Your own media. A private place to enjoy it.</p>
         </div>
-        <form className="panel auth-form" onSubmit={authenticate}>
+        <form
+          className="panel auth-form"
+          onSubmit={authenticate}
+          aria-busy={busy}
+        >
           <p className="eyebrow">
             {phase === 'setup' ? 'WELCOME HOME' : 'GOOD TO SEE YOU'}
           </p>
-          <h2>{phase === 'setup' ? 'Set up your server' : 'Sign in'}</h2>
+          <h2 ref={authHeading} tabIndex={-1}>
+            {phase === 'setup' ? 'Set up your server' : 'Sign in'}
+          </h2>
           {phase === 'setup' && (
             <>
               <p className="muted">
@@ -305,13 +322,25 @@ export default function App() {
         </a>
         <p className="nav-label">YOUR SPACE</p>
         <nav aria-label="Main navigation">
-          <a className={route === 'home' ? 'active' : ''} href="#home">
+          <a
+            aria-current={route === 'home' ? 'page' : undefined}
+            className={route === 'home' ? 'active' : ''}
+            href="#home"
+          >
             <span aria-hidden="true">⌂</span> <span>Home</span>
           </a>
-          <a className={route === 'library' ? 'active' : ''} href="#library">
+          <a
+            aria-current={route === 'library' ? 'page' : undefined}
+            className={route === 'library' ? 'active' : ''}
+            href="#library"
+          >
             <span aria-hidden="true">▦</span> <span>Library</span>
           </a>
-          <a className={route === 'settings' ? 'active' : ''} href="#settings">
+          <a
+            aria-current={route === 'settings' ? 'page' : undefined}
+            className={route === 'settings' ? 'active' : ''}
+            href="#settings"
+          >
             <span aria-hidden="true">⚙</span> <span>Settings</span>
           </a>
         </nav>
@@ -331,7 +360,7 @@ export default function App() {
             Sign out
           </button>
         </header>
-        <main id="main-content" tabIndex={-1}>
+        <main ref={mainRef} id="main-content" tabIndex={-1} aria-busy={loading}>
           {error && (
             <p role="alert" className="error">
               {error}
@@ -409,9 +438,11 @@ export default function App() {
                 <div className="section-heading">
                   <div>
                     <p className="eyebrow">CURATED BY YOU</p>
-                    <h2>
-                      {route === 'home' ? 'Your collection' : 'Media library'}
-                    </h2>
+                    {route === 'home' ? (
+                      <h2>Your collection</h2>
+                    ) : (
+                      <h1>Media library</h1>
+                    )}
                   </div>
                   <label className="search-label">
                     <span className="sr-only">Search library</span>
@@ -423,6 +454,16 @@ export default function App() {
                     />
                   </label>
                 </div>
+                {query && (
+                  <p role="status">
+                    {
+                      items.filter((m) =>
+                        m.title.toLowerCase().includes(query.toLowerCase()),
+                      ).length
+                    }{' '}
+                    matching videos
+                  </p>
+                )}
                 {!items.length && !loading ? (
                   <div className="empty-state">
                     <span aria-hidden="true">▦</span>
