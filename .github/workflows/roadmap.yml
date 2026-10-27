@@ -15,7 +15,7 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v7
-      - uses: actions/github-script@v7
+      - uses: actions/github-script@v9
         with:
           script: |
             const bootstrap = require('./scripts/github-bootstrap.cjs');
