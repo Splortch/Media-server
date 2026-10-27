@@ -40,6 +40,8 @@ against that source, covering next, next_back, nth, nth_back, last, empty string
 Unicode and empty arrays. Existing Windows compilation, unit tests, real-backend
 integration, installers, startup smoke and dependency audits remain enabled.
 
+Audits now use `--deny unsound` so a future registry dependency with an unsoundness advisory fails CI rather than appearing only as a warning.
+
 No audit ignore entry, advisory dismissal, fake crate version or certificate
 bypass is introduced. Version-based scanners may not understand a patched git
 source. An absence of an advisory after changing source is not proof of safety;
