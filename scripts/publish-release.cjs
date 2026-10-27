@@ -2,6 +2,7 @@ const fs = require('node:fs');
 const crypto = require('node:crypto');
 const path = require('node:path');
 const {targets} = require('./release-targets.cjs');
+const {platformNotes} = require('./release-notes.cjs');
 module.exports = async function publish({github, context}) {
   const sha = process.env.SOURCE_SHA;
   const tag = process.env.RELEASE_TAG;
@@ -34,7 +35,7 @@ module.exports = async function publish({github, context}) {
     catch(error) { if(error.status !== 404) throw error; }
     if (release && release.target_commitish !== sha) throw new Error('Release tag source mismatch.');
     if (release && !release.draft) continue; // Already published platforms remain immutable on retries.
-    const body = `Early alpha from commit ${sha}.\n\n${target.instructions}\n\nSee docs/deployment/RELEASES.md for setup. Builds are unsigned. Back up server data before upgrading. SHA256SUMS verifies download integrity.\n\nPlatform: ${target.id}; version: ${target.version}.${target.id === 'docker' ? ' Image: ' + manifest.image : ''}`;
+    const body = platformNotes(target, sha, `${context.repo.owner}/${context.repo.repo}`, manifest.image);
     if (!release) release = (await github.rest.repos.createRelease({...context.repo,tag_name:target.tag,target_commitish:sha,name:`${target.name} ${target.version}`,body,draft:true,prerelease:true,make_latest:'false'})).data;
     const platformManifest = {commit:sha,platform:target.id,version:target.version,channel:'alpha',signed:false,...(target.id === 'docker' ? {image:manifest.image} : {})};
     const manifestData = Buffer.from(JSON.stringify(platformManifest,null,2)+'\n');

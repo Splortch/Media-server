@@ -1,0 +1,27 @@
+name: Release descriptions
+on:
+  push:
+    branches: [main]
+    paths:
+      - scripts/release-notes.cjs
+      - scripts/release-targets.cjs
+      - .github/workflows/release-descriptions.yml
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency:
+  group: release-descriptions
+  cancel-in-progress: false
+jobs:
+  descriptions:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/github-script@v9
+        with:
+          script: |
+            await require('./scripts/release-notes.cjs').syncReleaseNotes({github,context});

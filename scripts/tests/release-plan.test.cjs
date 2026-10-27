@@ -95,9 +95,9 @@ test('publisher produces four releases with independent integrity manifests and 
  updateRelease:async p=>{for(const r of releases.values())if(r.id===p.release_id)r.draft=p.draft;}
  }}};
  try{process.chdir(temporary);process.env.SOURCE_SHA=sha;process.env.RELEASE_TAG='v0.2.0-alpha.50';
- await assert.rejects(publish({github,context:{repo:{}}}),/second platform/);
+ await assert.rejects(publish({github,context:{repo:{owner:'Splortch',repo:'Media-server'}}}),/second platform/);
  assert.equal(releases.get(targets[0].tag).draft,false);assert.equal(releases.get(targets[1].tag).draft,true);
- assert.equal(await publish({github,context:{repo:{}}}),true);assert.equal(releases.size,4);
+ assert.equal(await publish({github,context:{repo:{owner:'Splortch',repo:'Media-server'}}}),true);assert.equal(releases.size,4);
  for(const target of targets){
   const r=releases.get(target.tag);assert.equal(r.draft,false);const a=assets.get(r.id);
   assert.deepEqual([...a.keys()].sort(),[...target.files,'release.json','SHA256SUMS'].sort());
@@ -107,4 +107,24 @@ test('publisher produces four releases with independent integrity manifests and 
   }
  }
  }finally{process.chdir(original);for(const [k,v]of Object.entries(saved)){if(v===undefined)delete process.env[k];else process.env[k]=v;}fs.rmSync(temporary,{recursive:true,force:true});}
+});
+
+test('release descriptions explain each real platform and only synchronize recognized alpha notes',async()=>{
+ const {platformNotes,syncReleaseNotes}=require('../release-notes.cjs');
+ const targets=require('../release-targets.cjs').targets('0.2.0-alpha.50','0.1.0-alpha.50');
+ const bodies=targets.map(t=>platformNotes(t,sha,'Splortch/Media-server','test-image'));
+ assert.match(bodies[0],/Start-MediaServer.cmd/);assert.match(bodies[1],/sudo apt install ffmpeg/);
+ assert.match(bodies[2],/WebView2/);assert.match(bodies[3],/docker compose up -d/);
+ const changed=[];
+ const releases=[
+ {id:1,tag_name:'v0.2.0-alpha.40',target_commitish:sha,prerelease:true,draft:false},
+ ...targets.map((t,i)=>({id:i+2,tag_name:t.tag,target_commitish:sha,prerelease:true,draft:false})),
+ {id:6,tag_name:'server-linux/v0.2.0-alpha.50',target_commitish:sha,prerelease:true,draft:true},
+ {id:7,tag_name:'server-linux/v0.2.0-alpha.50',target_commitish:sha,prerelease:false,draft:false},
+ {id:8,tag_name:'unrelated',target_commitish:sha,prerelease:true,draft:false}
+ ];
+ const github={paginate:async()=>releases,rest:{repos:{listReleases:()=>{},updateRelease:async p=>changed.push(p)}}};
+ await syncReleaseNotes({github,context:{repo:{owner:'Splortch',repo:'Media-server'}}});
+ assert.deepEqual(changed.map(p=>p.release_id),[1,2,3,4,5]);
+ for(const p of changed){assert.deepEqual(Object.keys(p).sort(),['body','owner','release_id','repo']);assert.match(p.body,/Get started/);}
 });
