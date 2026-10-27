@@ -19,7 +19,7 @@ jobs:
           fetch-depth: 0
       - id: changes
         run: python scripts/component-changes.py backend
-      - uses: actions/setup-dotnet@v4
+      - uses: actions/setup-dotnet@v6
         if: steps.changes.outputs.changed == 'true'
         with:
           global-json-file: global.json
