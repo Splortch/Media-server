@@ -49,6 +49,9 @@ runpy.run_path(sys.argv[0], run_name='__main__')
         self.assertTrue(module.component_changed('windows', event, 'merge', run))
         self.assertFalse(module.component_changed('backend', event, 'merge', run))
 
+    def test_recovery_regression_change_runs_backend(self):
+        self.assertTrue(module.component_changed('backend', {'before': 'base'}, 'head', lambda *a, **k: self.result(['scripts/test-credential-recovery.py'])))
+
     def test_missing_history_runs_checks(self):
         self.assertTrue(module.component_changed('backend', {'before': 'base'}, 'head', lambda *a, **k: self.result([], 128)))
 
@@ -66,3 +69,4 @@ runpy.run_path(sys.argv[0], run_name='__main__')
 
 if __name__ == '__main__':
     unittest.main()
+

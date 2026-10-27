@@ -30,6 +30,28 @@ if (!OperatingSystem.IsWindows())
         data,
         UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute
     );
+FileStream instanceLock;
+try
+{
+    var lockOptions = new FileStreamOptions
+    {
+        Mode = FileMode.OpenOrCreate,
+        Access = FileAccess.ReadWrite,
+        Share = FileShare.None,
+    };
+    if (!OperatingSystem.IsWindows())
+        lockOptions.UnixCreateMode = UnixFileMode.UserRead | UnixFileMode.UserWrite;
+    instanceLock = new FileStream(Path.Combine(data, ".server.lock"), lockOptions);
+}
+catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+{
+    Console.Error.WriteLine(
+        "Cannot exclusively lock the data directory. Ensure it is writable and stop other server instances before starting or recovering this server."
+    );
+    Environment.ExitCode = 1;
+    return;
+}
+using var instanceLease = instanceLock;
 var setupPath = Path.Combine(data, "setup-token");
 builder
     .Services.AddDataProtection()

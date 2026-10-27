@@ -45,7 +45,7 @@ and axe WCAG A/AA scans. Web and automation checks also passed on the implementa
 A separate local subprocess smoke test provisioned an isolated server, logged in, stopped it,
 ran --reset-admin-password through stdin, verified no password echo and empty session storage,
 then restarted and verified old-password rejection, new-password login and closed setup. Its data
-was temporary. Local Chrome launch was blocked by the workspace's Unix-socket restriction; the
+was temporary. The CLI also rejects recovery while a live server owns the same data directory. Local Chrome launch was blocked by the workspace's Unix-socket restriction; the
 browser result above is hosted CI, not a local browser or physical-device claim.
 
 Manual assistive-technology testing, hostile-writer-safe scan handles and independent security

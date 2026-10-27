@@ -10,7 +10,9 @@ Setup uses a random local token, created with mode 0600 on Unix inside the priva
 It is deleted after administrator creation and cleaned up on startup for an already configured
 server. Restarting does not reopen setup or generate a replacement token for a configured server.
 Concurrent credential operations share a server-wide gate; SQLite's fixed administrator ID also
-prevents two setup winners. Run one server process per data directory.
+prevents two setup winners. An exclusive .server.lock lease enforces one server process per data directory, including local recovery.
+The lock file may remain after exit; its open handle, rather than file existence, indicates ownership.
+Do not delete the lock file while a server owns it or place data on a filesystem that ignores file locks.
 
 Settings → Change password verifies the current password, writes a new Argon2id hash and revokes
 all that user's sessions in one SQLite transaction. The current browser signs out too. Copied
