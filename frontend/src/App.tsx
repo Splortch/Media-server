@@ -353,7 +353,14 @@ export default function App() {
                   {item.audioCodec.toUpperCase() || 'No audio'} ·{' '}
                   {(item.size / 1024 ** 3).toFixed(2)} GB
                 </p>
-                <Player item={item} resume={position(item.id)} />
+                <Player
+                  item={item}
+                  resume={position(item.id)}
+                  progressRevision={
+                    progress.find((p) => p.mediaItemId === item.id)?.revision ??
+                    0
+                  }
+                />
               </>
             )
           ) : (

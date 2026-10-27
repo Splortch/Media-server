@@ -26,6 +26,7 @@ public class MediaItem
     public string AudioCodec { get; set; } = "";
     public double Duration { get; set; }
     public long Size { get; set; }
+    public string TracksJson { get; set; } = "[]";
 }
 
 public class PlaybackProgress
@@ -34,6 +35,8 @@ public class PlaybackProgress
     public int MediaItemId { get; set; }
     public double Seconds { get; set; }
     public DateTime UpdatedAt { get; set; }
+    public long Revision { get; set; }
+    public bool Completed { get; set; }
 }
 
 public class Session
@@ -41,6 +44,9 @@ public class Session
     public string Id { get; set; } = "";
     public int UserId { get; set; }
     public DateTime ExpiresAt { get; set; }
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+    public string DeviceName { get; set; } = "Web browser";
+    public string CapabilitiesJson { get; set; } = "{}";
 }
 
 public class ScanJob
@@ -53,7 +59,15 @@ public class ScanJob
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 }
 
-public record ProbeResult(double Duration, string Container, string VideoCodec, string AudioCodec);
+public record MediaTrack(int Index, string Type, string Codec, string? Language, string? Title);
+
+public record ProbeResult(
+    double Duration,
+    string Container,
+    string VideoCodec,
+    string AudioCodec,
+    IReadOnlyList<MediaTrack>? Tracks = null
+);
 
 public interface IMediaProbe
 {
@@ -70,4 +84,14 @@ public interface IPlaybackPlanner
 public interface IScanEvents
 {
     Task PublishAsync(ScanJob job, CancellationToken ct);
+}
+
+public class PlaybackReport
+{
+    public int Id { get; set; }
+    public int UserId { get; set; }
+    public int MediaItemId { get; set; }
+    public string Code { get; set; } = "unknown";
+    public string Client { get; set; } = "";
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 }

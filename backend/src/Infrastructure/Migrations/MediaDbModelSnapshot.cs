@@ -67,6 +67,10 @@ namespace Infrastructure.Migrations
                         .IsRequired()
                         .HasColumnType("TEXT");
 
+                    b.Property<string>("TracksJson")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
                     b.Property<string>("VideoCodec")
                         .IsRequired()
                         .HasColumnType("TEXT");
@@ -87,6 +91,12 @@ namespace Infrastructure.Migrations
                     b.Property<int>("MediaItemId")
                         .HasColumnType("INTEGER");
 
+                    b.Property<bool>("Completed")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<long>("Revision")
+                        .HasColumnType("INTEGER");
+
                     b.Property<double>("Seconds")
                         .HasColumnType("REAL");
 
@@ -98,6 +108,38 @@ namespace Infrastructure.Migrations
                     b.HasIndex("MediaItemId");
 
                     b.ToTable("Progress");
+                });
+
+            modelBuilder.Entity("MediaServer.Core.PlaybackReport", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Client")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("MediaItemId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("UserId")
+                        .HasColumnType("INTEGER");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("MediaItemId");
+
+                    b.HasIndex("UserId");
+
+                    b.ToTable("Reports");
                 });
 
             modelBuilder.Entity("MediaServer.Core.ScanJob", b =>
@@ -132,6 +174,17 @@ namespace Infrastructure.Migrations
             modelBuilder.Entity("MediaServer.Core.Session", b =>
                 {
                     b.Property<string>("Id")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("CapabilitiesJson")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("DeviceName")
+                        .IsRequired()
                         .HasColumnType("TEXT");
 
                     b.Property<DateTime>("ExpiresAt")
@@ -179,6 +232,21 @@ namespace Infrastructure.Migrations
                 });
 
             modelBuilder.Entity("MediaServer.Core.PlaybackProgress", b =>
+                {
+                    b.HasOne("MediaServer.Core.MediaItem", null)
+                        .WithMany()
+                        .HasForeignKey("MediaItemId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("MediaServer.Core.User", null)
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("MediaServer.Core.PlaybackReport", b =>
                 {
                     b.HasOne("MediaServer.Core.MediaItem", null)
                         .WithMany()

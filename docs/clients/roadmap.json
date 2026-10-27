@@ -1,0 +1,129 @@
+[
+  {
+    "key": "client-api",
+    "title": "Stabilize the versioned client API and generated contract",
+    "milestone": "Client API Foundation",
+    "priority": "P1",
+    "labels": [
+      "enhancement",
+      "backend",
+      "p1"
+    ],
+    "goal": "Review and merge API v1 while preserving browser authentication and independent server operation.",
+    "acceptance": [
+      "Verify generated OpenAPI/TypeScript matches the running authenticated backend.",
+      "Exercise native cookie/CSRF login, server compatibility, strict URL validation, expired sessions and protected ranges.",
+      "Validate search, track metadata flags and bounded diagnostic/capability reports.",
+      "Review the additive migration and preserve legacy browser functionality."
+    ],
+    "dependencies": []
+  },
+  {
+    "key": "clients",
+    "title": "Define client SDK and ship a first Windows desktop client",
+    "milestone": "Windows Client Alpha",
+    "priority": "P1",
+    "labels": [
+      "enhancement",
+      "frontend",
+      "p1"
+    ],
+    "goal": "Ship the dedicated Tauri Windows alpha from this monorepo; continue existing issue #17 rather than duplicating it.",
+    "acceptance": [
+      "Build a real native window with bundled React UI, server selection, login, library/details/search, Direct Play and Continue Watching.",
+      "Validate Credential Manager storage and actual-backend networking/ranges/progress/revocation.",
+      "Produce EXE/MSI artifacts and perform installer launch, high-DPI and WebView2 codec tests on physical Windows.",
+      "Scope native media controls, notifications, libmpv fallback and signed update follow-ups after measurements."
+    ],
+    "dependencies": [
+      "client-api"
+    ]
+  },
+  {
+    "key": "tv-mobile",
+    "title": "Build the native Android phone client with Compose, Media3 and Keystore",
+    "milestone": "Android Client Alpha",
+    "priority": "P1",
+    "labels": [
+      "enhancement",
+      "frontend",
+      "p1"
+    ],
+    "goal": "Refine existing issue #18 into the next focused implementation PR; TV now has its own issue.",
+    "acceptance": [
+      "Implement the modules and staged PR plan in docs/clients/ANDROID.md using the same v1 API.",
+      "Protect session cookies with Keystore-backed AES-GCM; enforce TLS and clear credentials on logout.",
+      "Validate Compose connection/library/details and real Media3 playback/resume, rotations and session expiry against the actual backend.",
+      "Build installable debug APK plus unsigned release APK/AAB; document signing and add an independent Gradle workflow.",
+      "Do not add offline downloads before server authorization/download design."
+    ],
+    "dependencies": [
+      "client-api",
+      "clients"
+    ]
+  },
+  {
+    "key": "handoff",
+    "title": "Implement authenticated playback handoff between devices",
+    "milestone": "Cross-Device Synchronization",
+    "priority": "P1",
+    "labels": [
+      "enhancement",
+      "frontend",
+      "p1"
+    ],
+    "goal": "Resume a current stream on a second authorized client.",
+    "acceptance": [
+      "Use expiring single-use handoff requests, never raw media-path URLs.",
+      "Enforce user/device permissions and opt-in confirmation on destination.",
+      "Transfer position and selected tracks, handle stale/offline devices and avoid duplicate playback.",
+      "Extend revision/conflict tests across Windows and Android; never silently replay stale offline positions."
+    ],
+    "dependencies": [
+      "client-api",
+      "tv-mobile"
+    ]
+  },
+  {
+    "key": "android-tv",
+    "title": "Implement a dedicated Android TV interface over shared Android layers",
+    "milestone": "Android TV",
+    "priority": "P2",
+    "labels": [
+      "enhancement",
+      "frontend",
+      "p2"
+    ],
+    "goal": "Build a ten-foot experience after the phone network/authentication/playback modules work.",
+    "acceptance": [
+      "Share Kotlin security, network and Media3 modules; implement a separate TV UI.",
+      "Test D-pad focus restoration, remote controls, Continue Watching, reconnect and track-capability behavior.",
+      "Keep discovery untrusted until TLS identity is verified; design expiring pairing challenges separately.",
+      "Build/install on emulator and validate playback/focus on physical Android TV hardware."
+    ],
+    "dependencies": [
+      "tv-mobile"
+    ]
+  },
+  {
+    "key": "ios-client",
+    "title": "Implement the first SwiftUI and AVPlayer iOS client",
+    "milestone": "iOS",
+    "priority": "P2",
+    "labels": [
+      "enhancement",
+      "frontend",
+      "p2"
+    ],
+    "goal": "Follow docs/clients/IOS.md; do not create a nonfunctional Xcode placeholder.",
+    "acceptance": [
+      "Use generated API models, URLSession cookie/CSRF transport, Keychain storage and version checks.",
+      "Prove an authenticated AVPlayer stream with server-authoritative resume on a real device.",
+      "Document AVPlayer codec/HLS requirements, local-network privacy prompts and lifecycle behavior.",
+      "Set up macOS/Xcode simulator CI and external signing/provisioning for device/TestFlight distribution."
+    ],
+    "dependencies": [
+      "client-api"
+    ]
+  }
+]

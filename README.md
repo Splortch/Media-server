@@ -4,6 +4,10 @@ A modern, open-source, self-hosted media server focused on performance, simplici
 
 **Early alpha foundation.** Independent of Jellyfin, Plex and Emby. No cloud account, subscription, advertising or telemetry. Host only media you are entitled to use. Apache-2.0; see [LICENSE](LICENSE) and [NOTICE](NOTICE).
 
+## Cross-platform clients (proposed alpha)
+
+The [client ecosystem](docs/clients/README.md) adds a dedicated Windows Tauri client and versioned API without requiring any client on the server. [Windows development](docs/clients/WINDOWS.md) covers actual installer builds and limitations. Android phone, Android TV and iOS are separately scoped follow-ups in this monorepo; no placeholder apps or fake APK builds are included. Existing web installation below remains valid.
+
 ## What works
 
 | Capability | Status | Scope |
@@ -89,3 +93,5 @@ The browser test starts a fresh API database and generates its own short test vi
 ## Two-maintainer workflow
 
 One maintainer can own backend/media and the other frontend/experience. Share security-sensitive API and playback reviews. Use focused issues, feature branches, Conventional Commits and pull requests. Require CI; one review is recommended with an administrator bypass for urgent fixes or an unavailable teammate. No bureaucracy collection minigame required.
+
+Approved AI implementation tasks use the [issue-to-PR workflow](docs/development/AUTONOMY.md): a maintainer approves one issue, Copilot proposes a tested PR, and a human reviews it. Repository configuration is required before activation; no automatic merges are enabled.

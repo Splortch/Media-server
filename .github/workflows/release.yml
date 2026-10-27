@@ -9,7 +9,7 @@ permissions:
   contents: read
 jobs:
   validate:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - env:
           VERSION: ${{ inputs.version }}
@@ -19,14 +19,14 @@ jobs:
     strategy:
       matrix:
         include:
-          - os: ubuntu-latest
+          - os: ubuntu-24.04
             rid: linux-x64
           - os: windows-latest
             rid: win-x64
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-dotnet@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-dotnet@v6
         with:
           global-json-file: global.json
       - uses: actions/setup-node@v4
@@ -48,7 +48,7 @@ jobs:
           path: artifacts/${{ matrix.rid }}/
   draft:
     needs: build
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     permissions:
       contents: write
     steps:
@@ -65,13 +65,13 @@ jobs:
           gh release create "$VERSION" artifacts/*.tar.gz --draft --prerelease --title "$VERSION" --notes 'Early alpha. Install FFprobe separately; see bundled release notes. Not a stable release.'
   docker:
     needs: [validate, build]
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     permissions:
       packages: write
       contents: read
     steps:
-      - uses: actions/checkout@v4
-      - uses: docker/login-action@v3
+      - uses: actions/checkout@v7
+      - uses: docker/login-action@v4
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
