@@ -106,5 +106,5 @@ retries, automatic queue processing, automatic merges, release publishing or dep
 Run `node --test scripts/tests/issue-to-pr.test.cjs` (Node 24, no package install). Tests use a fake
 GitHub API and verify authorization, changed/edited approval, isolation, task requirements, API
 eligibility, locking, repeated commands, ambiguous failures and the exact assignment payload.
-`Agent automation tests` runs the same tests without secrets on PRs and pushes to main.
+`Agent automation tests` runs these tests and the CI script regressions without secrets on Windows and Ubuntu for PRs and pushes to main.
 An actual paid agent session remains unverified until activation step 5 is performed.

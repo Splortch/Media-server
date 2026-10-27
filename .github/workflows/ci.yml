@@ -21,7 +21,8 @@ jobs:
         with:
           node-version: '24'
       - name: Ensure FFmpeg tools
-        timeout-minutes: 5
+        # A healthy but slow Ubuntu mirror exceeded the previous five-minute budget.
+        timeout-minutes: 15
         shell: bash
         run: |
           if command -v ffmpeg >/dev/null && command -v ffprobe >/dev/null; then
@@ -33,6 +34,8 @@ jobs:
               sudo apt-get "${apt_options[@]}" install -y --no-install-recommends ffmpeg
             }
           fi
+          ffmpeg -version
+          ffprobe -version
       - run: dotnet build MediaServer.sln
       - name: Verify generated API contract
         run: |
