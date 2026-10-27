@@ -1,3 +1,4 @@
+const {targets} = require('./release-targets.cjs');
 const required = ['backend-server.yml', 'web-client.yml', 'windows-client.yml', 'ci.yml', 'agent-automation-tests.yml'];
 function versions(number) {
   if (!Number.isSafeInteger(number) || number < 1 || number > 65535) throw new Error('Release build number must fit the Windows installer version (1..65535).');
@@ -31,11 +32,15 @@ async function plan({ github, context }) {
   if (!runs) return { build: false, publish: false };
   const windows = runs.find(r => r.path.endsWith('/windows-client.yml'));
   const release = { build: true, publish: true, sha, ...versions(windows.run_number) };
-  try {
-    const existing = await github.rest.repos.getReleaseByTag({ ...context.repo, tag: release.tag });
-    if (existing.data.target_commitish !== sha) throw new Error('Existing release tag belongs to another source commit.');
-    if (!existing.data.draft) return { build: false, publish: false };
-  } catch (error) { if (error.status !== 404) throw error; }
+  let complete = true;
+  for (const target of targets(release.server, release.client)) {
+    try {
+      const existing = await github.rest.repos.getReleaseByTag({ ...context.repo, tag: target.tag });
+      if (existing.data.target_commitish !== sha) throw new Error('Existing release tag belongs to another source commit.');
+      if (existing.data.draft) complete = false;
+    } catch (error) { if (error.status !== 404) throw error; complete = false; }
+  }
+  if (complete) return { build: false, publish: false };
   return release;
 }
 module.exports = { plan, successfulRuns, versions, required };

@@ -1,13 +1,12 @@
 # Automatic alpha releases and easy installation
 
-Once this workflow change is merged, every successful main commit can publish a complete
-**prerelease** automatically. No release tag, personal token or signing key is needed.
+Every successful main commit can publish separate platform **prereleases** automatically. No release tag, personal token or signing key is needed.
 GitHub's built-in repository token publishes Releases and the GHCR container image.
 Organization policy must permit repository Actions to write Releases and Packages.
 
 ## Download and run
 
-Open the repository's **Releases** page and choose the newest alpha. These are runnable builds,
+Open the repository's **Releases** page and choose the newest alpha for your platform. These are runnable builds,
 not source zips. No .NET SDK is needed by end users. The web UI is included in both server builds
 and the Docker image; there is no browser-only file:// application to install.
 
@@ -46,6 +45,23 @@ Server: Windows x64 and Linux x64. Desktop client: Windows x64 (EXE/MSI). Contai
 Web: bundled into the server/container. ARM64, macOS desktop, Android phone/TV and iOS artifacts
 are not generated because this repository has no validated distribution for them yet.
 
+## Separate platform releases
+
+Each validated commit creates four separate GitHub Releases, with independent tags, notes,
+checksums and provenance manifests:
+
+| Release | Tag | Downloads |
+| --- | --- | --- |
+| Media Server for Windows | `server-windows/v0.2.0-alpha.N` | Windows x64 server ZIP |
+| Media Server for Linux | `server-linux/v0.2.0-alpha.N` | Linux x64 server tar.gz |
+| Media Server Windows Client | `client-windows/v0.1.0-alpha.N` | EXE and MSI installers |
+| Media Server Docker | `docker/v0.2.0-alpha.N` | Compose setup ZIP, package/license inventory and corresponding source |
+
+EXE and MSI are alternative installers in the same Windows client release. Web remains bundled
+with the server. Future Android/TV/iOS distributions will receive their own release identities
+when functional builds exist. The earlier combined `v0.2.0-alpha.40` release remains unchanged.
+GitHub adds source archive links to each release automatically; those are not application builds.
+
 ## Publication rules
 
 `Automatic prereleases` listens for completion of the five existing main workflows. It requires
@@ -58,18 +74,24 @@ The Windows CI run number N supplies deterministic versions for the commit: serv
 and its third field increases, allowing MSI to recognize newer alpha installers. The value
 must fit 1..65535; the workflow fails before overflow instead of wrapping. Application config,
 Cargo package/lock metadata, assembly versions and download names are stamped consistently.
-This is independent component versioning within an alpha release set, not a stable-release process.
+Server and client versions belong to separate platform releases. They currently share a validated
+source commit and build counter; this is not a stable-release process.
 
 All release builds and package smoke checks must pass before assembling named downloads and
 SHA256SUMS. Container images are smoke-tested, saved, then the identical image is pushed to
 `ghcr.io/splortch/media-server:v0.2.0-alpha.N`. The `alpha` tag advances only after publication;
 `latest` is never written. Containers do not update themselves on a user's machine.
 
-Assets are uploaded to a draft first, and only then is the alpha release made visible. Published
-releases are not overwritten. A retry can repair a same-source draft; another-source tag is an
-error. A superseded/failed attempt may leave a draft or a version-specific container tag, but
-cannot advertise an incomplete GitHub release. Source-commit provenance and independent component
-versions are recorded in `release.json`; SHA256SUMS verifies integrity, not publisher identity.
+Each platform's assets are uploaded to its own draft first, then that complete platform release
+is made visible. Published releases are not overwritten. A retry skips completed platforms and
+repairs missing platforms or same-source drafts; another-source tag is an error. All four must
+exist before the coordinator considers the source commit complete. A network interruption can
+leave some complete platform releases visible while the remainder await retry; it cannot expose
+a half-uploaded platform release. The container alpha channel advances only after all four finish.
+The Docker image keeps its version tag `v0.2.0-alpha.N` (Git tag prefixes are not Docker tags).
+Source-commit provenance and the platform version are recorded in each release's `release.json`;
+each SHA256SUMS covers only that release's downloads and manifest, and verifies integrity,
+not publisher identity.
 Compiler/package locks improve repeatability, but changing OS packages/hosted images prevent
 claims of bit-for-bit reproducibility. Builds are unsigned and no stable release is published.
 
@@ -93,8 +115,8 @@ Download `release-downloads` from the workflow to inspect it before merging. Pol
 failed/stale/fork checks, exact source identity, retries, version overflow and metadata stamping.
 This does not replace physical Windows installation/playback or Android/iOS device tests.
 
-After merging, the first real GitHub/GHCR publication must be observed before calling external
-publication verified. The PR dry run cannot test organization registry permissions. Repository
+The initial combined alpha publication succeeded. Separate platform publication must still be
+observed after this change reaches main; the PR dry run cannot publish Releases. Repository
 and package visibility remain administrator settings: private repos require sign-in for downloads,
 and a private GHCR package requires `docker login`. Make the package public in GitHub Packages
 settings if anonymous installation is intended. The connector cannot change those admin settings.
