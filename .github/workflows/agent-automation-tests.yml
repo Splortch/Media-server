@@ -1,0 +1,20 @@
+name: Agent automation tests
+on:
+  pull_request:
+  push:
+    branches: [main, feat/issue-to-pr-agent]
+permissions:
+  contents: read
+jobs:
+  policy:
+    name: Agent dispatch policy
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - run: node --test scripts/tests/issue-to-pr.test.cjs
