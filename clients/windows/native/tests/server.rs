@@ -187,6 +187,7 @@ async fn real_server_cookie_login_ranges_resume_conflicts_revocation_and_disconn
         Some(401)
     );
     first.logout().await.unwrap();
+    assert_eq!(http.get(&source).send().await.unwrap().status(), 404);
     assert_eq!(
         first
             .request("GET", "/api/v1/media", None)

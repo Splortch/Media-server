@@ -120,7 +120,12 @@ public static class ClientV1
                     // Lost-response retries are idempotent; stale, different positions are never silently replayed.
                     return
                         count > 0
-                        || (current.Seconds == input.Seconds && current.Completed == completed)
+                        || (
+                            current.Revision > 0
+                            && input.ExpectedRevision < current.Revision
+                            && current.Seconds == input.Seconds
+                            && current.Completed == completed
+                        )
                         ? TypedResults.Ok(current)
                         : TypedResults.Conflict(current);
                 }

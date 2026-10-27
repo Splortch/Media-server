@@ -48,6 +48,15 @@
     "icon": [
       "icons/icon.ico",
       "icons/icon.png"
-    ]
+    ],
+    "licenseFile": "../../../LICENSE",
+    "resources": {
+      "../../../LICENSE": "LICENSE",
+      "../../../NOTICE": "NOTICE",
+      "../node_modules/react/LICENSE": "licenses/react-LICENSE",
+      "../node_modules/react-dom/LICENSE": "licenses/react-dom-LICENSE",
+      "../node_modules/scheduler/LICENSE": "licenses/scheduler-LICENSE",
+      "../node_modules/@tauri-apps/api/LICENSE-MIT": "licenses/tauri-api-LICENSE-MIT"
+    }
   }
 }

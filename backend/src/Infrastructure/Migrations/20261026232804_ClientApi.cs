@@ -92,6 +92,9 @@ namespace Infrastructure.Migrations
                 }
             );
 
+            migrationBuilder.Sql(
+                "UPDATE Progress SET Completed=1 WHERE EXISTS (SELECT 1 FROM Items WHERE Items.Id=Progress.MediaItemId AND Items.Duration>0 AND Progress.Seconds>=Items.Duration*0.95)"
+            );
             migrationBuilder.CreateIndex(
                 name: "IX_Reports_MediaItemId",
                 table: "Reports",

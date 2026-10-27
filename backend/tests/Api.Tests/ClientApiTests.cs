@@ -3,6 +3,9 @@ using System.Net.Http.Json;
 using System.Text.Json;
 using MediaServer.Core;
 using MediaServer.Infrastructure;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.Extensions.DependencyInjection;
 using Xunit;
 
@@ -10,6 +13,43 @@ namespace Api.Tests;
 
 public sealed class ClientApiTests
 {
+    [Fact]
+    public async Task DatabaseSessionExpirationRejectsAnOtherwiseValidCookie()
+    {
+        using var server = new Server();
+        using var client = await server.Admin();
+        using (var scope = server.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<MediaDb>();
+            await db.Sessions.ExecuteUpdateAsync(s =>
+                s.SetProperty(x => x.ExpiresAt, DateTime.UtcNow.AddMinutes(-1))
+            );
+        }
+        Assert.Equal(
+            HttpStatusCode.Unauthorized,
+            (await client.GetAsync("/api/v1/media")).StatusCode
+        );
+    }
+
+    [Fact]
+    public async Task UpgradePreservesExistingPositionsAndBackfillsCompletion()
+    {
+        using var server = new Server();
+        var options = new DbContextOptionsBuilder<MediaDb>()
+            .UseSqlite($"Data Source={Path.Combine(server.Root, "upgrade.db")}")
+            .Options;
+        await using var db = new MediaDb(options);
+        await db.GetService<IMigrator>().MigrateAsync("20261026224241_Initial");
+        await db.Database.ExecuteSqlRawAsync(
+            "INSERT INTO Users (Id,Name,PasswordHash,Role) VALUES (1,'fixture','test-only','Admin'); INSERT INTO Libraries (Id,Name,Path) VALUES (1,'fixture','fixture'); INSERT INTO Items (Id,LibraryId,RelativePath,Title,Container,VideoCodec,AudioCodec,Duration,Size) VALUES (1,1,'fixture.webm','fixture','webm','vp9','opus',100,100); INSERT INTO Progress (UserId,MediaItemId,Seconds,UpdatedAt) VALUES (1,1,98,'2026-10-27 00:00:00');"
+        );
+        await db.Database.MigrateAsync();
+        var state = await db.Progress.SingleAsync();
+        Assert.Equal(98, state.Seconds);
+        Assert.True(state.Completed);
+        Assert.Equal(0, state.Revision);
+    }
+
     [Fact]
     public async Task VersionedApiPreservesSecurityAndDetectsProgressConflicts()
     {
@@ -39,7 +79,7 @@ public sealed class ClientApiTests
             );
             await db.SaveChangesAsync();
         }
-        var list = await first.GetFromJsonAsync<JsonElement>("/api/v1/media?search=Test");
+        var list = await first.GetFromJsonAsync<JsonElement>("/api/v1/media?search=test");
         Assert.Single(list.EnumerateArray());
         Assert.Empty(
             (

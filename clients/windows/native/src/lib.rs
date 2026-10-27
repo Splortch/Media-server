@@ -106,6 +106,9 @@ impl CredentialStore for WindowsVault {
     }
 }
 pub fn validate_server(input: &str) -> Result<Url> {
+    if input.len() > 2048 {
+        return Err(ClientError::new("URL", "Server address is too long."));
+    }
     let mut url = Url::parse(input.trim())
         .map_err(|_| ClientError::new("URL", "Enter an absolute HTTPS server address."))?;
     if url.host_str().is_none()
@@ -139,6 +142,7 @@ struct Connection {
     http: reqwest::Client,
     remember: bool,
     cancel: CancellationToken,
+    proxy_secret: Arc<str>,
 }
 impl Connection {
     fn new(base: Url, remember: bool) -> Result<Self> {
@@ -157,6 +161,7 @@ impl Connection {
             http,
             remember,
             cancel: CancellationToken::new(),
+            proxy_secret: uuid::Uuid::new_v4().simple().to_string().into(),
         })
     }
     async fn json(&self, method: Method, path: &str, body: Option<Value>) -> Result<Value> {
@@ -265,7 +270,6 @@ pub struct DesktopClient {
     connection: Arc<Mutex<Option<Connection>>>,
     vault: Arc<dyn CredentialStore>,
     proxy: String,
-    secret: Arc<str>,
 }
 impl DesktopClient {
     pub async fn start(vault: Arc<dyn CredentialStore>) -> Result<Self> {
@@ -283,7 +287,6 @@ impl DesktopClient {
             connection: Arc::new(Mutex::new(None)),
             vault,
             proxy,
-            secret: uuid::Uuid::new_v4().simple().to_string().into(),
         };
         let router = Router::new()
             .route("/{secret}/media/{id}", get(stream_media))
@@ -298,7 +301,17 @@ impl DesktopClient {
         let connection = Connection::new(base, remember)?;
         let info = connection
             .json(Method::GET, "/api/v1/server-info", None)
-            .await?;
+            .await
+            .map_err(|e| {
+                if matches!(e.status, Some(401 | 404)) {
+                    ClientError::new(
+                        "INCOMPATIBLE",
+                        "This server does not offer client API v1. Update it before connecting.",
+                    )
+                } else {
+                    e
+                }
+            })?;
         if info.get("apiVersion").and_then(Value::as_u64) != Some(1)
             || info
                 .get("minimumClientApiVersion")
@@ -364,13 +377,24 @@ impl DesktopClient {
                 return Err(e);
             }
         }
+        let mut active = self.connection.lock().await;
+        if active
+            .as_ref()
+            .is_some_and(|current| current.proxy_secret == c.proxy_secret)
+        {
+            let mut authenticated = c.clone();
+            c.cancel.cancel();
+            authenticated.cancel = CancellationToken::new();
+            authenticated.proxy_secret = uuid::Uuid::new_v4().simple().to_string().into();
+            *active = Some(authenticated);
+        }
         Ok(result)
     }
     async fn clear(&self, c: &Connection) -> Result<()> {
         let mut active = self.connection.lock().await;
         if !active
             .as_ref()
-            .is_some_and(|current| Arc::ptr_eq(&current.jar, &c.jar))
+            .is_some_and(|current| current.proxy_secret == c.proxy_secret)
         {
             return Ok(());
         }
@@ -406,8 +430,8 @@ impl DesktopClient {
         if id == 0 {
             return Err(ClientError::new("PATH", "Invalid media ID."));
         }
-        let _ = self.current().await?;
-        Ok(format!("{}/{}/media/{id}", self.proxy, self.secret))
+        let c = self.current().await?;
+        Ok(format!("{}/{}/media/{id}", self.proxy, c.proxy_secret))
     }
 }
 fn allowed_request(method: &str, path: &str) -> bool {
@@ -462,7 +486,7 @@ async fn stream_media(
             .body(Body::empty())
             .unwrap()
     };
-    if secret.as_str() != client.secret.as_ref() || id == 0 {
+    if id == 0 {
         return denied();
     }
     if let Some(origin) = headers.get("origin").and_then(|v| v.to_str().ok()) {
@@ -476,6 +500,9 @@ async fn stream_media(
     let Ok(c) = client.current().await else {
         return denied();
     };
+    if secret.as_str() != c.proxy_secret.as_ref() {
+        return denied();
+    }
     let mut request = c.http.request(
         method,
         c.base.join(&format!("/api/v1/media/{id}/stream")).unwrap(),

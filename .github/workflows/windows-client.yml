@@ -10,6 +10,16 @@ concurrency:
   group: windows-client-${{ github.ref }}
   cancel-in-progress: true
 jobs:
+  audit:
+    name: Rust dependency audit
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-audit@0.22.2
+      - run: cargo audit --file clients/windows/native/Cargo.lock
+      - run: cargo audit --file clients/windows/src-tauri/Cargo.lock
   windows:
     name: Windows client
     runs-on: windows-latest

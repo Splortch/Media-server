@@ -35,6 +35,7 @@ export default function App() {
   const [user, setUser] = useState<{ name: string; role: string }>();
   const [items, setItems] = useState<Media[]>([]);
   const [watching, setWatching] = useState<ProgressState[]>([]);
+  const [continueItems, setContinueItems] = useState<Detail[]>([]);
   const [selection, setSelection] = useState<Selection>();
   const [sessions, setSessions] = useState<SessionInfo[]>([]);
   const [view, setView] = useState<'library' | 'settings'>('library');
@@ -69,6 +70,10 @@ export default function App() {
     if (expired(e)) {
       setUser(undefined);
       setSelection(undefined);
+      setItems([]);
+      setWatching([]);
+      setContinueItems([]);
+      setSessions([]);
     } else setOnline(false);
   }
   async function load(query = search, start = offset) {
@@ -80,14 +85,18 @@ export default function App() {
         api.media(query, start),
         api.continuing(),
       ]);
+      const recent = await Promise.all(
+        progress.slice(0, 24).map((p) => api.detail(p.mediaItemId)),
+      );
       if (requestVersion !== loadVersion.current) return;
+      setContinueItems(recent);
       setItems(list);
       setWatching(progress);
       setOnline(true);
     } catch (e) {
-      failure(e);
+      if (requestVersion === loadVersion.current) failure(e);
     } finally {
-      setBusy(false);
+      if (requestVersion === loadVersion.current) setBusy(false);
     }
   }
   useEffect(() => {
@@ -104,6 +113,7 @@ export default function App() {
   useEffect(() => {
     if (!selection) return;
     const shortcut = (event: KeyboardEvent) => {
+      if (event.ctrlKey || event.altKey || event.metaKey) return;
       if (
         event.target instanceof HTMLElement &&
         (event.target.closest('input,textarea,select,button,video') ||
@@ -196,7 +206,7 @@ export default function App() {
       setBusy(false);
     }
   }
-  async function open(item: Media) {
+  async function open(item: Media | Detail) {
     setBusy(true);
     setError('');
     try {
@@ -234,18 +244,26 @@ export default function App() {
     await load();
   }
   async function signOut() {
+    ++loadVersion.current;
+    clearTimeout(searchTimer.current);
     setBusy(true);
     try {
       await logout();
       setError('');
     } catch (e) {
       setError(
-        'Local session cleared; remote revocation may not have completed. ' +
+        (e && typeof e === 'object' && 'code' in e && e.code === 'VAULT'
+          ? 'Saved credentials could not be removed. Remove this entry in Windows Credential Manager and revoke the session in the web interface. '
+          : 'Local session cleared; remote revocation may not have completed. ') +
           errorMessage(e),
       );
     } finally {
       setUser(undefined);
       setSelection(undefined);
+      setItems([]);
+      setWatching([]);
+      setContinueItems([]);
+      setSessions([]);
       setConnected(false);
       setBusy(false);
     }
@@ -349,7 +367,7 @@ export default function App() {
         </section>
       </main>
     );
-  const cards = (list: Media[]) => (
+  const cards = (list: (Media | Detail)[]) => (
     <div className="media-grid">
       {list.map((m, i) => (
         <button
@@ -549,11 +567,7 @@ export default function App() {
                   <div className="section-heading">
                     <h2>Continue Watching</h2>
                   </div>
-                  {cards(
-                    items.filter((m) =>
-                      watching.some((p) => p.mediaItemId === m.id),
-                    ),
-                  )}
+                  {cards(continueItems)}
                 </section>
               )}
               <div className="section-heading">

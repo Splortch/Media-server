@@ -8,7 +8,7 @@ common=('Directory.Build.props','global.json','dotnet-tools.json','.editorconfig
 prefixes={'backend':('backend/','scripts/audit.py','.github/workflows/backend-server.yml'),'web':('frontend/','shared/api/','.github/workflows/web-client.yml'),'windows':('clients/windows/','shared/api/','backend/','frontend/','scripts/test-native-client.py','.github/workflows/windows-client.yml')}
 changed=True
 if base and set(base)!={'0'}:
-    result=subprocess.run(['git','diff','--name-only',base,head],capture_output=True,text=True)
-    if result.returncode==0:changed=any(p.startswith(prefixes[kind]) or p in common for p in result.stdout.splitlines())
+    result=subprocess.run(['git','diff','--name-only','-z',base,head],capture_output=True,text=True)
+    if result.returncode==0:changed=any(p.startswith(prefixes[kind]) or p in common for p in result.stdout.split('\0'))
 with open(os.environ['GITHUB_OUTPUT'],'a') as out:out.write('changed='+str(changed).lower()+'\n')
 print(kind+': '+('validate changed dependencies' if changed else 'no affected component changes'))
