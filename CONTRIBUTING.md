@@ -14,3 +14,7 @@ Backend/media maintainer: scanning, media access, authentication, schema migrati
 Never submit personal media, production databases, credentials, setup tokens, private logs or API keys. Do not run personal or untrusted media in tests. New scanning code must never modify originals. Add an EF Core migration for schema changes; do not replace migrations with `EnsureCreated`.
 
 No mandatory external account is permitted in core playback. Discuss architectural changes before introducing services or infrastructure. Contributions are provided under Apache-2.0 without a CLA requirement.
+
+For approved AI implementation tasks, use the [issue-to-PR operating guide](docs/development/AUTONOMY.md).
+A maintainer approves a focused issue with `/agent implement`; the agent proposes a PR and a human
+reviews it. Activation requires repository configuration. The agent never merges automatically.

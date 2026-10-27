@@ -18,3 +18,19 @@ updates:
     directory: /docker
     schedule:
       interval: weekly
+  - package-ecosystem: npm
+    directory: /clients/windows
+    schedule:
+      interval: weekly
+  - package-ecosystem: npm
+    directory: /shared/api
+    schedule:
+      interval: weekly
+  - package-ecosystem: cargo
+    directory: /clients/windows/native
+    schedule:
+      interval: weekly
+  - package-ecosystem: cargo
+    directory: /clients/windows/src-tauri
+    schedule:
+      interval: weekly

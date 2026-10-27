@@ -89,6 +89,9 @@ public sealed class ScanWorker(
                             };
                             db.Items.Add(item);
                         }
+                        item.TracksJson = System.Text.Json.JsonSerializer.Serialize(
+                            metadata.Tracks ?? []
+                        );
                         item.Title = Path.GetFileNameWithoutExtension(path);
                         item.Duration = metadata.Duration;
                         item.Container = metadata.Container;

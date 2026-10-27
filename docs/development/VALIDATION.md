@@ -14,11 +14,11 @@ Validation performed in a Linux x64 workspace on 2026-10-26. This record disting
 | NuGet direct/transitive vulnerability audit | Zero reported vulnerable packages |
 | npm dependency audit | Zero reported vulnerabilities |
 | Browser-to-real-backend integration | Passed in Chromium using generated VP9/Opus WebM |
-| Self-contained Linux x64 publish | Passed |
+| Self-contained Linux x64 publish | Passed, including native startup, configured listener, health and bundled UI smoke checks |
 | Self-contained Windows x64 cross-publish | Passed; Windows executable not run in Linux |
 | Workflow YAML, shell and bootstrap syntax | Parsed/checked locally |
-| Docker image build/runtime | Not run locally: Docker is unavailable; hosted CI includes build and startup smoke checks |
-| GitHub-hosted CI | Configured; local results do not establish hosted workflow success |
+| Docker image build/runtime | Passed in GitHub-hosted CI, including startup, bundled UI and private-media smoke checks; Docker unavailable locally |
+| GitHub-hosted CI | Initial frontend/Linux backend/Docker jobs passed; all 7 backend tests also passed on Windows. Browser OS compatibility and Windows checkout line endings were corrected with a pinned runner and .gitattributes; see Actions for current commit status. |
 | Release workflow | Not dispatched; no official release published |
 
 The browser integration creates a fresh SQLite database, completes setup/login through the real UI, adds a media directory, scans using real FFprobe, opens the discovered video, verifies actual browser playback, saves progress, checks a 206 byte-range response and reloads to verify resume. Responsive screenshots are inspected internally using synthetic test data.
