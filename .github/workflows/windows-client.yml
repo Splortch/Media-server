@@ -99,7 +99,7 @@ jobs:
           if ($client.HasExited) { throw "Native client exited during startup: $($client.ExitCode)" }
           Stop-Process -Id $client.Id
       - if: success() && steps.changes.outputs.changed == 'true'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: MediaServer-Windows-Client-v0.1.0-alpha.1-x64
           if-no-files-found: error
