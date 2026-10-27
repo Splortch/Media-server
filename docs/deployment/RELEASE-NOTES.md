@@ -1,9 +1,31 @@
-# Early alpha distribution notes
+# Media Server alpha — start here
 
-Run `Api.exe` on Windows or `Api` on Linux from the extracted directory. The browser UI is bundled under `wwwroot`; use http://127.0.0.1:5050. Install FFprobe separately on PATH or configure `MediaServer__FfprobePath`. Set `MediaServer__DataDirectory` and `MediaServer__AllowedRoots__0` before starting. Read the local setup-token file and create the administrator in the browser.
+This folder contains a runnable self-contained server and its web UI. You do not need the .NET
+SDK or Node.js. This is early alpha software; back up server data before updating.
 
-These are self-contained .NET builds, not source archives. FFmpeg/FFprobe is not bundled into native release archives. No stable release is authorized by the build workflow; it creates draft prereleases only when manually dispatched with an alpha tag.
+Windows: double-click **Start-MediaServer.cmd**. On first use choose the media folder the server
+may read. If FFprobe is missing, the launcher offers a pinned, checksum-verified media-tool
+download from GyanD. It then opens http://127.0.0.1:5050 and displays your local setup token.
+Create the administrator in the browser. In Settings add the selected folder as a library,
+scan it, then play a compatible video. Leave the console open while the server is running.
 
-Dependency lock files pin application packages, but hosted SDK/container tags and OS packages still change. Builds are deterministic at the compiler level, not promised bit-for-bit reproducible across toolchains. A future release task must add SBOMs, artifact hashes, signing, base-image digests and reproducibility verification.
+Linux: install FFprobe (Ubuntu: `sudo apt install ffmpeg`), then run `./start-media-server.sh`.
+Choose an absolute media folder, open http://127.0.0.1:5050 and read the setup-token file at the
+printed location. For a preconfigured FFprobe/data/media root, export MediaServer__FfprobePath,
+MediaServer__DataDirectory and MediaServer__AllowedRoots__0 before running.
 
-Apache-2.0 applies to project code. NuGet/npm packages retain their licenses. Docker includes Ubuntu's FFmpeg/FFprobe package, whose configured components may be GPL-licensed; an aggregate image is not wholly Apache-2.0. Before redistributing any image, review `ffmpeg -L`/`ffprobe -L`, preserve applicable notices and satisfy corresponding-source obligations for included GPL components (including build configuration and patches). Do not bundle proprietary codec libraries without explicit review. Native builds intentionally use a separately installed FFprobe executable.
+Data lives outside this archive: Windows uses %LOCALAPPDATA%\Splortch\MediaServer, Linux uses
+${XDG_DATA_HOME:-$HOME/.local/share}/media-server. Replacing the extracted application does not
+replace that data. Back it up before upgrades. Database migrations may prevent safe downgrades.
+You may also launch Api.exe/Api directly with explicit environment configuration; see the full docs.
+
+The separate Windows desktop installer is a client: connect it to a running server. The web UI
+already works without installing that client. All installers are unsigned; Windows may display
+publisher/SmartScreen warnings. No automatic public-internet access or port forwarding is enabled.
+Use HTTPS and the documented remote-access configuration before connecting remote devices.
+
+Project code is Apache-2.0; dependencies retain their licenses. Native archives do not bundle
+FFmpeg/FFprobe. Browser notices are included in licenses/. The separate Docker release includes
+Ubuntu FFmpeg with its own license configuration, package inventory and corresponding source
+archive. See docs/deployment/RELEASES.md in the source repository for distribution details,
+checksums, source commit and the complete installation/update guide.

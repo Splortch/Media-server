@@ -1,22 +1,62 @@
-name: Alpha release
+name: Automatic prereleases
 on:
+  workflow_run:
+    workflows: [Backend server, Web client, Windows client, CI, Agent automation tests]
+    types: [completed]
+    branches: [main]
+  pull_request:
+    paths:
+      - '.github/workflows/release.yml'
+      - '.github/workflows/windows-client.yml'
+      - 'scripts/*release*'
+      - 'scripts/stamp-windows-version.cjs'
+      - 'scripts/tests/*release*'
+      - 'release-resources/**'
+      - 'backend/locks/**'
+      - 'Directory.Build.props'
   workflow_dispatch:
     inputs:
-      version:
-        description: 'Prerelease tag, e.g. v0.1.0-alpha.1'
-        required: true
+      publish:
+        description: 'Publish the latest main commit only after all five main CI workflows pass'
+        type: boolean
+        default: false
 permissions:
   contents: read
+  actions: read
+concurrency:
+  group: prerelease-${{ github.event.workflow_run.head_sha || github.sha }}
+  cancel-in-progress: false
 jobs:
-  validate:
+  plan:
     runs-on: ubuntu-24.04
+    outputs:
+      build: ${{ steps.plan.outputs.build }}
+      publish: ${{ steps.plan.outputs.publish }}
+      sha: ${{ steps.plan.outputs.sha }}
+      server: ${{ steps.plan.outputs.server }}
+      client: ${{ steps.plan.outputs.client }}
+      msi: ${{ steps.plan.outputs.msi }}
+      tag: ${{ steps.plan.outputs.tag }}
     steps:
-      - env:
-          VERSION: ${{ inputs.version }}
-        run: '[[ "$VERSION" =~ ^v[0-9]+\.[0-9]+\.[0-9]+-alpha\.[0-9]+$ ]]'
-  build:
-    needs: validate
+      # workflow_run always loads trusted default-branch code. No upstream artifacts
+      # or fork/PR code are executed in a privileged job.
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/github-script@v9
+        id: plan
+        with:
+          script: |
+            const {plan} = require('./scripts/release-plan.cjs');
+            const result = await plan({github, context});
+            for (const [name, value] of Object.entries(result)) core.setOutput(name, String(value));
+            core.summary.addRaw(result.build ? `Build ${result.sha}; publish=${result.publish}` : 'Waiting for all exact-commit main checks, or already published.');
+            await core.summary.write();
+  server:
+    needs: plan
+    if: needs.plan.outputs.build == 'true'
     strategy:
+      fail-fast: false
       matrix:
         include:
           - os: ubuntu-24.04
@@ -24,61 +64,193 @@ jobs:
           - os: windows-latest
             rid: win-x64
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@v7
+        with:
+          ref: ${{ needs.plan.outputs.sha }}
+          persist-credentials: false
       - uses: actions/setup-dotnet@v6
         with:
           global-json-file: global.json
+          cache: true
+          cache-dependency-path: backend/**/packages.lock.json
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
       - run: npm ci --prefix frontend
       - run: npm run build --prefix frontend
-      - run: npm test --prefix frontend
-      - run: dotnet restore --locked-mode
-      - run: dotnet test MediaServer.sln -c Release
-      - run: dotnet publish backend/src/Api -c Release -r ${{ matrix.rid }} --self-contained true -o artifacts/${{ matrix.rid }}
-      - shell: bash
+      - run: python scripts/check-release-locks.py
+      - run: dotnet restore MediaServer.sln --locked-mode
+      - run: dotnet test MediaServer.sln -c Release --no-restore
+      - name: Publish self-contained server
+        env:
+          RID: ${{ matrix.rid }}
+          SERVER_VERSION: ${{ needs.plan.outputs.server }}
+        shell: bash
+        run: dotnet publish backend/src/Api -c Release -r "$RID" --self-contained true -p:Version="$SERVER_VERSION" -p:RestoreLockedMode=true -o artifacts/server
+      - name: Validate Windows launcher syntax
+        if: runner.os == 'Windows'
+        shell: pwsh
         run: |
-          cp -r frontend/dist artifacts/${{ matrix.rid }}/wwwroot
-          cp LICENSE NOTICE docs/deployment/RELEASE-NOTES.md artifacts/${{ matrix.rid }}/
+          $tokens = $null; $errors = $null
+          [void][System.Management.Automation.Language.Parser]::ParseFile((Resolve-Path 'release-resources/windows/Start-MediaServer.ps1'), [ref]$tokens, [ref]$errors)
+          if ($errors.Count) { throw ($errors | Out-String) }
+      - name: Package and smoke-test the actual archive
+        env:
+          RID: ${{ matrix.rid }}
+          SERVER_VERSION: ${{ needs.plan.outputs.server }}
+        run: |
+          python scripts/package-release.py server
+          python scripts/smoke-release.py
       - uses: actions/upload-artifact@v7
         with:
-          name: media-server-${{ matrix.rid }}
-          path: artifacts/${{ matrix.rid }}/
-  draft:
-    needs: build
-    runs-on: ubuntu-24.04
-    permissions:
-      contents: write
-    steps:
-      - uses: actions/download-artifact@v4
-        with:
-          path: artifacts
-      - env:
-          GH_TOKEN: ${{ github.token }}
-          GH_REPO: ${{ github.repository }}
-          VERSION: ${{ inputs.version }}
-        run: |
-          chmod +x artifacts/media-server-linux-x64/Api
-          for artifact in artifacts/*; do tar -czf "$artifact.tar.gz" -C "$artifact" .; done
-          gh release create "$VERSION" artifacts/*.tar.gz --draft --prerelease --title "$VERSION" --notes 'Early alpha. Install FFprobe separately; see bundled release notes. Not a stable release.'
+          name: release-server-${{ matrix.rid }}
+          path: artifacts/packages/*
+          if-no-files-found: error
+  windows-client:
+    needs: plan
+    if: needs.plan.outputs.build == 'true'
+    uses: ./.github/workflows/windows-client.yml
+    with:
+      source_sha: ${{ needs.plan.outputs.sha }}
+      client_version: ${{ needs.plan.outputs.client }}
+      msi_version: ${{ needs.plan.outputs.msi }}
+      artifact_name: release-windows-client
   docker:
-    needs: [validate, build]
+    needs: plan
+    if: needs.plan.outputs.build == 'true'
     runs-on: ubuntu-24.04
-    permissions:
-      packages: write
-      contents: read
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@v7
+        with:
+          ref: ${{ needs.plan.outputs.sha }}
+          persist-credentials: false
+      - name: Build and test the release image
+        env:
+          SERVER_VERSION: ${{ needs.plan.outputs.server }}
+          SOURCE_SHA: ${{ needs.plan.outputs.sha }}
+        run: |
+          docker build -f docker/Dockerfile --build-arg VERSION="$SERVER_VERSION" --label "org.opencontainers.image.source=$GITHUB_SERVER_URL/$GITHUB_REPOSITORY" --label "org.opencontainers.image.revision=$SOURCE_SHA" --label "org.opencontainers.image.version=$SERVER_VERSION" -t media-server:release .
+          docker run -d --name release-smoke --read-only --tmpfs /tmp -p 127.0.0.1:5050:5050 -v release-smoke-data:/data media-server:release
+          trap 'docker logs release-smoke; docker rm -f release-smoke' EXIT
+          for i in $(seq 1 60); do if curl -fsS http://127.0.0.1:5050/health; then break; fi; sleep 1; done
+          curl -fsS http://127.0.0.1:5050/health
+          test "$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:5050/api/media)" = 401
+          curl -fsS http://127.0.0.1:5050/ > /tmp/release-index.html
+          grep -q 'id="root"' /tmp/release-index.html
+          mkdir -p artifacts/container
+          docker run --rm --entrypoint dpkg-query media-server:release -W -f='${binary:Package}\t${Version}\t${source:Package}\t${source:Version}\n' > artifacts/container/CONTAINER-PACKAGES.txt
+          docker run --rm --entrypoint ffmpeg media-server:release -L > artifacts/container/FFMPEG-LICENSE.txt 2>&1
+          docker save media-server:release -o artifacts/container/image.tar
+          docker build --target corresponding-source --output type=local,dest=artifacts/container -f docker/Dockerfile --build-arg VERSION="$SERVER_VERSION" .
+      - uses: actions/upload-artifact@v7
+        with:
+          name: release-container
+          path: |
+            artifacts/container/CONTAINER-PACKAGES.txt
+            artifacts/container/FFMPEG-LICENSE.txt
+            artifacts/container/Container-Corresponding-Source.tar.gz
+          if-no-files-found: error
+          compression-level: 1
+      - uses: actions/upload-artifact@v7
+        with:
+          name: container-image
+          path: artifacts/container/image.tar
+          if-no-files-found: error
+          compression-level: 1
+  assemble:
+    name: Release packages
+    needs: [plan, server, windows-client, docker]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ needs.plan.outputs.sha }}
+          persist-credentials: false
+      - uses: actions/download-artifact@v8
+        with:
+          pattern: release-*
+          path: artifacts/downloads
+      - name: Assemble named downloads, instructions and checksums
+        env:
+          SERVER_VERSION: ${{ needs.plan.outputs.server }}
+          CLIENT_VERSION: ${{ needs.plan.outputs.client }}
+          SOURCE_SHA: ${{ needs.plan.outputs.sha }}
+          RELEASE_TAG: ${{ needs.plan.outputs.tag }}
+        run: python3 scripts/package-release.py assemble
+      - uses: actions/upload-artifact@v7
+        with:
+          name: release-downloads
+          path: artifacts/release/*
+          if-no-files-found: error
+  publish:
+    needs: [plan, assemble]
+    if: needs.plan.outputs.publish == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: write
+      packages: write
+      actions: read
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ needs.plan.outputs.sha }}
+          persist-credentials: false
+      - uses: actions/github-script@v9
+        id: current
+        env:
+          SOURCE_SHA: ${{ needs.plan.outputs.sha }}
+        with:
+          script: |
+            const {data} = await github.rest.repos.getBranch({...context.repo, branch:'main'});
+            core.setOutput('current', String(data.commit.sha === process.env.SOURCE_SHA));
+      - uses: actions/download-artifact@v8
+        if: steps.current.outputs.current == 'true'
+        with:
+          name: release-downloads
+          path: artifacts/release
+      - uses: actions/download-artifact@v8
+        if: steps.current.outputs.current == 'true'
+        with:
+          name: container-image
+          path: artifacts/container
       - uses: docker/login-action@v4
+        if: steps.current.outputs.current == 'true'
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-      - env:
-          VERSION: ${{ inputs.version }}
+          password: ${{ github.token }}
+      - name: Publish the tested image
+        if: steps.current.outputs.current == 'true'
+        env:
+          RELEASE_TAG: ${{ needs.plan.outputs.tag }}
+          SOURCE_SHA: ${{ needs.plan.outputs.sha }}
         run: |
-          IMAGE="ghcr.io/${GITHUB_REPOSITORY,,}:$VERSION"
-          docker build -f docker/Dockerfile -t "$IMAGE" .
-          docker push "$IMAGE"
+          docker load -i artifacts/container/image.tar
+          test "$(docker inspect --format '{{ index .Config.Labels "org.opencontainers.image.revision" }}' media-server:release)" = "$SOURCE_SHA"
+          IMAGE="ghcr.io/${GITHUB_REPOSITORY,,}"
+          docker tag media-server:release "$IMAGE:$RELEASE_TAG"
+          docker push "$IMAGE:$RELEASE_TAG"
+      - name: Upload complete prerelease and publish it
+        id: release
+        if: steps.current.outputs.current == 'true'
+        uses: actions/github-script@v9
+        env:
+          RELEASE_TAG: ${{ needs.plan.outputs.tag }}
+          SOURCE_SHA: ${{ needs.plan.outputs.sha }}
+        with:
+          script: |
+            const published = await require('./scripts/publish-release.cjs')({github,context});
+            core.setOutput('published', String(published));
+      - name: Update alpha container channel
+        if: steps.release.outputs.published == 'true'
+        run: |
+          IMAGE="ghcr.io/${GITHUB_REPOSITORY,,}"
+          docker tag media-server:release "$IMAGE:alpha"
+          docker push "$IMAGE:alpha"
