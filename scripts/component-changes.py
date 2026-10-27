@@ -16,6 +16,7 @@ PREFIXES = {
     'windows': (
         'clients/windows/', 'shared/api/', 'backend/', 'frontend/',
         'scripts/test-native-client.py', 'scripts/setup-ffmpeg.ps1',
+        'scripts/check-glib-patch.py', 'tests/security/',
         '.github/workflows/windows-client.yml',
     ),
 }

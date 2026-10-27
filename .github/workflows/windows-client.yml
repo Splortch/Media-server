@@ -10,6 +10,24 @@ concurrency:
   group: windows-client-${{ github.ref }}
   cancel-in-progress: true
 jobs:
+  glib-security:
+    name: GLib optimized regression
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: tests/security/glib-variant-iter -> target
+      - name: Install GLib test dependencies
+        run: sudo apt-get install -y --no-install-recommends pkg-config libglib2.0-dev
+      - name: Verify the application and regression use the reviewed backport
+        run: python3 scripts/check-glib-patch.py
+      - name: Exercise all affected iterator operations with optimizations
+        run: cargo test --release --locked --manifest-path tests/security/glib-variant-iter/Cargo.toml
   audit:
     name: Rust dependency audit
     runs-on: ubuntu-24.04
@@ -18,8 +36,8 @@ jobs:
       - uses: taiki-e/install-action@v2
         with:
           tool: cargo-audit@0.22.2
-      - run: cargo audit --file clients/windows/native/Cargo.lock
-      - run: cargo audit --file clients/windows/src-tauri/Cargo.lock
+      - run: cargo audit --deny unsound --file clients/windows/native/Cargo.lock
+      - run: cargo audit --deny unsound --file clients/windows/src-tauri/Cargo.lock
   windows:
     name: Windows client
     runs-on: windows-latest
