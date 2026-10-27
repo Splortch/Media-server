@@ -1,0 +1,28 @@
+# Client ecosystem
+
+All applications live in this monorepo. The ASP.NET server remains independently runnable on Windows/Linux; neither desktop nor mobile software is required by the server or web UI. Client/server OS combinations are independent.
+
+| Component | Status in this change |
+|---|---|
+| Server and web | Existing functionality retained; versioned client API and revision-safe web progress added |
+| Shared API | OpenAPI exported from the running API; generated TypeScript schemas and a transport-neutral client |
+| Windows | Tauri/Rust host with a locally bundled React UI, authenticated networking and local streaming bridge; Windows CI builds EXE/MSI |
+| Android phone | Follow-up implementation plan; no APK, Gradle project or pretend build workflow yet |
+| Android TV | Architecture and focused backlog; no placeholder application |
+| iOS | Architecture and focused backlog; no placeholder application |
+
+Start with [API/authentication](API.md), [Windows development and limitations](WINDOWS.md), [synchronization](SYNC.md), and [Android follow-up PR](ANDROID.md). The reviewable scope deliberately prioritizes a working Windows alpha before Android, as requested. Packaging success is distinct from real device playback validation.
+
+## Repository boundaries
+
+- `backend/`: API, persistence, media and service modules; no client dependency.
+- `frontend/`: independently usable browser UI; the existing Player and visual styles are reused by Windows.
+- `clients/windows/src/`: dedicated connection/login/library/settings UI, never a remote web-page shortcut.
+- `clients/windows/native/`: Rust transport, cookie session handling, credential-store abstraction, scoped media bridge, unit/integration tests. It can be tested without Tauri/GTK.
+- `clients/windows/src-tauri/`: Windows window, permissions, native preferences and installer configuration.
+- `shared/api/`: exported version-1 OpenAPI, generated models, reusable transport-neutral TypeScript client.
+- `docs/clients/`: future platform decisions and implementation scope. Android/TV/iOS directories will be created when functional implementations begin.
+
+## Two-maintainer split
+
+Maintainer A owns API/schema migrations, native transport, authentication and release packaging. Maintainer B owns client UI, Compose phone implementation, playback UX and accessibility. Both review authentication, stream authorization, schema changes and synchronization. Keep Windows/API work in one focused PR; implement Android in the next PR after those contracts stabilize. No merge or stable release is authorized by this change.

@@ -20,3 +20,7 @@
 artifacts/
 **/__pycache__/
 *.pyc
+
+**/target/
+**/gen/schemas/
+**/gen/android/

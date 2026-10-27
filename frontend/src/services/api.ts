@@ -6,12 +6,14 @@ export type Media = {
   videoCodec: string;
   audioCodec: string;
   size: number;
-  playback?: { mode: string; mimeType: string; warning?: string };
+  playback?: { mode: string; mimeType: string; warning?: string | null };
 };
 export type Progress = {
   mediaItemId: number;
   seconds: number;
   updatedAt: string;
+  revision: number;
+  completed: boolean;
 };
 export type Library = { id: number; name: string; path: string };
 let csrf: string | undefined;
@@ -54,6 +56,7 @@ export async function api<T>(
         {
           401: 'Sign-in failed or your session expired.',
           403: 'You do not have permission.',
+          409: 'Progress changed on another device. Reopen this video.',
           429: 'Too many attempts. Wait a minute and retry.',
         }[response.status] ||
         `Server returned ${response.status}.`,
