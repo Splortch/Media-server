@@ -52,14 +52,79 @@ test('privileged publication is isolated from PR dry runs and uses current-run a
 test('publisher verifies every byte before creating a release and keeps failed uploads private',async()=>{
  const publish=require('../publish-release.cjs');const crypto=require('node:crypto');const temporary=fs.mkdtempSync(path.join(os.tmpdir(),'media-publish-'));const original=process.cwd();const oldEnv={SOURCE_SHA:process.env.SOURCE_SHA,RELEASE_TAG:process.env.RELEASE_TAG};
  const folder=path.join(temporary,'artifacts/release');fs.mkdirSync(folder,{recursive:true});let created=0,updated=0,uploads=0;
- for(let i=0;i<8;i++)fs.writeFileSync(path.join(folder,`artifact-${i}.zip`),'explicit unit test fixture');
+ for(const target of require('../release-targets.cjs').targets('0.2.0-alpha.50','0.1.0-alpha.50'))for(const name of target.files)fs.writeFileSync(path.join(folder,name),'explicit unit test fixture');
  fs.writeFileSync(path.join(folder,'release.json'),JSON.stringify({commit:sha,channel:'alpha',serverVersion:'0.2.0-alpha.50',windowsClientVersion:'0.1.0-alpha.50',image:'test-image'}));
  const sums=fs.readdirSync(folder).sort().map(name=>`${crypto.createHash('sha256').update(fs.readFileSync(path.join(folder,name))).digest('hex')}  ${name}`).join('\n')+'\n';fs.writeFileSync(path.join(folder,'SHA256SUMS'),sums);
  const github={paginate:async()=>[],rest:{repos:{getBranch:async()=>({data:{commit:{sha}}}),getReleaseByTag:async()=>{throw Object.assign(new Error('not found'),{status:404});},createRelease:async p=>{assert.equal(p.draft,true);assert.equal(p.prerelease,true);created++;return{data:{id:1}};},listReleaseAssets:()=>{},uploadReleaseAsset:async()=>{uploads++;if(uploads===2)throw new Error('simulated network interruption');},updateRelease:async()=>{updated++;}}}};
  try {process.chdir(temporary);process.env.SOURCE_SHA=sha;process.env.RELEASE_TAG='v0.2.0-alpha.50';
  await assert.rejects(publish({github,context:{repo:{owner:'Splortch',repo:'Media-server'}}}),/network interruption/);assert.equal(created,1);assert.equal(updated,0);
- fs.writeFileSync(path.join(folder,'artifact-0.zip'),'tampered');created=0;await assert.rejects(publish({github,context:{repo:{owner:'Splortch',repo:'Media-server'}}}),/Checksum mismatch/);assert.equal(created,0);
+ fs.writeFileSync(path.join(folder,'MediaServer-v0.2.0-alpha.50-win-x64.zip'),'tampered');created=0;await assert.rejects(publish({github,context:{repo:{owner:'Splortch',repo:'Media-server'}}}),/Checksum mismatch/);assert.equal(created,0);
  }finally{process.chdir(original);for(const [key,value]of Object.entries(oldEnv)){if(value===undefined)delete process.env[key];else process.env[key]=value;}fs.rmSync(temporary,{recursive:true,force:true});}
 });
 
 test('automatic versions use the source Windows counter, not the coordinator counter',async()=>{const f=fixture();f.context.runNumber=70000;assert.equal((await f.run()).tag,'v0.2.0-alpha.50');});
+
+test('planner retries a partial platform release set',async()=>{
+ const f=fixture();
+ // The fixture returns one common existing value; a draft means the set is incomplete.
+ f.state.existing={target_commitish:sha,draft:true};
+ assert.equal((await f.run()).build,true);
+});
+test('platform release tags are unique and contain only relevant downloads',()=>{
+ const all=require('../release-targets.cjs').targets('0.2.0-alpha.50','0.1.0-alpha.50');
+ assert.deepEqual(all.map(t=>t.tag),['server-windows/v0.2.0-alpha.50','server-linux/v0.2.0-alpha.50','client-windows/v0.1.0-alpha.50','docker/v0.2.0-alpha.50']);
+ assert.equal(new Set(all.flatMap(t=>t.files)).size,8);
+ assert.equal(all[0].files.length,1);assert.equal(all[1].files.length,1);assert.equal(all[2].files.length,2);assert.equal(all[3].files.length,4);
+});
+test('publisher produces four releases with independent integrity manifests and resumes partial success',async()=>{
+ const publish=require('../publish-release.cjs');const crypto=require('node:crypto');
+ const temporary=fs.mkdtempSync(path.join(os.tmpdir(),'platform-publish-'));const original=process.cwd();
+ const saved={SOURCE_SHA:process.env.SOURCE_SHA,RELEASE_TAG:process.env.RELEASE_TAG};
+ const folder=path.join(temporary,'artifacts/release');fs.mkdirSync(folder,{recursive:true});
+ const targets=require('../release-targets.cjs').targets('0.2.0-alpha.50','0.1.0-alpha.50');
+ for(const target of targets)for(const name of target.files)fs.writeFileSync(path.join(folder,name),'fixture '+name);
+ fs.writeFileSync(path.join(folder,'release.json'),JSON.stringify({commit:sha,channel:'alpha',serverVersion:'0.2.0-alpha.50',windowsClientVersion:'0.1.0-alpha.50',image:'test-image'}));
+ fs.writeFileSync(path.join(folder,'SHA256SUMS'),fs.readdirSync(folder).sort().map(name=>crypto.createHash('sha256').update(fs.readFileSync(path.join(folder,name))).digest('hex')+'  '+name).join('\n')+'\n');
+ const releases=new Map();const assets=new Map();let next=1,fail=true;
+ const github={paginate:async(_fn,p)=>[...(assets.get(p.release_id)||[])].map(([name])=>({id:name,name})),rest:{repos:{
+ getBranch:async()=>({data:{commit:{sha}}}),
+ getReleaseByTag:async p=>{if(releases.has(p.tag))return{data:releases.get(p.tag)};throw Object.assign(new Error('missing'),{status:404});},
+ createRelease:async p=>{const r={id:next++,target_commitish:p.target_commitish,draft:true};releases.set(p.tag_name,r);assets.set(r.id,new Map());return{data:r};},
+ listReleaseAssets:()=>{},deleteReleaseAsset:async p=>{for(const a of assets.values())a.delete(p.asset_id);},
+ uploadReleaseAsset:async p=>{if(p.release_id===2&&fail){fail=false;throw new Error('interrupted second platform');}assets.get(p.release_id).set(p.name,Buffer.from(p.data));},
+ updateRelease:async p=>{for(const r of releases.values())if(r.id===p.release_id)r.draft=p.draft;}
+ }}};
+ try{process.chdir(temporary);process.env.SOURCE_SHA=sha;process.env.RELEASE_TAG='v0.2.0-alpha.50';
+ await assert.rejects(publish({github,context:{repo:{owner:'Splortch',repo:'Media-server'}}}),/second platform/);
+ assert.equal(releases.get(targets[0].tag).draft,false);assert.equal(releases.get(targets[1].tag).draft,true);
+ assert.equal(await publish({github,context:{repo:{owner:'Splortch',repo:'Media-server'}}}),true);assert.equal(releases.size,4);
+ for(const target of targets){
+  const r=releases.get(target.tag);assert.equal(r.draft,false);const a=assets.get(r.id);
+  assert.deepEqual([...a.keys()].sort(),[...target.files,'release.json','SHA256SUMS'].sort());
+  assert.equal(JSON.parse(a.get('release.json')).platform,target.id);
+  for(const line of a.get('SHA256SUMS').toString().trim().split('\n')){
+   const [hash,name]=line.split('  ');assert.equal(crypto.createHash('sha256').update(a.get(name)).digest('hex'),hash);
+  }
+ }
+ }finally{process.chdir(original);for(const [k,v]of Object.entries(saved)){if(v===undefined)delete process.env[k];else process.env[k]=v;}fs.rmSync(temporary,{recursive:true,force:true});}
+});
+
+test('release descriptions explain each real platform and only synchronize recognized alpha notes',async()=>{
+ const {platformNotes,syncReleaseNotes}=require('../release-notes.cjs');
+ const targets=require('../release-targets.cjs').targets('0.2.0-alpha.50','0.1.0-alpha.50');
+ const bodies=targets.map(t=>platformNotes(t,sha,'Splortch/Media-server','test-image'));
+ assert.match(bodies[0],/Start-MediaServer.cmd/);assert.match(bodies[1],/sudo apt install ffmpeg/);
+ assert.match(bodies[2],/WebView2/);assert.match(bodies[3],/docker compose up -d/);
+ const changed=[];
+ const releases=[
+ {id:1,tag_name:'v0.2.0-alpha.40',target_commitish:sha,prerelease:true,draft:false},
+ ...targets.map((t,i)=>({id:i+2,tag_name:t.tag,target_commitish:sha,prerelease:true,draft:false})),
+ {id:6,tag_name:'server-linux/v0.2.0-alpha.50',target_commitish:sha,prerelease:true,draft:true},
+ {id:7,tag_name:'server-linux/v0.2.0-alpha.50',target_commitish:sha,prerelease:false,draft:false},
+ {id:8,tag_name:'unrelated',target_commitish:sha,prerelease:true,draft:false}
+ ];
+ const github={paginate:async()=>releases,rest:{repos:{listReleases:()=>{},updateRelease:async p=>changed.push(p)}}};
+ await syncReleaseNotes({github,context:{repo:{owner:'Splortch',repo:'Media-server'}}});
+ assert.deepEqual(changed.map(p=>p.release_id),[1,2,3,4,5]);
+ for(const p of changed){assert.deepEqual(Object.keys(p).sort(),['body','owner','release_id','repo']);assert.match(p.body,/Get started/);}
+});

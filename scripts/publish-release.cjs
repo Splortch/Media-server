@@ -1,6 +1,8 @@
 const fs = require('node:fs');
 const crypto = require('node:crypto');
 const path = require('node:path');
+const {targets} = require('./release-targets.cjs');
+const {platformNotes} = require('./release-notes.cjs');
 module.exports = async function publish({github, context}) {
   const sha = process.env.SOURCE_SHA;
   const tag = process.env.RELEASE_TAG;
@@ -21,22 +23,36 @@ module.exports = async function publish({github, context}) {
     for await (const chunk of fs.createReadStream(path.join(folder, entry.name))) hash.update(chunk);
     if (hash.digest('hex') !== entry.hash) throw new Error(`Checksum mismatch: ${entry.name}`);
   }
-  let release;
-  try { release = (await github.rest.repos.getReleaseByTag({...context.repo,tag})).data; }
-  catch(error) { if(error.status !== 404) throw error; }
-  if (release && release.target_commitish !== sha) throw new Error('Release tag source mismatch.');
-  if (release && !release.draft) return true; // Published releases are immutable here.
-  const body = `Early alpha from commit ${sha}.\n\nDownload the server for your OS, extract it, and use its Start launcher. The web client is included. The separate Windows client installers connect to a running server. Docker users can download the Compose setup. See the bundled README and docs/deployment/RELEASES.md.\n\nBuilds and installers are unsigned. No Android, Android TV, iOS or macOS app is included. SHA256SUMS verifies download integrity. Container package/license inventory and corresponding source are provided separately; ordinary installation does not require the source archive. Server data lives outside the versioned download folder. Back it up before updating.\n\nServer ${manifest.serverVersion}; Windows client ${manifest.windowsClientVersion}. Image: ${manifest.image}.`;
-  if (!release) release = (await github.rest.repos.createRelease({...context.repo,tag_name:tag,target_commitish:sha,name:`Media Server ${manifest.serverVersion}`,body,draft:true,prerelease:true,make_latest:'false'})).data;
-  const existing = await github.paginate(github.rest.repos.listReleaseAssets,{...context.repo,release_id:release.id,per_page:100});
-  for (const name of [...entries.map(e=>e.name),'SHA256SUMS']) {
-    const old = existing.find(asset=>asset.name===name);
-    if (old) await github.rest.repos.deleteReleaseAsset({...context.repo,asset_id:old.id});
-    const data = fs.readFileSync(path.join(folder,name));
-    await github.rest.repos.uploadReleaseAsset({...context.repo,release_id:release.id,name,data,headers:{'content-type':'application/octet-stream','content-length':data.length}});
+  // Verify the complete build set above before creating any draft. Each public
+  // release contains only its platform assets and its own manifest/checksums.
+  for (const target of targets(manifest.serverVersion, manifest.windowsClientVersion)) {
+    for (const name of target.files) if (!entries.some(e => e.name === name)) throw new Error(`Missing platform asset: ${name}`);
   }
-  const current = await github.rest.repos.getBranch({...context.repo,branch:'main'});
-  if (current.data.commit.sha !== sha) return false; // Leave an incomplete/superseded attempt private.
-  await github.rest.repos.updateRelease({...context.repo,release_id:release.id,draft:false,prerelease:true,body,make_latest:'false'});
+  for (const target of targets(manifest.serverVersion, manifest.windowsClientVersion)) {
+    if ((await github.rest.repos.getBranch({...context.repo,branch:'main'})).data.commit.sha !== sha) return false;
+    let release;
+    try { release = (await github.rest.repos.getReleaseByTag({...context.repo,tag:target.tag})).data; }
+    catch(error) { if(error.status !== 404) throw error; }
+    if (release && release.target_commitish !== sha) throw new Error('Release tag source mismatch.');
+    if (release && !release.draft) continue; // Already published platforms remain immutable on retries.
+    const body = platformNotes(target, sha, `${context.repo.owner}/${context.repo.repo}`, manifest.image);
+    if (!release) release = (await github.rest.repos.createRelease({...context.repo,tag_name:target.tag,target_commitish:sha,name:`${target.name} ${target.version}`,body,draft:true,prerelease:true,make_latest:'false'})).data;
+    const platformManifest = {commit:sha,platform:target.id,version:target.version,channel:'alpha',signed:false,...(target.id === 'docker' ? {image:manifest.image} : {})};
+    const manifestData = Buffer.from(JSON.stringify(platformManifest,null,2)+'\n');
+    const checksumData = Buffer.from([...target.files.map(name => {
+      const entry = entries.find(e=>e.name===name);
+      return `${entry.hash}  ${name}`;
+    }),`${crypto.createHash('sha256').update(manifestData).digest('hex')}  release.json`].join('\n')+'\n');
+    const existing = await github.paginate(github.rest.repos.listReleaseAssets,{...context.repo,release_id:release.id,per_page:100});
+    const names = [...target.files,'release.json','SHA256SUMS'];
+    // Remove obsolete assets only from retryable drafts, never a published release.
+    for (const asset of existing) await github.rest.repos.deleteReleaseAsset({...context.repo,asset_id:asset.id});
+    for (const name of names) {
+      const data = name === 'release.json' ? manifestData : name === 'SHA256SUMS' ? checksumData : fs.readFileSync(path.join(folder,name));
+      await github.rest.repos.uploadReleaseAsset({...context.repo,release_id:release.id,name,data,headers:{'content-type':'application/octet-stream','content-length':data.length}});
+    }
+    if ((await github.rest.repos.getBranch({...context.repo,branch:'main'})).data.commit.sha !== sha) return false;
+    await github.rest.repos.updateRelease({...context.repo,release_id:release.id,draft:false,prerelease:true,body,make_latest:'false'});
+  }
   return true;
 };
