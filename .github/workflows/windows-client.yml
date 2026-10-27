@@ -71,19 +71,17 @@ jobs:
         run: cargo clippy --locked --manifest-path clients/windows/native/Cargo.toml --all-targets -- -D warnings
       - if: steps.changes.outputs.changed == 'true'
         run: cargo test --locked --manifest-path clients/windows/native/Cargo.toml
-      - name: Install cached FFmpeg and FFprobe
+      - name: Cache pinned FFmpeg archive
         if: steps.changes.outputs.changed == 'true'
-        uses: FedericoCarboni/setup-ffmpeg@37062fbf7149fc5578d6c57e08aed62458b375d6 # v3.1
-        timeout-minutes: 10
+        uses: actions/cache@v4
         with:
-          ffmpeg-version: '7.1.1'
-      - name: Verify media test prerequisites
+          path: ${{ runner.temp }}/ffmpeg-8.1.2-essentials_build.zip
+          key: windows-ffmpeg-8.1.2-db580001caa24ac104c8cb856cd113a87b0a443f7bdf47d8c12b1d740584a2ec
+      - name: Install and verify FFmpeg and FFprobe
         if: steps.changes.outputs.changed == 'true'
-        run: |
-          ffmpeg -version
-          if ($LASTEXITCODE -ne 0) { throw 'FFmpeg is not available' }
-          ffprobe -version
-          if ($LASTEXITCODE -ne 0) { throw 'FFprobe is not available' }
+        timeout-minutes: 10
+        shell: pwsh
+        run: ./scripts/setup-ffmpeg.ps1
       - if: steps.changes.outputs.changed == 'true'
         run: dotnet build MediaServer.sln
       - if: steps.changes.outputs.changed == 'true'

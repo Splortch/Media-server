@@ -6,7 +6,7 @@ older Dependabot branches. A failed check is not always a failed application tes
 | Affected PRs/runs | Verified cause | Resolution |
 | --- | --- | --- |
 | #25 Windows backend and desktop checks | `component-changes.py` opened GitHub's UTF-8 event JSON using the Windows ANSI default. An emoji in the Dependabot PR body caused `UnicodeDecodeError` before any build/test. | Explicit UTF-8 for event input, Git path output and Actions output; regression tests on Windows and Linux. |
-| #36 Windows desktop | Chocolatey FFmpeg feed returned HTTP 504 and installed zero packages. The later real-backend integration test failed with `WinError 2` when launching FFmpeg. | Pin FFmpeg 7.1.1 via a commit-pinned setup action; verify both ffmpeg and ffprobe before integration tests. No tests are skipped. |
+| #36 Windows desktop | Chocolatey FFmpeg feed returned HTTP 504 and installed zero packages. The later real-backend integration test failed with `WinError 2` when launching FFmpeg. | Download the exact FFmpeg 8.1.2 essentials archive, verify its pinned SHA-256 (also on cache hits), export PATH, and verify ffmpeg/ffprobe before integration tests. No tests are skipped. |
 | #36 and earlier #25/#27 browser checks | Ubuntu downloads were making progress, but the five-minute FFmpeg installation step expired. | Keep apt network/lock timeouts and bounded retries, allow 15 minutes for the full dependency download, verify executables. |
 | #35 Windows desktop | sha2 0.11 digest output no longer implements `LowerHex`; `format!("{:x}", digest)` fails with E0277. | Format the digest bytes and regression-test the exact credential key, preserving saved-session lookup. This repair retains sha2 0.10; the dependency upgrade must also regenerate both native and Tauri lockfiles. |
 | #24, #28, #29, #30 older Windows checks | Builds and all seven tests passed, then the formatter rejected checkout line endings. | Current main already has `.gitattributes` enforcing LF. Refresh those branches before interpreting old formatting results. |
@@ -59,3 +59,9 @@ The Python regression deliberately simulates Windows cp1252 decoding of an emoji
 GitHub event. Automation tests run on Windows and Ubuntu, with the stable required check name
 `Agent dispatch policy` aggregating both platforms. Hosted Windows builds validate Rust and the
 actual native-to-backend integration; a Linux script test is not a Windows playback test.
+
+The Windows test-tool archive is fetched directly from the public GyanD/codexffmpeg 8.1.2
+release. Its SHA-256 in `scripts/setup-ffmpeg.ps1` was taken from the release asset metadata.
+Cache keys include that digest. Updating the version requires reviewing the upstream asset and
+changing version, digest and cache key together. A checksum mismatch fails closed. This is CI
+test tooling, not an added application runtime or redistributed client component.

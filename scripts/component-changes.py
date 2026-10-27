@@ -15,7 +15,8 @@ PREFIXES = {
     'web': ('frontend/', 'shared/api/', '.github/workflows/web-client.yml'),
     'windows': (
         'clients/windows/', 'shared/api/', 'backend/', 'frontend/',
-        'scripts/test-native-client.py', '.github/workflows/windows-client.yml',
+        'scripts/test-native-client.py', 'scripts/setup-ffmpeg.ps1',
+        '.github/workflows/windows-client.yml',
     ),
 }
 
