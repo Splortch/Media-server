@@ -37,3 +37,34 @@ describe('client contract', () => {
     );
   });
 });
+
+it('reports the real desktop engine while preserving the Windows defaults', async () => {
+  const request = vi.fn().mockResolvedValue(undefined);
+  const api = new ClientApi({ request, streamUrl: vi.fn() } as Transport);
+  await api.capabilities(['mp4'], [], {
+    platform: 'macos',
+    player: 'WKWebView',
+  });
+  expect(request).toHaveBeenLastCalledWith('PUT', '/api/v1/capabilities', {
+    platform: 'macos',
+    player: 'WKWebView',
+    containers: ['mp4'],
+    codecs: [],
+  });
+  await api.report(3, 'decode', 'macos-wkwebview');
+  expect(request).toHaveBeenLastCalledWith(
+    'POST',
+    '/api/v1/media/3/playback-errors',
+    {
+      code: 'decode',
+      client: 'macos-wkwebview',
+    },
+  );
+  await api.capabilities(['webm'], []);
+  expect(request).toHaveBeenLastCalledWith('PUT', '/api/v1/capabilities', {
+    platform: 'windows',
+    player: 'WebView2',
+    containers: ['webm'],
+    codecs: [],
+  });
+});

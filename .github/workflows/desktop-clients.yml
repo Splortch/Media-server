@@ -69,6 +69,7 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         if: steps.changes.outputs.changed == 'true'
         with:
+          cache-on-failure: true
           workspaces: |
             clients/windows/native -> target
             clients/windows/src-tauri -> target

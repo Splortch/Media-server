@@ -64,9 +64,21 @@ export default function App() {
   const [address, setAddress] = useState('https://');
   const [remember, setRemember] = useState(false);
   const [persistentSessions, setPersistentSessions] = useState(false);
+  const [clientPlatform, setClientPlatform] = useState('desktop');
+  const playerEngine =
+    clientPlatform === 'windows'
+      ? 'WebView2'
+      : clientPlatform === 'macos'
+        ? 'WKWebView'
+        : clientPlatform === 'linux'
+          ? 'WebKitGTK'
+          : 'HTML video';
   useEffect(() => {
     void desktopCapabilities()
-      .then((c) => setPersistentSessions(c.persistentSessions))
+      .then((c) => {
+        setPersistentSessions(c.persistentSessions);
+        setClientPlatform(c.os);
+      })
       .catch(() => {});
   }, []);
   const [theme, setTheme] = useState('system');
@@ -243,7 +255,10 @@ export default function App() {
       const supported = formats
         .filter(([, mime]) => video.canPlayType(mime))
         .map(([name]) => name);
-      await api.capabilities(supported, []);
+      await api.capabilities(supported, [], {
+        platform: clientPlatform,
+        player: playerEngine,
+      });
     } catch (e) {
       failure(e);
     } finally {
@@ -495,7 +510,11 @@ export default function App() {
                   selection.writer.save(seconds, completed)
                 }
                 onPlaybackError={async () => {
-                  await api.report(selection.item.id, 'unknown');
+                  await api.report(
+                    selection.item.id,
+                    'unknown',
+                    `${clientPlatform}-${playerEngine.toLowerCase()}`,
+                  );
                   await api.me();
                 }}
               />
@@ -567,9 +586,9 @@ export default function App() {
                 ))}
               </section>
               <p className="muted">
-                Updates are manual in this alpha. WebView2 playback depends on
-                your operating system’s codec support; native libmpv playback is
-                planned.
+                Updates are manual in this alpha. Playback support depends on
+                your operating system and installed media codecs; native libmpv
+                playback is planned.
               </p>
             </>
           ) : (

@@ -4,7 +4,7 @@ umask 077
 cd -- "$(dirname -- "${BASH_SOURCE[0]}")"
 export MediaServer__DataDirectory="${MediaServer__DataDirectory:-$HOME/Library/Application Support/Splortch/MediaServer}"
 mkdir -p -- "$MediaServer__DataDirectory"
-chmod 700 -- "$MediaServer__DataDirectory"
+chmod 700 "$MediaServer__DataDirectory"
 config="$MediaServer__DataDirectory/media-root"
 if [[ -z "${MediaServer__AllowedRoots__0:-}" ]]; then
   if [[ -f "$config" ]]; then

@@ -14,7 +14,8 @@ with tempfile.TemporaryDirectory(prefix='media-desktop-installed-') as temp:
     directory = Path(temp)
     if mac:
         mount = directory / 'mounted'
-        subprocess.run(['hdiutil', 'attach', '-nobrowse', '-readonly', '-mountpoint', str(mount), str(package)], check=True)
+        mount.mkdir()
+        subprocess.run(['hdiutil', 'attach', '-nobrowse', '-readonly', '-mountpoint', str(mount), str(package)], input='Y\n', text=True, check=True)
         try:
             app, = mount.glob('*.app')
             installed = directory / app.name
