@@ -3,7 +3,7 @@
 import json
 from pathlib import Path
 root = Path(__file__).resolve().parents[1]
-for rid in ('win-x64', 'linux-x64'):
+for rid in ('win-x64', 'linux-x64', 'osx-x64', 'osx-arm64'):
     for project in (root / 'backend/src').glob('*/*.csproj'):
         baseline = json.loads((project.parent / 'packages.lock.json').read_text(encoding='utf-8'))['dependencies']
         publish = root / 'backend/locks' / rid / project.stem / 'packages.lock.json'
@@ -17,4 +17,4 @@ for rid in ('win-x64', 'linux-x64'):
                     raise RuntimeError(f'{rid}/{project.stem}: reviewed package {name} drifted')
         if not any(key.endswith('/' + rid) for key in locked):
             raise RuntimeError(f'{rid}/{project.stem}: missing runtime graph')
-print('Both platform publish graphs retain the reviewed dependency versions and hashes.')
+print('All platform publish graphs retain the reviewed dependency versions and hashes.')

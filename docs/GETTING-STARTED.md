@@ -241,3 +241,6 @@ Record pass/fail and versions when you try it. These boxes are intentionally unc
 - [ ] Stopped/restarted without losing the library or accidentally reopening setup.
 
 Known review findings and the limits of automated validation are in [PROJECT-REVIEW.md](development/PROJECT-REVIEW.md). Developer/source setup is in [SETUP.md](development/SETUP.md); it requires .NET/Node tooling and is not needed for downloaded builds.
+
+
+See [desktop installers for Windows, Linux and macOS](deployment/DESKTOP-INSTALLERS.md) for server/client package selection and step-by-step setup.

@@ -150,3 +150,6 @@ The Release descriptions workflow refreshes existing descriptions when this chan
 Use **[Browse by platform](https://github.com/Splortch/Media-server/blob/downloads/README.md)** to see Servers and Clients separately. Each platform has one latest-build entry and its own collapsed older-version history, so accumulated Windows or Android releases cannot hide another platform. GitHub's native Releases feed remains the complete archive.
 
 The `Download catalog` workflow refreshes the generated `downloads` branch from actual published releases after validation. This works as a GitHub Markdown page without Pages configuration. The workflow also produces a responsive HTML preview; hosting that preview is separate from the always-available GitHub category index. See [catalog development and publication](../../downloads/README.md).
+
+
+See [desktop installers for Windows, Linux and macOS](DESKTOP-INSTALLERS.md) for server/client package selection and step-by-step setup.

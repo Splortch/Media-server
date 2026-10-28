@@ -10,6 +10,9 @@ function fixtures() {
     release('docker', 10, ['MediaServer-Docker-v0.2.0-alpha.10.zip']),
     release('client-windows', 10, ['MediaServer-Windows-Client-v0.1.0-alpha.10-win-x64-setup.exe', 'MediaServer-Windows-Client-v0.1.0-alpha.10-win-x64.msi']),
     release('client-android', 17, ['MediaServer-Android-v0.1.0-alpha.17-debug.apk']),
+    release('server-macos', 10, ['MediaServer-v0.2.0-alpha.10-osx-arm64.pkg', 'MediaServer-v0.2.0-alpha.10-osx-x64.pkg']),
+    release('client-linux', 10, ['MediaServer-Desktop-Client-v0.1.0-alpha.10-linux-x64.deb']),
+    release('client-macos', 10, ['MediaServer-Desktop-Client-v0.1.0-alpha.10-osx-arm64.dmg', 'MediaServer-Desktop-Client-v0.1.0-alpha.10-osx-x64.dmg']),
     release('client-android', 7, ['MediaServer-Android-v0.1.0-alpha.7-debug.apk']),
   ];
 }

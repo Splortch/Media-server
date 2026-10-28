@@ -1,5 +1,5 @@
 const {targets} = require('./release-targets.cjs');
-const required = ['backend-server.yml', 'web-client.yml', 'windows-client.yml', 'ci.yml', 'agent-automation-tests.yml'];
+const required = ['backend-server.yml', 'web-client.yml', 'windows-client.yml', 'ci.yml', 'agent-automation-tests.yml', 'desktop-clients.yml'];
 function versions(number) {
   if (!Number.isSafeInteger(number) || number < 1 || number > 65535) throw new Error('Release build number must fit the Windows installer version (1..65535).');
   return { server: `0.2.0-alpha.${number}`, client: `0.1.0-alpha.${number}`, msi: `0.1.${number}`, tag: `v0.2.0-alpha.${number}` };

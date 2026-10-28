@@ -43,3 +43,9 @@ export function errorMessage(e: unknown) {
 export function expired(e: unknown) {
   return !!e && typeof e === 'object' && 'code' in e && e.code === 'AUTH';
 }
+
+export function desktopCapabilities() {
+  return invoke<{ os: string; persistentSessions: boolean }>(
+    'desktop_capabilities',
+  );
+}

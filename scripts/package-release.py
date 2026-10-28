@@ -43,9 +43,9 @@ def browser_licenses(folder):
 def package_server():
     ver = version('SERVER_VERSION')
     rid = os.environ['RID']
-    if rid not in ('win-x64', 'linux-x64'):
+    if rid not in ('win-x64', 'linux-x64', 'osx-x64', 'osx-arm64'):
         raise ValueError('Unsupported server runtime')
-    linux = rid == 'linux-x64'
+    linux = rid != 'win-x64'
     executable = 'Api' if linux else 'Api.exe'
     source = ARTIFACTS / 'server'
     if not (source / executable).is_file():
@@ -59,12 +59,12 @@ def package_server():
     browser_licenses(folder)
     shutil.copyfile(ROOT / 'scripts/update-server.py', folder / 'update-server.py')
     shutil.copyfile(ROOT / 'docs/deployment/BACKUPS-UPDATES.md', folder / 'BACKUPS-UPDATES.md')
-    resources = ROOT / 'release-resources' / ('linux' if linux else 'windows')
+    resources = ROOT / 'release-resources' / ('macos' if rid.startswith('osx-') else 'linux' if linux else 'windows')
     for path in resources.iterdir():
         shutil.copyfile(path, folder / path.name)
     if linux:
         (folder / executable).chmod(0o755)
-        (folder / 'start-media-server.sh').chmod(0o755)
+        (folder / ('Start-MediaServer.command' if rid.startswith('osx-') else 'start-media-server.sh')).chmod(0o755)
     extension = '.tar.gz' if linux else '.zip'
     archive(folder, ARTIFACTS / 'packages' / (folder.name + extension), linux)
 
@@ -88,6 +88,15 @@ def assemble():
     for rid, extension in [('win-x64', '.zip'), ('linux-x64', '.tar.gz')]:
         name = f'MediaServer-v{server}-{rid}{extension}'
         shutil.copyfile(downloads / f'release-server-{rid}' / name, output / name)
+    for rid in ('osx-arm64', 'osx-x64'):
+        for ext in ('pkg', 'tar.gz'):
+            name = f'MediaServer-v{server}-{rid}.{ext}'
+            shutil.copyfile(downloads / f'release-server-{rid}' / name, output / name)
+    deb = f'MediaServer-v{server}-linux-x64.deb'
+    shutil.copyfile(downloads / 'release-server-linux-x64' / deb, output / deb)
+    for rid, ext in [('linux-x64', 'deb'), ('osx-arm64', 'dmg'), ('osx-x64', 'dmg')]:
+        name = f'MediaServer-Desktop-Client-v{client}-{rid}.{ext}'
+        shutil.copyfile(downloads / f'release-desktop-{rid}' / name, output / name)
     installer = f'MediaServer-v{server}-win-x64-setup.exe'
     shutil.copyfile(downloads / 'release-server-win-x64' / installer, output / installer)
     native = downloads / 'release-windows-client'
@@ -126,8 +135,8 @@ volumes:
             with path.open('rb') as stream:
                 sums.append(f'{hashlib.file_digest(stream, "sha256").hexdigest()}  {path.name}')
     (output / 'SHA256SUMS').write_text('\n'.join(sums) + '\n', encoding='utf-8')
-    if len(sums) != 10:
-        raise RuntimeError(f'Expected 10 release assets before checksums; found {len(sums)}')
+    if len(sums) != 18:
+        raise RuntimeError(f'Expected 18 release assets before checksums; found {len(sums)}')
 
 
 if __name__ == '__main__':

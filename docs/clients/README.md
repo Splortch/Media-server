@@ -31,3 +31,6 @@ Maintainer A owns API/schema migrations, native transport, authentication and re
 ## Android phone alpha
 
 See the [Android installation and development guide](ANDROID.md) for the native Kotlin/Compose application, APK artifacts, USB setup, signing and validation limits. Server and web operation do not depend on Android. Android TV and iOS remain future applications; no empty projects are added.
+
+
+See [desktop installers for Windows, Linux and macOS](../deployment/DESKTOP-INSTALLERS.md) for server/client package selection and step-by-step setup.

@@ -4,6 +4,9 @@ import App from '../src/App';
 import * as bridge from '../src/bridge';
 vi.mock('../src/bridge', () => ({
   preferences: vi.fn().mockResolvedValue({}),
+  desktopCapabilities: vi
+    .fn()
+    .mockResolvedValue({ os: 'windows', persistentSessions: true }),
   savePreferences: vi.fn().mockResolvedValue(undefined),
   connect: vi.fn(),
   login: vi.fn(),
