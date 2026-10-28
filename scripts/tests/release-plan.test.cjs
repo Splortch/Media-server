@@ -115,6 +115,8 @@ test('release descriptions explain each real platform and only synchronize recog
  const bodies=targets.map(t=>platformNotes(t,sha,'Splortch/Media-server','test-image'));
  assert.match(bodies[0],/Start-MediaServer.cmd/);assert.match(bodies[1],/sudo apt install ffmpeg/);
  assert.match(bodies[2],/WebView2/);assert.match(bodies[3],/docker compose up -d/);
+ const historical=require('../release-notes.cjs').combinedNotes('0.2.0-alpha.40','0.1.0-alpha.40',sha,'Splortch/Media-server');
+ assert.doesNotMatch(historical,/osx-(?:arm64|x64)\.(?:pkg|dmg)/);
  const changed=[];
  const releases=[
  {id:1,tag_name:'v0.2.0-alpha.40',target_commitish:sha,prerelease:true,draft:false},

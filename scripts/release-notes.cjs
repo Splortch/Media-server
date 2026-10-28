@@ -51,7 +51,7 @@ function platformNotes(target, sha, repository, image, {serverInstaller = false,
 }
 function combinedNotes(server, client, sha, repository) {
   return '# Combined alpha download archive\n\nThis earlier release contains several platforms together. Choose the download that matches what you want to run. Future releases list each platform separately.\n\n' +
-    targets(server, client).map(t=>platformNotes(t,sha,repository,'ghcr.io/'+repository.toLowerCase()+':v'+server)).join('\n\n---\n\n');
+    targets(server, client).filter(t=>['server-windows','server-linux','client-windows','docker'].includes(t.id)).map(t=>platformNotes(t,sha,repository,'ghcr.io/'+repository.toLowerCase()+':v'+server)).join('\n\n---\n\n');
 }
 async function syncReleaseNotes({github, context}) {
   const releases = await github.paginate(github.rest.repos.listReleases,{...context.repo,per_page:100});
