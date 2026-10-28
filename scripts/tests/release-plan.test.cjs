@@ -19,6 +19,7 @@ for(const [label,edit] of [
   ['PR upstream run',f=>f.context.payload.workflow_run.event='pull_request'],
   ['fork run',f=>f.context.payload.workflow_run.head_repository.full_name='Other/Media-server'],
   ['failed upstream',f=>f.context.payload.workflow_run.conclusion='failure'],
+  ['event/source commit mismatch',f=>f.context.sha='b'.repeat(40)],
   ['stale source',f=>f.state.head='b'.repeat(40)],
   ['missing workflow',f=>f.state.runs.pop()],
   ['pending workflow',f=>f.state.runs[0].status='in_progress'],
@@ -46,7 +47,9 @@ test('privileged publication is isolated from PR dry runs and uses current-run a
  assert.match(workflow,/if: needs.plan.outputs.publish == 'true'/);
  assert.match(workflow,/contents: write/);assert.match(workflow,/packages: write/);
  assert.doesNotMatch(workflow,/run-id:.*workflow_run/);
- assert.match(workflow,/ref: \$\{\{ needs.plan.outputs.sha \}\}/);
+ assert.match(workflow,/ref: \$\{\{ github.sha \}\}/);
+ assert.doesNotMatch(workflow,/(?:ref|source_sha): \$\{\{ needs.plan.outputs.sha/);
+ assert.match(workflow,/github.ref == 'refs\/heads\/main' && github.event_name != 'pull_request'/);
 });
 
 test('publisher verifies every byte before creating a release and keeps failed uploads private',async()=>{

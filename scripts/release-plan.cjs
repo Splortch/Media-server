@@ -25,6 +25,9 @@ async function plan({ github, context }) {
     sha = context.sha;
   } else return { build: false, publish: false };
   if (!/^[a-f0-9]{40}$/.test(sha)) throw new Error('Invalid source commit.');
+  // Builds always check out the workflow's own immutable event commit. Never
+  // execute a planner-supplied ref in the default branch's cache/security context.
+  if (sha !== context.sha) return { build: false, publish: false };
   const branch = await github.rest.repos.getBranch({ ...context.repo, branch: 'main' });
   if (branch.data.commit.sha !== sha) return { build: false, publish: false };
   const response = await github.rest.actions.listWorkflowRunsForRepo({ ...context.repo, event: 'push', head_sha: sha, per_page: 100 });

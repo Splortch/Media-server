@@ -82,7 +82,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
         with:
-          ref: ${{ needs.plan.outputs.sha }}
+          ref: ${{ github.sha }}
           persist-credentials: false
       - uses: actions/setup-dotnet@v6
         with:
@@ -174,7 +174,7 @@ jobs:
     if: needs.plan.outputs.build == 'true'
     uses: ./.github/workflows/windows-client.yml
     with:
-      source_sha: ${{ needs.plan.outputs.sha }}
+      source_sha: ${{ github.sha }}
       client_version: ${{ needs.plan.outputs.client }}
       msi_version: ${{ needs.plan.outputs.msi }}
       artifact_name: release-windows-client
@@ -183,7 +183,7 @@ jobs:
     if: needs.plan.outputs.build == 'true'
     uses: ./.github/workflows/desktop-clients.yml
     with:
-      source_sha: ${{ needs.plan.outputs.sha }}
+      source_sha: ${{ github.sha }}
       client_version: ${{ needs.plan.outputs.client }}
       msi_version: ${{ needs.plan.outputs.msi }}
   docker:
@@ -194,7 +194,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
         with:
-          ref: ${{ needs.plan.outputs.sha }}
+          ref: ${{ github.sha }}
           persist-credentials: false
       - name: Build and test the release image
         env:
@@ -237,7 +237,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
         with:
-          ref: ${{ needs.plan.outputs.sha }}
+          ref: ${{ github.sha }}
           persist-credentials: false
       - uses: actions/download-artifact@v8
         with:
@@ -257,7 +257,7 @@ jobs:
           if-no-files-found: error
   publish:
     needs: [plan, assemble]
-    if: needs.plan.outputs.publish == 'true'
+    if: needs.plan.outputs.publish == 'true' && github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     permissions:
@@ -267,7 +267,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
         with:
-          ref: ${{ needs.plan.outputs.sha }}
+          ref: ${{ github.sha }}
           persist-credentials: false
       - uses: actions/github-script@v9
         id: current
