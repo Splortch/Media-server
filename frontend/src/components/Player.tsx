@@ -300,7 +300,7 @@ export default function Player({
               onClick={() => seek((videoRef.current?.currentTime ?? 0) - 10)}
               aria-label="Rewind 10 seconds"
             >
-              −10s
+              Rewind 10 seconds
             </button>
             <button
               type="button"
@@ -308,7 +308,7 @@ export default function Player({
               onClick={() => seek((videoRef.current?.currentTime ?? 0) + 10)}
               aria-label="Forward 10 seconds"
             >
-              +10s
+              Forward 10 seconds
             </button>
             <button
               type="button"

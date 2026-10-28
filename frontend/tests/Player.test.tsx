@@ -156,6 +156,12 @@ it('provides custom controls, bounded seeking, volume and container fullscreen',
   );
   const video = screen.getByLabelText('Controls video') as HTMLVideoElement;
   expect(video.controls).toBe(false);
+  expect(
+    screen.getByRole('button', { name: 'Rewind 10 seconds' }),
+  ).toHaveTextContent('Rewind 10 seconds');
+  expect(
+    screen.getByRole('button', { name: 'Forward 10 seconds' }),
+  ).toHaveTextContent('Forward 10 seconds');
   Object.defineProperty(video, 'duration', { value: 100, configurable: true });
   fireEvent.loadedMetadata(video);
   expect(video.currentTime).toBe(20);
