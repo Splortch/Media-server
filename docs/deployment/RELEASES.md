@@ -136,3 +136,11 @@ in Actions; existing releases/running servers remain unaffected. Do not delete d
 The Android client workflow builds real APKs/AABs only when Android, shared API, relevant backend or Android automation inputs change (or manually requested). On a push to main, publication waits for APK assembly, lint/JVM tests and real-backend emulator playback. It creates its own `client-android/v0.1.0-alpha.N` prerelease, using the Android workflow run number as its independent monotonically increasing version code. Gaps from PR/failed runs are expected. It does not advance server/Windows versions or publish stable releases.
 
 Install the `-debug.apk` for testing. `-release-unsigned.apk` needs a production signature before installation; `-release-unsigned.aab` is not directly installable. Each release includes SHA256SUMS and source identity. Debug signing keys are ephemeral; uninstall may be required between runs. See [Android setup/signing](../clients/ANDROID.md). No signing keys are committed. Publication stages all assets in a draft, checks hashes and current main, then publishes; it never changes an existing published Android release.
+
+## Find every supported platform
+
+Each platform has its own published release/tag: `server-windows`, `server-linux`, `docker`, `client-windows` and `client-android`. The release descriptions begin with **All platform downloads**, linking to the latest published alpha for each platform. Version ordering is numeric and independent per platform; a newer Android number is not required to match the server's number. Only releases with actual platform build assets appear as downloadable.
+
+The web interface is included with the server packages. Android TV and iOS do not yet have installable builds or releases. Android's debug APK is the testing installer; its unsigned release APK/AAB need signing.
+
+The Release descriptions workflow refreshes existing descriptions when this change reaches main, after successful main release/Android workflows, daily, or by manual dispatch. It preserves Android-specific instructions, platform assets, tags, signatures, versions and prerelease status. It updates descriptions only; it does not fabricate or rebuild missing artifacts. PR runs test the table and synchronization logic with read-only permissions and cannot edit published releases.
