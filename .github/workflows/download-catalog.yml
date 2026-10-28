@@ -1,0 +1,82 @@
+name: Download catalog
+on:
+  push:
+    branches: [main]
+    paths: ['downloads/**', 'scripts/*download*', 'scripts/tests/*download*', '.github/workflows/download-catalog.yml']
+  pull_request:
+    paths: ['downloads/**', 'scripts/*download*', 'scripts/tests/*download*', '.github/workflows/download-catalog.yml']
+  workflow_run:
+    workflows: [Automatic prereleases, Android client]
+    types: [completed]
+    branches: [main]
+  schedule:
+    - cron: '41 5 * * *'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: download-catalog-${{ github.event_name == 'pull_request' && github.ref || 'main' }}
+  cancel-in-progress: false
+jobs:
+  build:
+    if: github.event_name != 'workflow_run' || (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.head_repository.full_name == github.repository)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Test catalog selection, safe links and publication policy
+        run: node --test scripts/tests/download-catalog.test.cjs scripts/tests/platform-downloads.test.cjs
+      - run: npm ci --prefix frontend
+      - run: npx --prefix frontend playwright install --with-deps chromium
+      - name: Test desktop/mobile category filters and collapsed history
+        run: node --test scripts/tests/download-catalog.browser.cjs
+      - name: Build from the real published release inventory
+        uses: actions/github-script@v9
+        with:
+          script: |
+            const fs = require('node:fs');
+            const releases = await github.paginate(github.rest.repos.listReleases, {...context.repo, per_page: 100});
+            const published = releases.filter(r => !r.draft);
+            const dates = published.map(r => r.published_at).filter(Boolean).sort();
+            require('./scripts/build-download-catalog.cjs').build({repository: `${context.repo.owner}/${context.repo.repo}`, releases: published, output: 'artifacts/downloads', generatedAt: dates.at(-1)});
+            fs.writeFileSync('artifacts/downloads/catalog-source.json', JSON.stringify({repository: `${context.repo.owner}/${context.repo.repo}`, sha: context.sha, generated: true}, null, 2) + '\n');
+      - name: Capture actual catalog previews
+        run: node scripts/tests/download-catalog.browser.cjs --capture artifacts/downloads
+      - uses: actions/upload-artifact@v7
+        with:
+          name: categorized-downloads
+          if-no-files-found: error
+          include-hidden-files: true
+          path: artifacts/downloads/
+      - uses: actions/upload-artifact@v7
+        with:
+          name: categorized-downloads-screenshots
+          path: artifacts/downloads-*.png
+  publish:
+    needs: build
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: main
+          persist-credentials: false
+      - uses: actions/download-artifact@v8
+        with:
+          name: categorized-downloads
+          path: artifacts/downloads
+      - name: Refresh the generated downloads branch
+        uses: actions/github-script@v9
+        with:
+          script: |
+            await require('./scripts/publish-download-catalog.cjs')({github, context});
+            await core.summary.addLink('Browse by platform', `https://github.com/${context.repo.owner}/${context.repo.repo}/blob/downloads/README.md`).write();

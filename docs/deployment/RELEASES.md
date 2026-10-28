@@ -144,3 +144,9 @@ Each platform has its own published release/tag: `server-windows`, `server-linux
 The web interface is included with the server packages. Android TV and iOS do not yet have installable builds or releases. Android's debug APK is the testing installer; its unsigned release APK/AAB need signing.
 
 The Release descriptions workflow refreshes existing descriptions when this change reaches main, after successful main release/Android workflows, daily, or by manual dispatch. It preserves Android-specific instructions, platform assets, tags, signatures, versions and prerelease status. It updates descriptions only; it does not fabricate or rebuild missing artifacts. PR runs test the table and synchronization logic with read-only permissions and cannot edit published releases.
+
+## Categorized download catalog
+
+Use **[Browse by platform](https://github.com/Splortch/Media-server/blob/downloads/README.md)** to see Servers and Clients separately. Each platform has one latest-build entry and its own collapsed older-version history, so accumulated Windows or Android releases cannot hide another platform. GitHub's native Releases feed remains the complete archive.
+
+The `Download catalog` workflow refreshes the generated `downloads` branch from actual published releases after validation. This works as a GitHub Markdown page without Pages configuration. The workflow also produces a responsive HTML preview; hosting that preview is separate from the always-available GitHub category index. See [catalog development and publication](../../downloads/README.md).

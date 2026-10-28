@@ -19,7 +19,7 @@ function latestPlatforms(releases) {
       for (let i = 0; i < av.length; i++) if (av[i] !== bv[i]) return bv[i] - av[i];
       return 0;
     });
-    return {id, name, description, release: candidates[0]};
+    return {id, name, description, release: candidates[0], releases: candidates};
   });
 }
 function downloadTable(repository, releases) {
@@ -30,7 +30,7 @@ function downloadTable(repository, releases) {
     return `| ${p.name} | ${p.description} | ${download} |`;
   });
   rows.push(`| Web browser | Included with Windows, Linux and Docker servers | [Server setup](${root}/blob/main/docs/GETTING-STARTED.md) |`);
-  return `${START}\n## All platform downloads\n\nEach implemented target has its own versioned alpha release. Choose a server to host media, or a client to connect to an existing server.\n\n| Platform | What to use it for | Download |\n| --- | --- | --- |\n${rows.join('\n')}\n\nAndroid TV and iOS are planned; they do not have installable releases yet. Android release APK/AAB files marked unsigned need signing; the debug APK is the installable testing build.\n${END}`;
+  return `${START}\n## All platform downloads\n\n[Browse by platform — latest builds and collapsed version history](https://github.com/${repository}/blob/downloads/README.md)\n\nEach implemented target has its own versioned alpha release. Choose a server to host media, or a client to connect to an existing server.\n\n| Platform | What to use it for | Download |\n| --- | --- | --- |\n${rows.join('\n')}\n\nAndroid TV and iOS are planned; they do not have installable releases yet. Android release APK/AAB files marked unsigned need signing; the debug APK is the installable testing build.\n${END}`;
 }
 function withDownloads(body, table) {
   const existing = body || '';
