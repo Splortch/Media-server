@@ -1,13 +1,17 @@
 name: Automatic prereleases
 on:
   workflow_run:
-    workflows: [Backend server, Web client, Windows client, CI, Agent automation tests]
+    workflows: [Backend server, Web client, Windows client, CI, Agent automation tests, Desktop clients]
     types: [completed]
     branches: [main]
   pull_request:
     paths:
       - '.github/workflows/release.yml'
       - '.github/workflows/windows-client.yml'
+      - '.github/workflows/desktop-clients.yml'
+      - 'scripts/*unix*installer*'
+      - 'scripts/*desktop*'
+      - 'scripts/tests/test_unix_installers.py'
       - 'scripts/*release*'
       - 'scripts/stamp-windows-version.cjs'
       - 'scripts/build-server-installer.py'
@@ -23,7 +27,7 @@ on:
   workflow_dispatch:
     inputs:
       publish:
-        description: 'Publish the latest main commit only after all five main CI workflows pass'
+        description: 'Publish the latest main commit only after all required main CI workflows pass'
         type: boolean
         default: false
 permissions:
@@ -69,6 +73,10 @@ jobs:
             rid: linux-x64
           - os: windows-latest
             rid: win-x64
+          - os: macos-15-intel
+            rid: osx-x64
+          - os: macos-15
+            rid: osx-arm64
     runs-on: ${{ matrix.os }}
     timeout-minutes: 25
     steps:
@@ -118,14 +126,26 @@ jobs:
             sudo apt-get -o Acquire::Retries=2 update
             sudo apt-get -o Acquire::Retries=2 install -y --no-install-recommends ffmpeg
           fi
+      - name: Ensure macOS media tooling
+        if: runner.os == 'macOS'
+        run: brew list ffmpeg >/dev/null 2>&1 || brew install ffmpeg
       - name: Package and smoke-test the actual archive
+        shell: bash
         env:
           RID: ${{ matrix.rid }}
           SERVER_VERSION: ${{ needs.plan.outputs.server }}
         run: |
           python scripts/package-release.py server
           python scripts/smoke-release.py
-          python scripts/test-native-update.py
+          if [ "$RUNNER_OS" != macOS ]; then python scripts/test-native-update.py; fi
+      - name: Build and install-test Unix server packages
+        if: runner.os != 'Windows'
+        env:
+          RID: ${{ matrix.rid }}
+          SERVER_VERSION: ${{ needs.plan.outputs.server }}
+        run: |
+          python3 scripts/build-unix-server-installer.py
+          python3 scripts/test-unix-server-installer.py
       - name: Build and test the actual Windows server setup.exe
         if: runner.os == 'Windows'
         env:
@@ -155,6 +175,14 @@ jobs:
       client_version: ${{ needs.plan.outputs.client }}
       msi_version: ${{ needs.plan.outputs.msi }}
       artifact_name: release-windows-client
+  desktop-clients:
+    needs: plan
+    if: needs.plan.outputs.build == 'true'
+    uses: ./.github/workflows/desktop-clients.yml
+    with:
+      source_sha: ${{ needs.plan.outputs.sha }}
+      client_version: ${{ needs.plan.outputs.client }}
+      msi_version: ${{ needs.plan.outputs.msi }}
   docker:
     needs: plan
     if: needs.plan.outputs.build == 'true'
@@ -200,7 +228,7 @@ jobs:
           compression-level: 1
   assemble:
     name: Release packages
-    needs: [plan, server, windows-client, docker]
+    needs: [plan, server, windows-client, desktop-clients, docker]
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:

@@ -119,3 +119,6 @@ Security and troubleshooting updates: [operator recovery and trust boundaries](d
 [playback diagnostics](docs/development/PLAYBACK-DIAGNOSTICS.md), and
 [accessibility validation and remaining manual checks](docs/development/ACCESSIBILITY.md).
 
+
+
+See [desktop installers for Windows, Linux and macOS](docs/deployment/DESKTOP-INSTALLERS.md) for server/client package selection and step-by-step setup.
