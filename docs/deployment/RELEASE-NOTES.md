@@ -5,7 +5,7 @@ Follow the [step-by-step first setup guide](https://github.com/Splortch/Media-se
 This folder contains a runnable self-contained server and its web UI. You do not need the .NET
 SDK or Node.js. This is early alpha software; back up server data before updating.
 
-Windows: double-click **Start-MediaServer.cmd**. On first use choose the media folder the server
+Windows installed server: use the tray icon or Start menu. See the [setup.exe guide](https://github.com/Splortch/Media-server/blob/main/docs/deployment/WINDOWS-SERVER-INSTALLER.md). Portable Windows: double-click **Start-MediaServer.cmd**. On first use choose the media folder the server
 may read. If FFprobe is missing, the launcher offers a pinned, checksum-verified media-tool
 download from GyanD. It then opens http://127.0.0.1:5050 and displays your local setup token.
 Create the administrator in the browser. In Settings add the selected folder as a library,

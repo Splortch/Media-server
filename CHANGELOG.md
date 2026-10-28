@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased — Windows server installer
+
+- Per-user Windows server setup.exe alongside the portable ZIP, with a tray controller, optional sign-in startup, verified FFprobe setup and browser administration.
+- Refuse running upgrades/uninstall and installed alpha downgrades; preserve data, media and unknown files on uninstall.
+- Add actual Windows installer/backend integration and release-completeness tests.
+
 ## Unreleased — client API / Windows alpha
 
 - Add versioned `/api/v1` alongside the existing browser routes, generated OpenAPI/TypeScript contracts, server search, track metadata, device sessions/capabilities and sanitized playback reports.

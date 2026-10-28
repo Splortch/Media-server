@@ -42,6 +42,7 @@ class ReleasePackagesTests(unittest.TestCase):
                 folder = downloads / f'release-server-{rid}'
                 folder.mkdir(parents=True)
                 (folder / f'MediaServer-v0.2.0-alpha.5-{rid}{ext}').write_text('test archive fixture')
+            (downloads / 'release-server-win-x64' / 'MediaServer-v0.2.0-alpha.5-win-x64-setup.exe').write_text('test server installer fixture')
             native = downloads / 'release-windows-client'
             native.mkdir()
             (native / 'client-setup.exe').write_text('test installer fixture')
@@ -54,8 +55,8 @@ class ReleasePackagesTests(unittest.TestCase):
             with patch.object(module, 'ARTIFACTS', artifacts), patch.dict(os.environ, env):
                 module.assemble()
             output = artifacts / 'release'
-            self.assertEqual(len(list(output.iterdir())), 10)
-            self.assertEqual(len((output / 'SHA256SUMS').read_text().splitlines()), 9)
+            self.assertEqual(len(list(output.iterdir())), 11)
+            self.assertEqual(len((output / 'SHA256SUMS').read_text().splitlines()), 10)
             self.assertTrue((output / 'MediaServer-Windows-Client-v0.1.0-alpha.5-win-x64.msi').exists())
             with zipfile.ZipFile(output / 'MediaServer-Docker-v0.2.0-alpha.5.zip') as archive:
                 text = archive.read('MediaServer-Docker-v0.2.0-alpha.5/compose.yaml').decode()

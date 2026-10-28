@@ -17,7 +17,8 @@ module.exports = async function publish({github, context}) {
     if (!match) throw new Error('Invalid checksum entry.');
     return {hash:match[1], name:match[2]};
   });
-  if (entries.length !== 9 || new Set(entries.map(e=>e.name)).size !== 9) throw new Error('Incomplete or duplicate release assets.');
+  const expected = [...targets(manifest.serverVersion, manifest.windowsClientVersion).flatMap(t=>t.files), 'release.json'];
+  if (entries.length !== expected.length || new Set(entries.map(e=>e.name)).size !== expected.length || expected.some(name=>!entries.some(e=>e.name===name))) throw new Error('Incomplete or duplicate release assets.');
   for (const entry of entries) {
     const hash = crypto.createHash('sha256');
     for await (const chunk of fs.createReadStream(path.join(folder, entry.name))) hash.update(chunk);
@@ -35,7 +36,7 @@ module.exports = async function publish({github, context}) {
     catch(error) { if(error.status !== 404) throw error; }
     if (release && release.target_commitish !== sha) throw new Error('Release tag source mismatch.');
     if (release && !release.draft) continue; // Already published platforms remain immutable on retries.
-    const body = platformNotes(target, sha, `${context.repo.owner}/${context.repo.repo}`, manifest.image);
+    const body = platformNotes(target, sha, `${context.repo.owner}/${context.repo.repo}`, manifest.image, {serverInstaller:true});
     if (!release) release = (await github.rest.repos.createRelease({...context.repo,tag_name:target.tag,target_commitish:sha,name:`${target.name} ${target.version}`,body,draft:true,prerelease:true,make_latest:'false'})).data;
     const platformManifest = {commit:sha,platform:target.id,version:target.version,channel:'alpha',signed:false,...(target.id === 'docker' ? {image:manifest.image} : {})};
     const manifestData = Buffer.from(JSON.stringify(platformManifest,null,2)+'\n');

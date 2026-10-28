@@ -1,13 +1,13 @@
 
 const {targets} = require('./release-targets.cjs');
-function platformNotes(target, sha, repository, image) {
+function platformNotes(target, sha, repository, image, {serverInstaller = false} = {}) {
   const docs = 'https://github.com/' + repository + '/blob/' + sha + '/docs/deployment/RELEASES.md';
   const common = '\n\n### Before you install\n\nThis is an early alpha, intended for testing. Builds are unsigned. Back up existing server data before upgrading. HTTPS is required for safe remote access; server downloads bind to localhost by default.\n\n### Verify your download\n\nDownload SHA256SUMS to check file integrity. release.json records the platform, version and source commit. GitHub’s automatically added source archives are project source code, not installers.\n\n[Full setup and troubleshooting](' + docs + ') · [Source commit](https://github.com/' + repository + '/commit/' + sha + ')';
   const text = {
     'server-windows': [
       'Host your media library on a **Windows x64 PC**. This is the server: it scans your media and streams it to the included browser interface or a separate client. You do not need the Windows desktop client to use it.',
-      '### Download\n\nChoose **MediaServer-v' + target.version + '-win-x64.zip**. The server includes its .NET runtime and web interface; no .NET SDK installation is needed.',
-      '### Get started\n\n1. Extract the ZIP into a folder.\n2. Double-click **Start-MediaServer.cmd** and choose your media folder.\n3. If FFprobe is missing, accept the optional verified download or install it yourself.\n4. Follow the browser setup and use the setup token displayed by the launcher. Add your library in Settings, then scan it.\n5. Keep the server console open while streaming.',
+      '### Download\n\n' + (serverInstaller ? 'Choose **MediaServer-v' + target.version + '-win-x64-setup.exe** for per-user installation with a tray controller. The **.zip** remains the portable alternative. ' : 'Choose **MediaServer-v' + target.version + '-win-x64.zip**. ') + 'The server includes its .NET runtime and web interface; no .NET SDK installation is needed.',
+      (serverInstaller ? '### Get started\n\n1. Run the server setup.exe (no administrator account required).\n2. Start Media Server from the finish page or Start menu. Choose a media folder and optionally install verified FFprobe tools.\n3. Copy the token from the setup window into the browser and create your administrator.\n4. Sign in, add the selected media folder in Settings, and scan it.\n5. The tray menu opens the web UI, controls sign-in startup, and stops the server. Exit it before upgrades or uninstall.\n\nPortable alternative:\n\n' : '') + '### Get started\n\n1. Extract the ZIP into a folder.\n2. Double-click **Start-MediaServer.cmd** and choose your media folder.\n3. If FFprobe is missing, accept the optional verified download or install it yourself.\n4. Follow the browser setup and use the setup token displayed by the launcher. Add your library in Settings, then scan it.\n5. Keep the server console open while streaming.',
       '### Data and updates\n\nData is stored separately in %LOCALAPPDATA%\\Splortch\\MediaServer. Stop the old server before starting a newer download. Scanning does not modify or delete original media files.'
     ],
     'server-linux': [
@@ -48,7 +48,7 @@ async function syncReleaseNotes({github, context}) {
     if ((id === 'client-windows' ? minor !== '1' : minor !== '2')) continue;
     const server = '0.2.0-alpha.'+number, client='0.1.0-alpha.'+number;
     const target = targets(server,client).find(t=>t.id===id);
-    const body = id ? platformNotes(target,release.target_commitish,repository,'ghcr.io/'+repository.toLowerCase()+':v'+server) : combinedNotes(server,client,release.target_commitish,repository);
+    const body = id ? platformNotes(target,release.target_commitish,repository,'ghcr.io/'+repository.toLowerCase()+':v'+server,{serverInstaller:(release.assets||[]).some(a=>a.name===`MediaServer-v${server}-win-x64-setup.exe`)}) : combinedNotes(server,client,release.target_commitish,repository);
     if (release.body !== body) await github.rest.repos.updateRelease({...context.repo,release_id:release.id,body});
   }
 }

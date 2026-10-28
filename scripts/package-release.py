@@ -86,6 +86,8 @@ def assemble():
     for rid, extension in [('win-x64', '.zip'), ('linux-x64', '.tar.gz')]:
         name = f'MediaServer-v{server}-{rid}{extension}'
         shutil.copyfile(downloads / f'release-server-{rid}' / name, output / name)
+    installer = f'MediaServer-v{server}-win-x64-setup.exe'
+    shutil.copyfile(downloads / 'release-server-win-x64' / installer, output / installer)
     native = downloads / 'release-windows-client'
     shutil.copyfile(one(native, '*-setup.exe'), output / f'MediaServer-Windows-Client-v{client}-win-x64-setup.exe')
     shutil.copyfile(one(native, '*.msi'), output / f'MediaServer-Windows-Client-v{client}-win-x64.msi')
@@ -122,8 +124,8 @@ volumes:
             with path.open('rb') as stream:
                 sums.append(f'{hashlib.file_digest(stream, "sha256").hexdigest()}  {path.name}')
     (output / 'SHA256SUMS').write_text('\n'.join(sums) + '\n', encoding='utf-8')
-    if len(sums) != 9:
-        raise RuntimeError(f'Expected 9 release assets before checksums; found {len(sums)}')
+    if len(sums) != 10:
+        raise RuntimeError(f'Expected 10 release assets before checksums; found {len(sums)}')
 
 
 if __name__ == '__main__':

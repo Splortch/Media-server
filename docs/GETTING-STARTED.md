@@ -8,7 +8,7 @@ The instructions describe main commit `32645e5` and the published `alpha.49` dow
 
 | Your goal | Choose | What it does |
 | --- | --- | --- |
-| Try it on a Windows x64 PC | **Windows server ZIP** | Runs the server and includes the browser interface. Recommended first test. |
+| Try it on a Windows x64 PC | **Windows server setup.exe (when available), or ZIP** | Runs the server and includes the browser interface. Recommended first test. |
 | Run on a Linux x64 computer | **Linux server tar.gz** | Same server and browser interface; requires FFprobe and a compatible glibc-based Linux installation. |
 | You already use Docker | **Docker setup ZIP** | Runs a prebuilt Linux amd64 image through Docker Compose. |
 | Watch through a dedicated Windows window | **Windows client EXE or MSI** | Connects to an already running server. Install later, after browser playback works. |
@@ -20,6 +20,8 @@ Open [Releases](https://github.com/Splortch/Media-server/releases). Releases are
 Choose **one** server installation route below. Do not start native and Docker servers together on port 5050.
 
 ## 2A. Windows: recommended first installation
+
+If your Windows **server** release includes `MediaServer-vVERSION-win-x64-setup.exe`, use the [server installer walkthrough](deployment/WINDOWS-SERVER-INSTALLER.md). It installs a Start menu/tray controller without administrator access. Then return to step 3 below. Older releases and portable installations use the ZIP steps that follow. The Windows **client** setup.exe is a separate application.
 
 1. Confirm your PC runs Windows x64. ARM64 Windows is not a validated target for these downloads.
 2. Create a test folder, for example `C:\MediaServer-TestMedia`, and copy a compatible video into it. Do not select all of `C:\`, a shortcut/junction, a cloud-only file, or a disconnected external drive.
