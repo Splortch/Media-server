@@ -80,3 +80,8 @@ export function duration(seconds: number) {
   const m = Math.floor(seconds / 60);
   return m >= 60 ? `${Math.floor(m / 60)}h ${m % 60}m` : `${m} min`;
 }
+
+// SQLite materializes UTC DateTime values without a Kind/offset. Preserve UTC before local display.
+export function serverTime(value: string): Date {
+  return new Date(/(?:z|[+-]\d{2}:\d{2})$/i.test(value) ? value : value + 'Z');
+}

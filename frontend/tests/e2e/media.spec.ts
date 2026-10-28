@@ -62,6 +62,9 @@ test('setup, accounts, collections, diagnostics, stream ranges and persist resum
   ).toBeVisible();
   await page.getByRole('link', { name: 'Library', exact: true }).click();
   await expect(
+    page.getByRole('heading', { name: 'Media library', exact: true }),
+  ).toBeVisible();
+  await expect(
     page.getByRole('heading', { name: 'sample', exact: true }),
   ).toBeVisible();
   await accessible(page);
@@ -142,6 +145,9 @@ test('setup, accounts, collections, diagnostics, stream ranges and persist resum
     .getByRole('button', { name: 'Save smart collection', exact: true })
     .click();
   await page.getByRole('link', { name: 'Library', exact: true }).click();
+  await expect(
+    page.getByRole('heading', { name: 'Media library', exact: true }),
+  ).toBeVisible();
   await page
     .getByLabel('Smart collection', { exact: true })
     .selectOption({ label: 'Samples' });
@@ -210,6 +216,9 @@ test('setup, accounts, collections, diagnostics, stream ranges and persist resum
     .fill('test-only-long-password');
   await page.getByRole('button', { name: 'Sign in', exact: true }).click();
   await page.getByRole('link', { name: 'Library', exact: true }).click();
+  await expect(
+    page.getByRole('heading', { name: 'Media library', exact: true }),
+  ).toBeVisible();
   await page.getByRole('heading', { name: 'sample', exact: true }).click();
   // Missing media produces actionable diagnostics, not a leaked server pathname.
   const { unlink } = await import('node:fs/promises');

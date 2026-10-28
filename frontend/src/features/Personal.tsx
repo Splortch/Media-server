@@ -1,5 +1,5 @@
 import { useEffect, useState, type FormEvent } from 'react';
-import { api, duration } from '../services/api';
+import { api, duration, serverTime } from '../services/api';
 export type Collection = {
   id: number;
   name: string;
@@ -116,7 +116,7 @@ export function Sessions() {
           <li key={session.id}>
             {session.deviceName}
             {session.current ? ' (this session)' : ''} · Expires{' '}
-            {new Date(session.expiresAt).toLocaleString()}{' '}
+            {serverTime(session.expiresAt).toLocaleString()}{' '}
             <button
               className="secondary"
               onClick={() => {
@@ -168,7 +168,7 @@ export function History() {
               {item.title}
             </a>
             {duration(item.seconds)} ·{' '}
-            {new Date(item.lastPlayedAt).toLocaleString()}
+            {serverTime(item.lastPlayedAt).toLocaleString()}
             {item.completedAt ? ' · Previously completed' : ''}
           </li>
         ))}
