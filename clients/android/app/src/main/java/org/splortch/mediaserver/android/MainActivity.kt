@@ -225,7 +225,7 @@ class MainActivity : ComponentActivity() {
                                 item {
                                     Text("Tracks", style = MaterialTheme.typography.titleLarge)
                                     Text(
-                                        "The server currently exposes track information only. Track switching awaits server support.",
+                                        "Track switching is not yet available in this Android client. Use the web player for HLS audio and subtitle selection.",
                                         style = MaterialTheme.typography.bodySmall,
                                     )
                                 }

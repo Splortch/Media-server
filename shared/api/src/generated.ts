@@ -803,6 +803,231 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/transcoding/encoders": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["EncoderCapability"][];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/media/{id}/playback-options": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: number;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["PlaybackOptions"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/media/{id}/playback-sessions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: number;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["PlaybackSelection"];
+                };
+            };
+            responses: {
+                /** @description Accepted */
+                202: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ConversionState"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/playback-sessions/{session}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    session: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ConversionState"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    session: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/playback-sessions/{session}/files/{file}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    session: string;
+                    file: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    session: string;
+                    file: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/users": {
         parameters: {
             query?: never;
@@ -1303,6 +1528,41 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/libraries/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: number;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/libraries/{id}/options": {
         parameters: {
             query?: never;
@@ -1498,6 +1758,20 @@ export interface components {
             libraryId?: null | number;
             videoCodec?: null | string;
         };
+        ConversionState: {
+            id: string;
+            state: string;
+            encoder: string;
+            error: null | string;
+            /** Format: double */
+            encodeSeconds: number;
+            manifest: string;
+        };
+        EncoderCapability: {
+            encoder: string;
+            available: boolean;
+            diagnostic: string;
+        };
         Library: {
             /** Format: int32 */
             id?: number;
@@ -1576,6 +1850,13 @@ export interface components {
             codec: string;
             language: null | string;
             title: null | string;
+            /** Format: int32 */
+            channels?: null | number;
+            channelLayout?: null | string;
+            /** @default false */
+            default: boolean;
+            /** @default false */
+            forced: boolean;
         };
         PasswordChange: {
             currentPassword: string;
@@ -1594,10 +1875,26 @@ export interface components {
             correlationId: string;
             playback: components["schemas"]["PlaybackPlan"];
         };
+        PlaybackOptions: {
+            color: null | components["schemas"]["VideoColor"];
+            tracks: components["schemas"]["MediaTrack"][];
+            externalWebVtt: boolean;
+            qualities: components["schemas"]["Rendition"][];
+            encoders: string[];
+            conversionNotice: string;
+        };
         PlaybackPlan: {
             mode: string;
             mimeType: string;
             warning: null | string;
+        };
+        PlaybackSelection: {
+            /** Format: int32 */
+            audioTrack?: null | number;
+            /** Format: int32 */
+            subtitleTrack?: null | number;
+            /** @default libx264 */
+            encoder: string;
         };
         ProgressRequest: {
             /** Format: double */
@@ -1625,6 +1922,13 @@ export interface components {
         RatingInput: {
             /** Format: int32 */
             rating: number;
+        };
+        Rendition: {
+            name: string;
+            /** Format: int32 */
+            height: number;
+            /** Format: int32 */
+            kilobits: number;
         };
         ScanIssueInfo: {
             fileName: string;
@@ -1674,6 +1978,21 @@ export interface components {
         UserIdentity: {
             name: string;
             role: string;
+        };
+        VideoColor: {
+            /** Format: int32 */
+            width: number;
+            /** Format: int32 */
+            height: number;
+            /** Format: int32 */
+            bitDepth: null | number;
+            pixelFormat: null | string;
+            primaries: null | string;
+            transfer: null | string;
+            matrix: null | string;
+            hasMasteringMetadata: boolean;
+            sideDataJson?: null | string;
+            hdr?: boolean;
         };
     };
     responses: never;

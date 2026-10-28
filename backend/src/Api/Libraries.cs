@@ -1,4 +1,5 @@
 using MediaServer.Infrastructure;
+using MediaServer.Services;
 using Microsoft.EntityFrameworkCore;
 
 public static partial class Operations
@@ -6,6 +7,24 @@ public static partial class Operations
     private static void MapLibraries(RouteGroupBuilder api)
     {
         var admin = api.MapGroup("").RequireAuthorization("admin");
+        admin.MapDelete(
+            "/libraries/{id:int}",
+            async (int id, ScanScheduler scheduler, CancellationToken ct) =>
+            {
+                var result = await scheduler.RemoveAsync(id, ct);
+                return result switch
+                {
+                    "missing" => Results.NotFound(),
+                    "busy" => Results.Conflict(
+                        new
+                        {
+                            message = "Wait for the active library scan to finish before removing this library.",
+                        }
+                    ),
+                    _ => Results.NoContent(),
+                };
+            }
+        );
         admin.MapPut(
             "/libraries/{id:int}/options",
             async (int id, LibraryOptions input, MediaDb db) =>

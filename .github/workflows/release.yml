@@ -101,6 +101,27 @@ jobs:
       - name: Verify macOS secure media ABI
         if: runner.os == 'macOS'
         run: cc -std=c11 tests/security/darwin-media-abi.c -o "$RUNNER_TEMP/media-abi" && "$RUNNER_TEMP/media-abi"
+      - name: Install pinned media tooling for Windows update validation
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: ./scripts/setup-ffmpeg.ps1
+      - name: Ensure Linux media tooling for update validation
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          if ! command -v ffmpeg >/dev/null || ! command -v ffprobe >/dev/null; then
+            sudo apt-get -o Acquire::Retries=2 update
+            sudo apt-get -o Acquire::Retries=2 install -y --no-install-recommends ffmpeg
+          fi
+      - name: Ensure full-featured macOS media tooling
+        if: runner.os == 'macOS'
+        run: |
+          # The regular Homebrew ffmpeg formula omits libaom and zscale.
+          # This maintained versioned formula supplies both on Intel and ARM.
+          brew list ffmpeg@7 >/dev/null 2>&1 || brew install ffmpeg@7
+          echo "$(brew --prefix ffmpeg@7)/bin" >> "$GITHUB_PATH"
+      - name: Verify conversion encoders and HDR filters
+        run: python scripts/check-media-tools.py
       - run: dotnet test MediaServer.sln -c Release --no-restore
       - name: Publish self-contained server
         env:
@@ -117,21 +138,6 @@ jobs:
             [void][System.Management.Automation.Language.Parser]::ParseFile($script.FullName, [ref]$tokens, [ref]$errors)
             if ($errors.Count) { throw ($errors | Out-String) }
           }
-      - name: Install pinned media tooling for Windows update validation
-        if: runner.os == 'Windows'
-        shell: pwsh
-        run: ./scripts/setup-ffmpeg.ps1
-      - name: Ensure Linux media tooling for update validation
-        if: runner.os == 'Linux'
-        shell: bash
-        run: |
-          if ! command -v ffmpeg >/dev/null || ! command -v ffprobe >/dev/null; then
-            sudo apt-get -o Acquire::Retries=2 update
-            sudo apt-get -o Acquire::Retries=2 install -y --no-install-recommends ffmpeg
-          fi
-      - name: Ensure macOS media tooling
-        if: runner.os == 'macOS'
-        run: brew list ffmpeg >/dev/null 2>&1 || brew install ffmpeg
       - name: Package and smoke-test the actual archive
         shell: bash
         env:

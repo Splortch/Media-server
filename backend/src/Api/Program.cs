@@ -158,6 +158,26 @@ builder.Services.AddSingleton<IMediaProbe>(
     new Ffprobe(builder.Configuration["MediaServer:FfprobePath"] ?? "ffprobe")
 );
 builder.Services.AddSingleton<IPlaybackPlanner, DirectPlaybackPlanner>();
+builder.Services.AddSingleton(
+    new FfmpegRunner(builder.Configuration["MediaServer:FfmpegPath"] ?? "ffmpeg")
+);
+builder.Services.AddSingleton<EncoderDiscovery>();
+var permittedEncoders =
+    builder.Configuration.GetSection("MediaServer:HardwareEncoders").Get<string[]>() ?? [];
+if (permittedEncoders.Any(x => !EncoderDiscovery.Encoders.Contains(x)))
+    throw new InvalidOperationException("Unknown configured hardware encoder.");
+builder.Services.AddSingleton(
+    new TranscodeSettings(new[] { "libx264" }.Concat(permittedEncoders).Distinct().ToArray())
+);
+builder.Services.AddSingleton(sp => new PlaybackSessions(
+    data,
+    sp.GetRequiredService<FfmpegRunner>(),
+    sp.GetRequiredService<EncoderDiscovery>(),
+    sp.GetRequiredService<IHostApplicationLifetime>(),
+    sp.GetRequiredService<TranscodeSettings>(),
+    sp.GetRequiredService<IMediaProbe>()
+));
+builder.Services.AddHostedService(sp => sp.GetRequiredService<PlaybackSessions>());
 builder.Services.AddSingleton<ScanQueue>();
 builder.Services.AddSingleton<StreamRegistry>();
 builder.Services.AddSingleton(new ResourceMonitor(data));
@@ -293,7 +313,7 @@ app.Use(
         context.Response.Headers["X-Content-Type-Options"] = "nosniff";
         context.Response.Headers["Referrer-Policy"] = "no-referrer";
         context.Response.Headers["Content-Security-Policy"] =
-            "default-src 'self'; img-src 'self' data:; media-src 'self'; style-src 'self'; script-src 'self'; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'";
+            "default-src 'self'; img-src 'self' data:; media-src 'self' blob:; style-src 'self'; script-src 'self'; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'";
         if (context.Request.Path.StartsWithSegments("/api"))
             context.Response.Headers.CacheControl = "no-store";
         try
@@ -350,6 +370,7 @@ app.MapGet("/health", () => Results.Ok(new { status = "ok" }));
 MapApi(app.MapGroup("/api"));
 MapApi(app.MapGroup("/api/v1").WithGroupName("client-v1"));
 app.MapClientV1();
+app.MapPlayback();
 app.MapOperations(credentialGate);
 void MapApi(RouteGroupBuilder root)
 {
@@ -531,8 +552,8 @@ void MapApi(RouteGroupBuilder root)
                 version = ClientV1.ServerVersion,
                 mediaCount = await db.Items.CountAsync(),
                 libraryCount = await db.Libraries.CountAsync(),
-                streaming = "Direct Play",
-                transcoding = false,
+                streaming = "Direct Play + bounded HLS (FFmpeg required)",
+                transcoding = true,
             }
     );
     api.MapGet(

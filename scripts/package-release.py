@@ -36,7 +36,7 @@ def archive(folder, destination, linux=False):
 def browser_licenses(folder):
     target = folder / 'licenses'
     target.mkdir(exist_ok=True)
-    for package in ('react', 'react-dom', 'scheduler'):
+    for package in ('react', 'react-dom', 'scheduler', 'hls.js'):
         shutil.copyfile(ROOT / 'frontend/node_modules' / package / 'LICENSE', target / f'{package}-LICENSE')
 
 

@@ -13,6 +13,37 @@ public sealed class ScanScheduler(IServiceScopeFactory scopes, ScanQueue queue)
 {
     private readonly SemaphoreSlim gate = new(1, 1);
 
+    // Share the scheduling gate so deletion cannot race a newly queued scan.
+    public async Task<string> RemoveAsync(int libraryId, CancellationToken ct)
+    {
+        await gate.WaitAsync(ct);
+        try
+        {
+            using var scope = scopes.CreateScope();
+            var db = scope.ServiceProvider.GetRequiredService<MediaDb>();
+            await using var transaction = await db.Database.BeginTransactionAsync(ct);
+            if (!await db.Libraries.AnyAsync(x => x.Id == libraryId, ct))
+                return "missing";
+            if (
+                await db.Jobs.AnyAsync(
+                    x => x.LibraryId == libraryId && (x.State == "queued" || x.State == "running"),
+                    ct
+                )
+            )
+                return "busy";
+            // Foreign keys cascade catalog items, grants, jobs, history and progress.
+            // Collections have no library FK; remove them explicitly in the same transaction.
+            await db.Collections.Where(x => x.LibraryId == libraryId).ExecuteDeleteAsync(ct);
+            await db.Libraries.Where(x => x.Id == libraryId).ExecuteDeleteAsync(ct);
+            await transaction.CommitAsync(ct);
+            return "removed";
+        }
+        finally
+        {
+            gate.Release();
+        }
+    }
+
     public async Task<ScanJob?> EnqueueAsync(int libraryId, CancellationToken ct)
     {
         await gate.WaitAsync(ct);

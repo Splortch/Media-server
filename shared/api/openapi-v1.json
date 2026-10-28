@@ -755,6 +755,205 @@
         }
       }
     },
+    "/api/v1/transcoding/encoders": {
+      "get": {
+        "tags": [
+          "Api"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/EncoderCapability"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/media/{id}/playback-options": {
+      "get": {
+        "tags": [
+          "Api"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlaybackOptions"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/media/{id}/playback-sessions": {
+      "post": {
+        "tags": [
+          "Api"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PlaybackSelection"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "description": "Accepted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConversionState"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/playback-sessions/{session}": {
+      "get": {
+        "tags": [
+          "Api"
+        ],
+        "parameters": [
+          {
+            "name": "session",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConversionState"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Api"
+        ],
+        "parameters": [
+          {
+            "name": "session",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/v1/playback-sessions/{session}/files/{file}": {
+      "get": {
+        "tags": [
+          "Api"
+        ],
+        "parameters": [
+          {
+            "name": "session",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "file",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      },
+      "head": {
+        "tags": [
+          "Api"
+        ],
+        "parameters": [
+          {
+            "name": "session",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "file",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
     "/api/v1/users": {
       "get": {
         "tags": [
@@ -1151,6 +1350,29 @@
       "get": {
         "tags": [
           "Api"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/v1/libraries/{id}": {
+      "delete": {
+        "tags": [
+          "Api"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
         ],
         "responses": {
           "200": {
@@ -1565,6 +1787,60 @@
           }
         }
       },
+      "ConversionState": {
+        "required": [
+          "id",
+          "state",
+          "encoder",
+          "error",
+          "encodeSeconds",
+          "manifest"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "state": {
+            "type": "string"
+          },
+          "encoder": {
+            "type": "string"
+          },
+          "error": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "encodeSeconds": {
+            "type": "number",
+            "format": "double"
+          },
+          "manifest": {
+            "type": "string"
+          }
+        }
+      },
+      "EncoderCapability": {
+        "required": [
+          "encoder",
+          "available",
+          "diagnostic"
+        ],
+        "type": "object",
+        "properties": {
+          "encoder": {
+            "type": "string"
+          },
+          "available": {
+            "type": "boolean"
+          },
+          "diagnostic": {
+            "type": "string"
+          }
+        }
+      },
       "Library": {
         "type": "object",
         "properties": {
@@ -1818,6 +2094,27 @@
               "null",
               "string"
             ]
+          },
+          "channels": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int32"
+          },
+          "channelLayout": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "default": {
+            "type": "boolean",
+            "default": false
+          },
+          "forced": {
+            "type": "boolean",
+            "default": false
           }
         }
       },
@@ -1885,6 +2182,53 @@
           }
         }
       },
+      "PlaybackOptions": {
+        "required": [
+          "color",
+          "tracks",
+          "externalWebVtt",
+          "qualities",
+          "encoders",
+          "conversionNotice"
+        ],
+        "type": "object",
+        "properties": {
+          "color": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/VideoColor"
+              }
+            ]
+          },
+          "tracks": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MediaTrack"
+            }
+          },
+          "externalWebVtt": {
+            "type": "boolean"
+          },
+          "qualities": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Rendition"
+            }
+          },
+          "encoders": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "conversionNotice": {
+            "type": "string"
+          }
+        }
+      },
       "PlaybackPlan": {
         "required": [
           "mode",
@@ -1904,6 +2248,29 @@
               "null",
               "string"
             ]
+          }
+        }
+      },
+      "PlaybackSelection": {
+        "type": "object",
+        "properties": {
+          "audioTrack": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int32"
+          },
+          "subtitleTrack": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int32"
+          },
+          "encoder": {
+            "type": "string",
+            "default": "libx264"
           }
         }
       },
@@ -1981,6 +2348,27 @@
         "type": "object",
         "properties": {
           "rating": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
+      "Rendition": {
+        "required": [
+          "name",
+          "height",
+          "kilobits"
+        ],
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "height": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "kilobits": {
             "type": "integer",
             "format": "int32"
           }
@@ -2155,6 +2543,72 @@
           },
           "role": {
             "type": "string"
+          }
+        }
+      },
+      "VideoColor": {
+        "required": [
+          "width",
+          "height",
+          "bitDepth",
+          "pixelFormat",
+          "primaries",
+          "transfer",
+          "matrix",
+          "hasMasteringMetadata"
+        ],
+        "type": "object",
+        "properties": {
+          "width": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "height": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "bitDepth": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int32"
+          },
+          "pixelFormat": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "primaries": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "transfer": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "matrix": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "hasMasteringMetadata": {
+            "type": "boolean"
+          },
+          "sideDataJson": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "hdr": {
+            "type": "boolean"
           }
         }
       }

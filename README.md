@@ -21,13 +21,14 @@ The [client ecosystem](docs/clients/README.md) adds a shared Tauri desktop clien
 | REST/OpenAPI and scan status | Implemented | Protected OpenAPI; scan polling and SignalR event transport |
 | Automated quality checks | Implemented configuration | Backend, frontend, browser integration, audits and Docker build |
 | Native alpha releases | Implemented workflow | Self-contained Windows/Linux/macOS servers, native desktop packages, bundled web UI, separate automatic alpha releases |
-| Hardware acceleration / HLS / transcoding | Planned | Direct Play only in this alpha |
+| Web HLS conversion / quality / audio / text subtitles | Implemented alpha | Bounded full-video preparation; FFmpeg required; Auto/manual quality; native clients still Direct Play |
+| Hardware encoders / HDR | Partial alpha | Opt-in NVENC/QSV/VAAPI/AMF adapters and software fallback; explicit SDR tone mapping; physical GPU/HDR validation pending |
 | Artwork / online metadata / TV matching | Planned | Current titles derive from filenames; no fabricated posters |
 | Accounts / permissions / ratings | Implemented alpha | Admin-managed accounts, library grants, explicit content ratings; unknown ratings denied to restricted viewers |
 | Library watching / reconciliation | Implemented alpha | Opt-in watching, missing-entry tombstones and optional hash-based move/duplicate detection |
 | Indexed browsing / smart collections | Implemented alpha | Prefix search, bounded keyset pages, per-user typed rules |
 | Backups / native updates | Implemented alpha | Offline verified snapshots, empty-directory restore and optional staged update manager on Windows/Linux; manual application replacement on macOS |
-| Server monitoring | Implemented alpha | Admin-only process, storage, scan and HTTP stream metrics; GPU/transcoding unavailable |
+| Server monitoring | Implemented alpha | Admin-only process, storage, scan and HTTP stream metrics; GPU and HLS-session monitoring planned |
 | Desktop clients | Alpha implementation | Shared Tauri client; Windows EXE/MSI, Ubuntu 24.04 x64 DEB, Intel/Apple Silicon macOS DMGs; see native CI for build/install evidence |
 | Android phone client | Alpha implementation | Native Compose/Media3, authenticated playback, encrypted sessions and revision-checked progress; see Android CI for build/device evidence |
 | TV / iOS / plugins / secure remote streaming | Planned | Localhost deployment by default; remote clients require trusted HTTPS |
@@ -124,3 +125,7 @@ Security and troubleshooting updates: [operator recovery and trust boundaries](d
 
 
 See [desktop installers for Windows, Linux and macOS](docs/deployment/DESKTOP-INSTALLERS.md) for server/client package selection and step-by-step setup.
+
+### Playback and library management
+
+See [HLS conversion, hardware opt-in, HDR, subtitles and library removal](docs/architecture/PLAYBACK-PIPELINE.md) for setup, API details, alpha limits and the physical-device validation still needed.

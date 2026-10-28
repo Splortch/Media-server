@@ -32,6 +32,7 @@ public class MediaItem
     public string AudioCodec { get; set; } = "";
     public double Duration { get; set; }
     public long Size { get; set; }
+    public string ColorJson { get; set; } = "null";
     public string TracksJson { get; set; } = "[]";
     public int ContentRating { get; set; }
     public bool IsMissing { get; set; }
@@ -70,14 +71,25 @@ public class ScanJob
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 }
 
-public record MediaTrack(int Index, string Type, string Codec, string? Language, string? Title);
+public record MediaTrack(
+    int Index,
+    string Type,
+    string Codec,
+    string? Language,
+    string? Title,
+    int? Channels = null,
+    string? ChannelLayout = null,
+    bool Default = false,
+    bool Forced = false
+);
 
 public record ProbeResult(
     double Duration,
     string Container,
     string VideoCodec,
     string AudioCodec,
-    IReadOnlyList<MediaTrack>? Tracks = null
+    IReadOnlyList<MediaTrack>? Tracks = null,
+    string ColorJson = "null"
 );
 
 public interface IMediaProbe

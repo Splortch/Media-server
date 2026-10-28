@@ -76,6 +76,9 @@ public static class ClientV1
                         !await db.Users.AnyAsync(),
                         [
                             "direct-play",
+                            "hls-conversion",
+                            "track-selection",
+                            "library-removal",
                             "progress-revisions",
                             "track-metadata",
                             "sessions",
@@ -194,11 +197,15 @@ public static class ClientV1
                     var item = await db.Items.FindAsync(id);
                     if (item is null)
                         return TypedResults.NotFound();
+                    var tracks = JsonSerializer.Deserialize<MediaTrack[]>(item.TracksJson) ?? [];
                     return TypedResults.Ok(
                         new TrackCatalog(
-                            JsonSerializer.Deserialize<MediaTrack[]>(item.TracksJson) ?? [],
-                            false,
-                            false
+                            tracks,
+                            tracks.Any(x => x.Type == "audio"),
+                            tracks.Any(x =>
+                                x.Type == "subtitle"
+                                && MediaServer.Services.PlaybackSessions.TextSubtitle(x.Codec)
+                            )
                         )
                     );
                 }
