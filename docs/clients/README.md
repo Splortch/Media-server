@@ -26,3 +26,7 @@ Start with [API/authentication](API.md), [Windows development and limitations](W
 ## Two-maintainer split
 
 Maintainer A owns API/schema migrations, native transport, authentication and release packaging. Maintainer B owns client UI, Compose phone implementation, playback UX and accessibility. Both review authentication, stream authorization, schema changes and synchronization. Keep Windows/API work in one focused PR; implement Android in the next PR after those contracts stabilize. No merge or stable release is authorized by this change.
+
+## Android phone alpha
+
+See the [Android installation and development guide](ANDROID.md) for the native Kotlin/Compose application, APK artifacts, USB setup, signing and validation limits. Server and web operation do not depend on Android. Android TV and iOS remain future applications; no empty projects are added.

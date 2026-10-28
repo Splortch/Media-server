@@ -49,6 +49,8 @@ class MediaViewModel(app: Application) : AndroidViewModel(app) {
     private val progressMutex = Mutex()
     private var progress: ProgressState? = null
     private var epoch = 0
+    private var actionId = 0
+    private var playbackGeneration = 0
 
     private fun message(e: Exception): String = when (e) {
         is SSLException -> "TLS connection failed. Check the server certificate and your device clock."
@@ -66,13 +68,13 @@ class MediaViewModel(app: Application) : AndroidViewModel(app) {
     }
     private fun action(block: suspend () -> Unit) {
         operation?.cancel()
-        val generation = epoch
+        val generation = ++actionId
         operation = viewModelScope.launch {
             mutable.update { it.copy(busy = true, error = null) }
             try { block() }
             catch (e: CancellationException) { throw e }
-            catch (e: Exception) { if (epoch == generation) mutable.update { it.copy(error = message(e)) } }
-            finally { if (epoch == generation) mutable.update { it.copy(busy = false) } }
+            catch (e: Exception) { if (actionId == generation) mutable.update { it.copy(error = message(e)) } }
+            finally { if (actionId == generation) mutable.update { it.copy(busy = false) } }
         }
     }
     internal fun connect(address: String, remember: Boolean) = action {
@@ -141,6 +143,7 @@ class MediaViewModel(app: Application) : AndroidViewModel(app) {
         val conn = requireNotNull(connection)
         val media = requireNotNull(mutable.value.detail)
         stopPlayer(false)
+        ++playbackGeneration
         val saved = conn.api.progress(media.id)
         require(saved.mediaItemId == media.id && saved.seconds.isFinite() && saved.seconds in 0.0..(media.duration + 2).coerceAtLeast(2.0) && saved.revision >= 0) { "Invalid playback progress." }
         progress = saved
@@ -174,9 +177,10 @@ class MediaViewModel(app: Application) : AndroidViewModel(app) {
         val active = player.value ?: return
         val conn = connection ?: return
         val id = mutable.value.detail?.id ?: return
+        val generation = playbackGeneration
         val seconds = (active.currentPosition.coerceAtLeast(0) / 1000.0).coerceAtMost(mutable.value.detail!!.duration.coerceAtLeast(0.0))
         viewModelScope.launch { progressMutex.withLock {
-            if (connection !== conn || mutable.value.syncError != null || progress?.mediaItemId != id) return@withLock
+            if (generation != playbackGeneration || connection !== conn || mutable.value.syncError != null || progress?.mediaItemId != id) return@withLock
             val previous = progress ?: return@withLock
             try { progress = conn.api.sync(id, conn.token(), ProgressUpdate(seconds, previous.revision, completed)) }
             catch (e: CancellationException) { throw e }
@@ -208,7 +212,7 @@ class MediaViewModel(app: Application) : AndroidViewModel(app) {
             mutable.value = Screen(address = prefs.getString("origin", "") ?: "", error = if (revoked) null else "Signed out locally. Server revocation could not be confirmed; revoke the session in web settings.") }
     }
     private fun expire() {
-        operation?.cancel(); stopPlayer(false); connection?.close(); connection = null; vault.clear(); ++epoch
+        ++actionId; operation?.cancel(); stopPlayer(false); connection?.close(); connection = null; vault.clear(); ++epoch
         mutable.value = Screen(address = prefs.getString("origin", "") ?: "", error = "Session expired or was revoked. Connect and sign in again.")
     }
     override fun onCleared() { stopPlayer(false); connection?.close(clearSaved = false) }

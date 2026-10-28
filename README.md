@@ -6,7 +6,7 @@ A modern, open-source, self-hosted media server focused on performance, simplici
 
 ## Cross-platform clients (proposed alpha)
 
-The [client ecosystem](docs/clients/README.md) adds a dedicated Windows Tauri client and versioned API without requiring any client on the server. [Windows development](docs/clients/WINDOWS.md) covers actual installer builds and limitations. Android phone, Android TV and iOS are separately scoped follow-ups in this monorepo; no placeholder apps or fake APK builds are included. Existing web installation below remains valid.
+The [client ecosystem](docs/clients/README.md) adds a dedicated Windows Tauri client and versioned API without requiring any client on the server. [Windows development](docs/clients/WINDOWS.md) covers actual installer builds and limitations. The [Android phone alpha](docs/clients/ANDROID.md) adds a native Compose/Media3 client, with APK builds and real-backend emulator validation. Android TV and iOS remain separately scoped follow-ups in this monorepo. Existing web installation below remains valid.
 
 ## What works
 
@@ -29,7 +29,8 @@ The [client ecosystem](docs/clients/README.md) adds a dedicated Windows Tauri cl
 | Backups / native updates | Implemented alpha | Offline verified snapshots, empty-directory restore and optional staged update manager |
 | Server monitoring | Implemented alpha | Admin-only process, storage, scan and HTTP stream metrics; GPU/transcoding unavailable |
 | Windows desktop client | Alpha | Separate Tauri client; Windows build and actual-backend tests in CI |
-| Android / TV / iOS / plugins / secure remote streaming | Planned | No mobile binaries yet; localhost deployment by default |
+| Android phone client | Alpha implementation | Native Compose/Media3, authenticated playback, encrypted sessions and revision-checked progress; see Android CI for build/device evidence |
+| TV / iOS / plugins / secure remote streaming | Planned | Localhost deployment by default; remote clients require trusted HTTPS |
 | Accessibility | In progress | Automated axe and keyboard regressions; manual assistive-technology review still required |
 
 Verification results and environment limits are recorded in [VALIDATION.md](docs/development/VALIDATION.md). Workflow presence is not a claim that hosted CI passed.

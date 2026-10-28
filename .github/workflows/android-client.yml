@@ -2,9 +2,9 @@ name: Android client
 on:
   push:
     branches: [main]
-    paths: ['clients/android/**', 'shared/api/**', 'backend/**', 'scripts/*android*', '.github/workflows/android-client.yml', 'global.json', 'Directory.Build.props']
+    paths: ['clients/android/**', 'shared/api/**', 'backend/**', 'scripts/*android*', 'scripts/tests/android-*', '.github/workflows/android-client.yml', 'global.json', 'Directory.Build.props']
   pull_request:
-    paths: ['clients/android/**', 'shared/api/**', 'backend/**', 'scripts/*android*', '.github/workflows/android-client.yml', 'global.json', 'Directory.Build.props']
+    paths: ['clients/android/**', 'shared/api/**', 'backend/**', 'scripts/*android*', 'scripts/tests/android-*', '.github/workflows/android-client.yml', 'global.json', 'Directory.Build.props']
   workflow_dispatch:
 permissions:
   contents: read
@@ -28,6 +28,8 @@ jobs:
           packages: platform-tools platforms;android-36 build-tools;35.0.0
           log-accepted-android-sdk-licenses: false
       - uses: gradle/actions/setup-gradle@v4
+      - name: Test Android release safety
+        run: node --test scripts/tests/android-release.test.cjs
       - name: Check generated API models
         run: python3 scripts/generate-android-models.py --check
       - name: Build APKs and bundle; run JVM tests and Android lint
@@ -88,3 +90,26 @@ jobs:
           disable-animations: true
           emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim
           script: python3 scripts/test-android-backend.py
+  release:
+    needs: [build, device]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@v8
+        with:
+          name: android-build
+          path: clients/android/app/build/outputs
+      - name: Package validated Android outputs with checksums
+        env:
+          ANDROID_BUILD_NUMBER: ${{ github.run_number }}
+          SOURCE_SHA: ${{ github.sha }}
+        run: python3 scripts/package-android.py
+      - name: Publish a separate Android prerelease
+        uses: actions/github-script@v9
+        with:
+          script: await require('./scripts/publish-android.cjs')({github, context})
