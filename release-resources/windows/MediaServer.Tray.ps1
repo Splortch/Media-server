@@ -1,4 +1,4 @@
-param([switch]$NoBrowser, [switch]$Stop)
+param([switch]$NoBrowser, [switch]$Stop, [switch]$NonInteractive)
 $ErrorActionPreference = 'Stop'
 $data = Join-Path $env:LOCALAPPDATA 'Splortch/MediaServer'
 $app = $PSScriptRoot
@@ -10,6 +10,7 @@ if ($Stop) {
 Add-Type -AssemblyName System.Windows.Forms
 Add-Type -AssemblyName System.Drawing
 [Windows.Forms.Application]::EnableVisualStyles()
+$exitCode = 0
 $lease = $null; $signal = $null; $server = $null; $tray = $null; $timer = $null
 try {
     New-Item -ItemType Directory -Path $data -Force | Out-Null
@@ -29,6 +30,7 @@ try {
     $configPath = Join-Path $data 'launcher.json'
     if (Test-Path -LiteralPath $configPath) { $config = Get-Content -LiteralPath $configPath -Raw | ConvertFrom-Json }
     else {
+        if ($NonInteractive) { throw 'Media folder has not been configured.' }
         $picker = New-Object Windows.Forms.FolderBrowserDialog
         $picker.Description = 'Choose the media folder the server is allowed to read. Add and scan it in the browser after setup.'
         try {
@@ -51,6 +53,7 @@ try {
     if ($probe) { $probePath = $probe.Source }
     elseif (Test-Path -LiteralPath $downloaded) { $probePath = $downloaded }
     else {
+        if ($NonInteractive) { throw 'FFprobe is unavailable.' }
         $answer = [Windows.Forms.MessageBox]::Show('Scanning needs FFprobe. Download the pinned FFmpeg tools from GyanD on GitHub and verify their checksum? The tools have their own GPL/LGPL licenses. No media is uploaded. This download may take several minutes.', 'Media Server tools', 'YesNo', 'Question', 'Button2')
         if ($answer -ne 'Yes') { throw 'Install FFprobe on PATH, then start Media Server again. See the setup guide for offline installation.' }
         $archive = Join-Path $data ('media-tools-' + [Guid]::NewGuid().ToString('N') + '.zip')
@@ -141,14 +144,16 @@ try {
         if ($signal.WaitOne(0)) { $context.ExitThread() }
         elseif ($server.HasExited) {
             $tray.Text = 'Media Server - stopped'; $status.Text = 'Server stopped; see logs'; $timer.Stop()
-            [Windows.Forms.MessageBox]::Show('The server stopped unexpectedly. Open server data and logs from the tray menu, then restart Media Server.', 'Media Server') | Out-Null
+            if ($NonInteractive) { $script:exitCode = 1; $context.ExitThread() }
+            else { [Windows.Forms.MessageBox]::Show('The server stopped unexpectedly. Open server data and logs from the tray menu, then restart Media Server.', 'Media Server') | Out-Null }
         }
     })
     $timer.Start()
     if (-not $NoBrowser) { Start-Process 'http://127.0.0.1:5050'; & $showToken }
     [Windows.Forms.Application]::Run($context)
+    if ($exitCode -ne 0) { throw 'The owned server stopped unexpectedly.' }
 } catch {
-    if ($NoBrowser) { [Console]::Error.WriteLine($_.Exception.Message) }
+    if ($NonInteractive) { [Console]::Error.WriteLine($_.Exception.Message) }
     else { [Windows.Forms.MessageBox]::Show(($_.Exception.Message + "`n`nData: " + $data), 'Media Server could not start', 'OK', 'Error') | Out-Null }
     exit 1
 } finally {

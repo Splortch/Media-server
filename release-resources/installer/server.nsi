@@ -47,6 +47,7 @@ Var TrayLease
 !macroend
 Function .onInit
   SetShellVarContext current
+  SetRegView 64
   ${IfNot} ${RunningX64}
     MessageBox MB_OK|MB_ICONSTOP "This build requires Windows x64." /SD IDOK
     SetErrorLevel 3
@@ -60,6 +61,7 @@ Function .onInit
     SetErrorLevel 4
     Abort
   ${EndIf}
+  ClearErrors
 FunctionEnd
 Section "Server and browser interface (required)"
   SectionIn RO
@@ -101,6 +103,7 @@ Function .onGUIEnd
 FunctionEnd
 Function un.onInit
   SetShellVarContext current
+  SetRegView 64
   !insertmacro CheckLease ".server.lock" $ServerLease
   !insertmacro CheckLease "tray-host.lock" $TrayLease
 FunctionEnd

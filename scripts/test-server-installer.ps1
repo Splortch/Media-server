@@ -16,7 +16,7 @@ function Run-Installer([string]$File, [string]$Arguments, [int]$Expected = 0) {
     if ($process.ExitCode -ne $Expected) { throw "Unexpected installer exit code: $($process.ExitCode), expected $Expected" }
 }
 function Start-Tray {
-    $process = Start-Process -FilePath $ps -ArgumentList ('-NoProfile -ExecutionPolicy Bypass -STA -WindowStyle Hidden -File "' + $trayScript + '" -NoBrowser') -PassThru
+    $process = Start-Process -FilePath $ps -ArgumentList ('-NoProfile -ExecutionPolicy Bypass -STA -WindowStyle Hidden -File "' + $trayScript + '" -NoBrowser -NonInteractive') -PassThru
     for ($i = 0; $i -lt 90; $i++) {
         if ($process.HasExited) { throw "Tray exited during startup: $($process.ExitCode)" }
         try { if ((Invoke-RestMethod 'http://127.0.0.1:5050/health' -TimeoutSec 1).status -eq 'ok') { return $process } } catch {}
@@ -53,6 +53,16 @@ try {
     if (-not $database) { throw 'Installed database missing.' }
     $databaseHash = (Get-FileHash $database.FullName).Hash
     $sentinel = Join-Path $data 'keep-private-data.txt'; Set-Content $sentinel 'explicit fixture'
+    $registration = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\Splortch.MediaServer'
+    $number = (Get-ItemProperty $registration).ReleaseNumber
+    if ($number -lt 65535) {
+        try {
+            Set-ItemProperty $registration -Name ReleaseNumber -Value ($number + 1)
+            Run-Installer $Installer '/S' 4
+        } finally { Set-ItemProperty $registration -Name ReleaseNumber -Value $number }
+    }
+    $trayLease = [IO.File]::Open((Join-Path $data 'tray-host.lock'), 'Open', 'ReadWrite', 'None')
+    try { Run-Installer $Installer '/S' 2 } finally { $trayLease.Dispose() }
     # Same-channel upgrade/reinstall must preserve existing data without starting it silently.
     Run-Installer $Installer '/S'
     if ((Get-FileHash $database.FullName).Hash -ne $databaseHash) { throw 'Installer modified the database.' }
