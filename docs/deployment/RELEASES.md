@@ -130,3 +130,9 @@ To build manually, run **Automatic prereleases** from Actions. Its default is bu
 Re-running a failed release can repair its draft. To pause automatic releases, disable that workflow
 in Actions; existing releases/running servers remain unaffected. Do not delete data volumes to update.
 
+
+## Independent Android phone prereleases
+
+The Android client workflow builds real APKs/AABs only when Android, shared API, relevant backend or Android automation inputs change (or manually requested). On a push to main, publication waits for APK assembly, lint/JVM tests and real-backend emulator playback. It creates its own `client-android/v0.1.0-alpha.N` prerelease, using the Android workflow run number as its independent monotonically increasing version code. Gaps from PR/failed runs are expected. It does not advance server/Windows versions or publish stable releases.
+
+Install the `-debug.apk` for testing. `-release-unsigned.apk` needs a production signature before installation; `-release-unsigned.aab` is not directly installable. Each release includes SHA256SUMS and source identity. Debug signing keys are ephemeral; uninstall may be required between runs. See [Android setup/signing](../clients/ANDROID.md). No signing keys are committed. Publication stages all assets in a draft, checks hashes and current main, then publishes; it never changes an existing published Android release.

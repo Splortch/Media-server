@@ -1,0 +1,6 @@
+Media Server
+Copyright 2026 Media Server contributors
+Licensed under the Apache License, Version 2.0.
+Third-party libraries retain their respective licenses. FFprobe/FFmpeg is a separately installed dependency for native builds. Container distributions include the distribution's FFmpeg package; consult docs/deployment/RELEASE-NOTES.md before redistributing images.
+
+Android client dependencies include AndroidX/Compose/Media3 (Android Open Source Project), Kotlin and kotlinx libraries (JetBrains and contributors), and Retrofit/OkHttp/Okio (Square and contributors), distributed under Apache-2.0. Their embedded notices and licenses are retained in the APK. This client does not bundle FFmpeg or a media server. See Gradle dependency reports for the exact resolved dependency graph.

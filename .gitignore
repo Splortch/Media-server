@@ -24,3 +24,10 @@ artifacts/
 **/target/
 **/gen/schemas/
 **/gen/android/
+
+# Android build state and local signing material
+**/.gradle/
+**/build/
+**/local.properties
+*.jks
+*.keystore
