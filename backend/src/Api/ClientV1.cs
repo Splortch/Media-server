@@ -74,7 +74,18 @@ public static class ClientV1
                         1,
                         1,
                         !await db.Users.AnyAsync(),
-                        ["direct-play", "progress-revisions", "track-metadata", "sessions"]
+                        [
+                            "direct-play",
+                            "progress-revisions",
+                            "track-metadata",
+                            "sessions",
+                            "accounts",
+                            "prefix-search",
+                            "smart-collections",
+                            "library-reconciliation",
+                            "monitoring",
+                            "maintenance-v1",
+                        ]
                     )
             )
             .WithName("ServerInfo");
@@ -117,15 +128,26 @@ public static class ClientV1
                     var completed =
                         input.Completed
                         || (item.Duration > 0 && input.Seconds >= item.Duration * .95);
+                    await using var transaction = await db.Database.BeginTransactionAsync();
                     var count = await db.Database.ExecuteSqlInterpolatedAsync(
                         $"INSERT INTO Progress (UserId, MediaItemId, Seconds, UpdatedAt, Revision, Completed) SELECT {uid}, {id}, {input.Seconds}, {updated}, 1, {completed} WHERE {input.ExpectedRevision} = 0 OR EXISTS (SELECT 1 FROM Progress WHERE UserId={uid} AND MediaItemId={id} AND Revision={input.ExpectedRevision}) ON CONFLICT(UserId, MediaItemId) DO UPDATE SET Seconds=excluded.Seconds, UpdatedAt=excluded.UpdatedAt, Completed=excluded.Completed, Revision=Progress.Revision+1 WHERE Progress.Revision={input.ExpectedRevision}"
                     );
+                    if (count > 0)
+                        await HistoryWriter.RecordAsync(
+                            db,
+                            uid,
+                            id,
+                            input.Seconds,
+                            completed,
+                            updated
+                        );
                     var current = State(
                         id,
                         await db
                             .Progress.AsNoTracking()
                             .SingleOrDefaultAsync(x => x.UserId == uid && x.MediaItemId == id)
                     );
+                    await transaction.CommitAsync();
                     // Lost-response retries are idempotent; stale, different positions are never silently replayed.
                     return
                         count > 0
@@ -146,7 +168,12 @@ public static class ClientV1
                 {
                     var uid = Uid(user);
                     return await db
-                        .Progress.Where(p => p.UserId == uid && !p.Completed && p.Seconds > 0)
+                        .Progress.Where(p =>
+                            p.UserId == uid
+                            && !p.Completed
+                            && p.Seconds > 0
+                            && db.Items.Any(item => item.Id == p.MediaItemId)
+                        )
                         .OrderByDescending(p => p.UpdatedAt)
                         .Take(100)
                         .Select(p => new ProgressState(
@@ -315,5 +342,6 @@ public record MediaDetails(
     string AudioCodec,
     string Container,
     long Size,
-    PlaybackPlan Playback
+    PlaybackPlan Playback,
+    int ContentRating = 0
 );

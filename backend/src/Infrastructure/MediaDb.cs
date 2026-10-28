@@ -3,8 +3,13 @@ using Microsoft.EntityFrameworkCore;
 
 namespace MediaServer.Infrastructure;
 
-public class MediaDb(DbContextOptions<MediaDb> options) : DbContext(options)
+public class MediaDb(DbContextOptions<MediaDb> options, IUserContext? context = null)
+    : DbContext(options)
 {
+    private int? CurrentUserId => context?.UserId;
+    public DbSet<LibraryGrant> Grants => Set<LibraryGrant>();
+    public DbSet<WatchHistory> History => Set<WatchHistory>();
+    public DbSet<SmartCollection> Collections => Set<SmartCollection>();
     public DbSet<User> Users => Set<User>();
     public DbSet<Library> Libraries => Set<Library>();
     public DbSet<MediaItem> Items => Set<MediaItem>();
@@ -18,6 +23,59 @@ public class MediaDb(DbContextOptions<MediaDb> options) : DbContext(options)
 
     protected override void OnModelCreating(ModelBuilder b)
     {
+        b.Entity<Library>()
+            .HasQueryFilter(library =>
+                CurrentUserId == null
+                || Users.Any(user =>
+                    user.Id == CurrentUserId
+                    && !user.Disabled
+                    && (
+                        user.Role == "Admin"
+                        || user.AllLibraries
+                        || Grants.Any(g => g.UserId == user.Id && g.LibraryId == library.Id)
+                    )
+                )
+            );
+        b.Entity<User>().Property(x => x.Name).UseCollation("NOCASE");
+        b.Entity<User>().HasIndex(x => x.Name).IsUnique();
+        b.Entity<MediaItem>()
+            .HasQueryFilter(item =>
+                CurrentUserId == null
+                || (
+                    !item.IsMissing
+                    && Users.Any(user =>
+                        user.Id == CurrentUserId
+                        && !user.Disabled
+                        && (
+                            user.Role == "Admin"
+                            || (
+                                (
+                                    user.AllLibraries
+                                    || Grants.Any(grant =>
+                                        grant.UserId == user.Id && grant.LibraryId == item.LibraryId
+                                    )
+                                )
+                                && (
+                                    user.MaximumRating == null
+                                    || (
+                                        item.ContentRating > 0
+                                        && item.ContentRating <= user.MaximumRating
+                                    )
+                                )
+                            )
+                        )
+                    )
+                )
+            );
+        b.Entity<MediaItem>().HasIndex(x => new { x.SearchTitle, x.Id });
+        b.Entity<MediaItem>().HasIndex(x => x.Fingerprint);
+        b.Entity<LibraryGrant>().HasKey(x => new { x.UserId, x.LibraryId });
+        b.Entity<LibraryGrant>().HasOne<User>().WithMany().HasForeignKey(x => x.UserId);
+        b.Entity<LibraryGrant>().HasOne<Library>().WithMany().HasForeignKey(x => x.LibraryId);
+        b.Entity<WatchHistory>().HasKey(x => new { x.UserId, x.MediaItemId });
+        b.Entity<WatchHistory>().HasOne<User>().WithMany().HasForeignKey(x => x.UserId);
+        b.Entity<WatchHistory>().HasOne<MediaItem>().WithMany().HasForeignKey(x => x.MediaItemId);
+        b.Entity<SmartCollection>().HasOne<User>().WithMany().HasForeignKey(x => x.UserId);
         b.Entity<ScanIssue>().HasOne<ScanJob>().WithMany().HasForeignKey(x => x.ScanJobId);
         b.Entity<ScanIssue>().HasIndex(x => x.ScanJobId);
         b.Entity<PlaybackReport>().HasOne<User>().WithMany().HasForeignKey(x => x.UserId);

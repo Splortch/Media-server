@@ -23,7 +23,11 @@ The [client ecosystem](docs/clients/README.md) adds a dedicated Windows Tauri cl
 | Native alpha releases | Implemented workflow | Self-contained Windows/Linux builds, bundled web UI, separate automatic alpha releases |
 | Hardware acceleration / HLS / transcoding | Planned | Direct Play only in this alpha |
 | Artwork / online metadata / TV matching | Planned | Current titles derive from filenames; no fabricated posters |
-| Multi-user administration / parental controls | Planned | Role authorization exists; no account-management UI yet |
+| Accounts / permissions / ratings | Implemented alpha | Admin-managed accounts, library grants, explicit content ratings; unknown ratings denied to restricted viewers |
+| Library watching / reconciliation | Implemented alpha | Opt-in watching, missing-entry tombstones and optional hash-based move/duplicate detection |
+| Indexed browsing / smart collections | Implemented alpha | Prefix search, bounded keyset pages, per-user typed rules |
+| Backups / native updates | Implemented alpha | Offline verified snapshots, empty-directory restore and optional staged update manager |
+| Server monitoring | Implemented alpha | Admin-only process, storage, scan and HTTP stream metrics; GPU/transcoding unavailable |
 | Windows desktop client | Alpha | Separate Tauri client; Windows build and actual-backend tests in CI |
 | Android / TV / iOS / plugins / secure remote streaming | Planned | No mobile binaries yet; localhost deployment by default |
 | Accessibility | In progress | Automated axe and keyboard regressions; manual assistive-technology review still required |

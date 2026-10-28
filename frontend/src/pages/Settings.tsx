@@ -1,8 +1,12 @@
 import { useEffect, useState, type FormEvent } from 'react';
+import Accounts from '../features/admin/Accounts';
+import Monitoring from '../features/admin/Monitoring';
+import LibraryTools from '../features/admin/LibraryTools';
+import { Collections, Sessions } from '../features/Personal';
 import { api, type Library } from '../services/api';
 type ScanIssue = { fileName: string; code: string; correlationId: string };
 type Job = { id: number; state: string; discovered: number; failed: number };
-export default function Settings() {
+export default function Settings({ admin = true }: { admin?: boolean }) {
   const [issues, setIssues] = useState<Record<number, ScanIssue[]>>({});
   const [passwordError, setPasswordError] = useState('');
   const [passwordBusy, setPasswordBusy] = useState(false);
@@ -13,6 +17,7 @@ export default function Settings() {
   const [busy, setBusy] = useState(false);
   const [jobs, setJobs] = useState<Record<number, Job>>({});
   useEffect(() => {
+    if (!admin) return;
     let active = true;
     api<Library[]>('/libraries')
       .then((x) => {
@@ -24,7 +29,7 @@ export default function Settings() {
     return () => {
       active = false;
     };
-  }, []);
+  }, [admin]);
   useEffect(() => {
     const pending = Object.values(jobs).filter((j) =>
       ['queued', 'running'].includes(j.state),
@@ -98,86 +103,96 @@ export default function Settings() {
         Your files stay yours. Scanning reads media and never changes the
         originals.
       </p>
-      <section className="panel">
-        <h2>Add a media directory</h2>
-        <p className="muted">
-          Use an absolute directory inside the allowed roots configured by the
-          server operator.
-        </p>
-        <form onSubmit={add} className="settings-form" aria-busy={busy}>
-          <label>
-            Library name
-            <input
-              required
-              maxLength={100}
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="Movies"
-            />
-          </label>
-          <label>
-            Directory on the server
-            <input
-              required
-              value={path}
-              onChange={(e) => setPath(e.target.value)}
-              placeholder="/media/movies or D:\Movies"
-            />
-          </label>
-          <button disabled={busy}>{busy ? 'Adding…' : 'Add library'}</button>
-        </form>
-        {error && (
-          <p role="alert" className="error">
-            {error}
-          </p>
-        )}
-      </section>
-      <section className="panel">
-        <h2>Media libraries</h2>
-        {!libraries.length && (
-          <p className="muted">
-            No directories configured. Add your first library above.
-          </p>
-        )}
-        {libraries.map((l) => (
-          <div className="library-row" key={l.id}>
-            <div>
-              <strong>{l.name}</strong>
-              <p className="muted path">{l.path}</p>
-            </div>
-            <button
-              className="secondary"
-              onClick={() => void scan(l.id)}
-              aria-label={`Scan library ${l.name}`}
-            >
-              Scan library
-            </button>
-          </div>
-        ))}
-        {Object.values(jobs).map((j) => (
-          <div key={j.id}>
-            <p role="status">
-              Scan #{j.id}: {j.state} · {j.discovered} identified · {j.failed}{' '}
-              failed
+      {admin && (
+        <>
+          <section className="panel">
+            <h2>Add a media directory</h2>
+            <p className="muted">
+              Use an absolute directory inside the allowed roots configured by
+              the server operator.
             </p>
-            {!!issues[j.id]?.length && (
-              <details>
-                <summary>
-                  Scan #{j.id} problems ({issues[j.id].length}; up to 100 shown)
-                </summary>
-                <ul>
-                  {issues[j.id].map((issue) => (
-                    <li key={issue.correlationId}>
-                      {issue.fileName}: {scanReason(issue.code)} · Reference{' '}
-                      {issue.correlationId}
-                    </li>
-                  ))}
-                </ul>
-              </details>
+            <form onSubmit={add} className="settings-form" aria-busy={busy}>
+              <label>
+                Library name
+                <input
+                  required
+                  maxLength={100}
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  placeholder="Movies"
+                />
+              </label>
+              <label>
+                Directory on the server
+                <input
+                  required
+                  value={path}
+                  onChange={(e) => setPath(e.target.value)}
+                  placeholder="/media/movies or D:\Movies"
+                />
+              </label>
+              <button disabled={busy}>
+                {busy ? 'Adding…' : 'Add library'}
+              </button>
+            </form>
+            {error && (
+              <p role="alert" className="error">
+                {error}
+              </p>
             )}
-          </div>
-        ))}
-      </section>
+          </section>
+          <section className="panel">
+            <h2>Media libraries</h2>
+            {!libraries.length && (
+              <p className="muted">
+                No directories configured. Add your first library above.
+              </p>
+            )}
+            {libraries.map((l) => (
+              <div className="library-row" key={l.id}>
+                <div>
+                  <strong>{l.name}</strong>
+                  <p className="muted path">{l.path}</p>
+                </div>
+                <button
+                  className="secondary"
+                  onClick={() => void scan(l.id)}
+                  aria-label={`Scan library ${l.name}`}
+                >
+                  Scan library
+                </button>
+              </div>
+            ))}
+            {Object.values(jobs).map((j) => (
+              <div key={j.id}>
+                <p role="status">
+                  Scan #{j.id}: {j.state} · {j.discovered} identified ·{' '}
+                  {j.failed} failed
+                </p>
+                {!!issues[j.id]?.length && (
+                  <details>
+                    <summary>
+                      Scan #{j.id} problems ({issues[j.id].length}; up to 100
+                      shown)
+                    </summary>
+                    <ul>
+                      {issues[j.id].map((issue) => (
+                        <li key={issue.correlationId}>
+                          {issue.fileName}: {scanReason(issue.code)} · Reference{' '}
+                          {issue.correlationId}
+                        </li>
+                      ))}
+                    </ul>
+                  </details>
+                )}
+              </div>
+            ))}
+          </section>
+          <LibraryTools libraries={libraries} />
+          <Accounts />
+          <Monitoring />
+        </>
+      )}
       <section className="panel">
         <h2>Change password</h2>
         <p className="muted">
@@ -226,14 +241,15 @@ export default function Settings() {
           </button>
         </form>
       </section>
+      <Sessions />
+      <Collections />
       <section className="panel">
         <h2>Alpha capabilities</h2>
         <p className="muted">
-          Direct Play · Local administrator account · SQLite · No telemetry
+          Direct Play · Local accounts · SQLite · No telemetry
         </p>
         <p className="muted">
-          Transcoding, metadata artwork, multiple users and remote access are
-          planned.
+          Transcoding, metadata artwork and remote access are planned.
         </p>
       </section>
     </>

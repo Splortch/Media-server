@@ -6,6 +6,7 @@ export type Media = {
   videoCodec: string;
   audioCodec: string;
   size: number;
+  contentRating?: number;
   playback?: { mode: string; mimeType: string; warning?: string | null };
 };
 export type Progress = {
@@ -15,7 +16,14 @@ export type Progress = {
   revision: number;
   completed: boolean;
 };
-export type Library = { id: number; name: string; path: string };
+export type Library = {
+  kind?: string;
+  watchEnabled?: boolean;
+  computeHashes?: boolean;
+  id: number;
+  name: string;
+  path: string;
+};
 let csrf: string | undefined;
 export function resetCsrf() {
   csrf = undefined;
@@ -71,4 +79,9 @@ export function duration(seconds: number) {
   if (seconds < 60) return `${Math.floor(seconds)} sec`;
   const m = Math.floor(seconds / 60);
   return m >= 60 ? `${Math.floor(m / 60)}h ${m % 60}m` : `${m} min`;
+}
+
+// SQLite materializes UTC DateTime values without a Kind/offset. Preserve UTC before local display.
+export function serverTime(value: string): Date {
+  return new Date(/(?:z|[+-]\d{2}:\d{2})$/i.test(value) ? value : value + 'Z');
 }

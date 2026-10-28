@@ -6,6 +6,9 @@ public class User
     public string Name { get; set; } = "";
     public string PasswordHash { get; set; } = "";
     public string Role { get; set; } = "Admin";
+    public bool Disabled { get; set; }
+    public bool AllLibraries { get; set; } = true;
+    public int? MaximumRating { get; set; }
 }
 
 public class Library
@@ -13,6 +16,9 @@ public class Library
     public int Id { get; set; }
     public string Name { get; set; } = "";
     public string Path { get; set; } = "";
+    public string Kind { get; set; } = "movies";
+    public bool WatchEnabled { get; set; }
+    public bool ComputeHashes { get; set; }
 }
 
 public class MediaItem
@@ -27,6 +33,11 @@ public class MediaItem
     public double Duration { get; set; }
     public long Size { get; set; }
     public string TracksJson { get; set; } = "[]";
+    public int ContentRating { get; set; }
+    public bool IsMissing { get; set; }
+    public string Fingerprint { get; set; } = "";
+    public long ModifiedTicks { get; set; }
+    public string SearchTitle { get; set; } = "";
 }
 
 public class PlaybackProgress
@@ -108,4 +119,34 @@ public class ScanIssue
 public class MediaProbeException(string code) : IOException("Media identification failed.")
 {
     public string Code { get; } = code;
+}
+
+public interface IUserContext
+{
+    int? UserId { get; }
+}
+
+public class LibraryGrant
+{
+    public int UserId { get; set; }
+    public int LibraryId { get; set; }
+}
+
+public class WatchHistory
+{
+    public int UserId { get; set; }
+    public int MediaItemId { get; set; }
+    public double Seconds { get; set; }
+    public DateTime LastPlayedAt { get; set; }
+    public DateTime? CompletedAt { get; set; }
+}
+
+public class SmartCollection
+{
+    public int Id { get; set; }
+    public int UserId { get; set; }
+    public string Name { get; set; } = "";
+    public string Prefix { get; set; } = "";
+    public int? LibraryId { get; set; }
+    public string? VideoCodec { get; set; }
 }

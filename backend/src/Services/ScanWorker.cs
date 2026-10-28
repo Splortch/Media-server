@@ -1,3 +1,4 @@
+using System.Security.Cryptography;
 using System.Text.Json;
 using System.Threading.Channels;
 using MediaServer.Core;
@@ -95,6 +96,8 @@ public sealed class ScanWorker(
                     stoppingToken
                 );
                 var policy = scope.ServiceProvider.GetRequiredService<PathPolicy>();
+                if (!Directory.Exists(library.Path))
+                    throw new DirectoryNotFoundException();
                 policy.ValidateDirectory(library.Path);
                 var probe = scope.ServiceProvider.GetRequiredService<IMediaProbe>();
                 var options = new EnumerationOptions
@@ -103,7 +106,18 @@ public sealed class ScanWorker(
                     IgnoreInaccessible = false,
                     AttributesToSkip = FileAttributes.ReparsePoint,
                 };
-                foreach (var path in Directory.EnumerateFiles(library.Path, "*", options))
+                var files = Directory
+                    .EnumerateFiles(library.Path, "*", options)
+                    .Where(path =>
+                        new[] { ".mp4", ".m4v", ".webm", ".mkv", ".mov", ".avi" }.Contains(
+                            Path.GetExtension(path).ToLowerInvariant()
+                        )
+                    )
+                    .ToArray();
+                var seen = files
+                    .Select(path => Path.GetRelativePath(library.Path, path))
+                    .ToHashSet(StringComparer.Ordinal);
+                foreach (var path in files)
                 {
                     stoppingToken.ThrowIfCancellationRequested();
                     if (
@@ -116,11 +130,38 @@ public sealed class ScanWorker(
                     {
                         var relative = Path.GetRelativePath(library.Path, path);
                         policy.Resolve(library.Path, relative);
+                        var fingerprint = "";
+                        if (library.ComputeHashes)
+                        {
+                            using var stream = policy.OpenRead(library.Path, relative);
+                            fingerprint = Convert.ToHexString(
+                                await SHA256.HashDataAsync(stream, stoppingToken)
+                            );
+                        }
                         var metadata = await probe.ProbeAsync(path, stoppingToken);
-                        var item = await db.Items.SingleOrDefaultAsync(
-                            x => x.LibraryId == library.Id && x.RelativePath == relative,
-                            stoppingToken
-                        );
+                        var item = await db
+                            .Items.IgnoreQueryFilters()
+                            .SingleOrDefaultAsync(
+                                x => x.LibraryId == library.Id && x.RelativePath == relative,
+                                stoppingToken
+                            );
+                        if (item is null && fingerprint != "")
+                        {
+                            var moved = await db
+                                .Items.IgnoreQueryFilters()
+                                .Where(x =>
+                                    x.LibraryId == library.Id
+                                    && x.Fingerprint == fingerprint
+                                    && !seen.Contains(x.RelativePath)
+                                )
+                                .Take(2)
+                                .ToListAsync(stoppingToken);
+                            if (moved.Count == 1)
+                            {
+                                item = moved[0];
+                                item.RelativePath = relative;
+                            }
+                        }
                         if (item is null)
                         {
                             item = new MediaItem
@@ -134,6 +175,10 @@ public sealed class ScanWorker(
                             metadata.Tracks ?? []
                         );
                         item.Title = Path.GetFileNameWithoutExtension(path);
+                        item.SearchTitle = item.Title.ToLowerInvariant();
+                        item.IsMissing = false;
+                        item.Fingerprint = fingerprint;
+                        item.ModifiedTicks = File.GetLastWriteTimeUtc(path).Ticks;
                         item.Duration = metadata.Duration;
                         item.Container = metadata.Container;
                         item.VideoCodec = metadata.VideoCodec;
@@ -155,6 +200,11 @@ public sealed class ScanWorker(
                         await RecordIssue(db, job, Path.GetFileName(path), ex, stoppingToken);
                     }
                 }
+                // Only a complete traversal may tombstone missing entries. Never delete original files or history.
+                await db
+                    .Items.IgnoreQueryFilters()
+                    .Where(x => x.LibraryId == library.Id && !seen.Contains(x.RelativePath))
+                    .ExecuteUpdateAsync(s => s.SetProperty(x => x.IsMissing, true), stoppingToken);
                 job.State = "completed";
             }
             catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
