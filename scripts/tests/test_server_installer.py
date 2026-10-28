@@ -9,6 +9,13 @@ spec.loader.exec_module(module)
 
 
 class InstallerManifestTests(unittest.TestCase):
+    def test_archive_gates_run_before_installer_adds_a_second_download(self):
+        workflow = (Path(__file__).resolve().parents[2] / '.github/workflows/release.yml').read_text()
+        # Both archive gates require exactly one native archive, on both OSes.
+        installer_step = workflow.index('      - name: Build and test the actual Windows server setup.exe')
+        for gate in ('python scripts/smoke-release.py', 'python scripts/test-native-update.py'):
+            self.assertLess(workflow.index(gate), installer_step)
+
     def test_uninstall_is_bounded_to_known_application_files(self):
         with tempfile.TemporaryDirectory() as temporary:
             payload = Path(temporary)

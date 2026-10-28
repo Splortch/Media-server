@@ -106,8 +106,6 @@ jobs:
             [void][System.Management.Automation.Language.Parser]::ParseFile($script.FullName, [ref]$tokens, [ref]$errors)
             if ($errors.Count) { throw ($errors | Out-String) }
           }
-          [void][System.Management.Automation.Language.Parser]::ParseFile((Resolve-Path 'release-resources/windows/Start-MediaServer.ps1'), [ref]$tokens, [ref]$errors)
-          if ($errors.Count) { throw ($errors | Out-String) }
       - name: Install pinned media tooling for Windows update validation
         if: runner.os == 'Windows'
         shell: pwsh
@@ -127,6 +125,7 @@ jobs:
         run: |
           python scripts/package-release.py server
           python scripts/smoke-release.py
+          python scripts/test-native-update.py
       - name: Build and test the actual Windows server setup.exe
         if: runner.os == 'Windows'
         env:
@@ -141,9 +140,7 @@ jobs:
           $env:MAKENSIS = $compiler
           python scripts/build-server-installer.py
           if ($LASTEXITCODE -ne 0) { throw 'Server installer build failed' }
-          ./scripts/setup-ffmpeg.ps1
           ./scripts/test-server-installer.ps1 -Installer (Resolve-Path "artifacts/packages/MediaServer-v$env:SERVER_VERSION-win-x64-setup.exe")
-          python scripts/test-native-update.py
       - uses: actions/upload-artifact@v7
         with:
           name: release-server-${{ matrix.rid }}
@@ -293,4 +290,3 @@ jobs:
           IMAGE="ghcr.io/${GITHUB_REPOSITORY,,}"
           docker tag media-server:release "$IMAGE:alpha"
           docker push "$IMAGE:alpha"
-

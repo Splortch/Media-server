@@ -2,7 +2,7 @@
 
 This guide is for trying the alpha on **one computer first**. Start with a small folder containing copies of a few videos you own. You do not need to write code, buy a subscription, or install the Windows client to use the browser interface.
 
-The instructions describe main commit `32645e5` and the published `alpha.49` downloads reviewed on 28 October 2026. Use the version shown in your chosen release if newer. [PR #55](https://github.com/Splortch/Media-server/pull/55) is still pending review: its account-management, monitoring, library-watching and managed-backup features are not part of these downloads.
+The original walkthrough was checked against source `32645e5` and the `alpha.49` downloads on 28 October 2026. Use the version shown in your release if newer. [PR #55](https://github.com/Splortch/Media-server/pull/55) has since merged account management, monitoring, library watching and backup tools into source; those features require a newer build whose source includes that merge. They are absent from alpha.49. The basic setup/playback steps below apply to both.
 
 ## 1. Choose what to install
 
@@ -156,7 +156,7 @@ If setup is already complete, use your existing account. If you forgot its passw
 6. If failures appear, expand **Scan problems**. It reports filename, reason and a diagnostic reference; check FFprobe availability before assuming the library is empty.
 7. Select **Library** after the scan finishes, or refresh it. You should see cards named after video filenames. No downloaded posters, online descriptions or TV episode matching are expected yet.
 
-The scanner considers `.mp4`, `.m4v`, `.webm`, `.mkv`, `.mov` and `.avi` files, recursively. Being scanned does **not** mean a browser can decode the file. Audio-only files and corrupt files cannot become playable videos. Scanning reads originals; it does not convert, rename or delete them. In the currently released version, rescanning is manual and removed-file entries may remain visible.
+The scanner considers `.mp4`, `.m4v`, `.webm`, `.mkv`, `.mov` and `.avi` files, recursively. Being scanned does **not** mean a browser can decode the file. Audio-only files and corrupt files cannot become playable videos. Scanning reads originals; it does not convert, rename or delete them. In alpha.49, rescanning is manual and removed-file entries may remain visible. Newer builds including PR #55 add opt-in watching and reconciliation; an explicit first scan is still a useful setup check.
 
 ## 5. Play a video and verify resume
 
