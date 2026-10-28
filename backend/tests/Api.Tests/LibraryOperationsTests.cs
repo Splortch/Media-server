@@ -125,18 +125,17 @@ public sealed class LibraryOperationsTests
         {
             if ((await admin.GetFromJsonAsync<JsonElement>("/api/media")).GetArrayLength() == 1)
             {
-                found = true;
-                break;
+                using var completedScope = server.Services.CreateScope();
+                var db = completedScope.ServiceProvider.GetRequiredService<MediaDb>();
+                if (await db.Jobs.AnyAsync(x => x.State == "completed"))
+                {
+                    found = true;
+                    break;
+                }
             }
             await Task.Delay(50);
         }
         Assert.True(found);
-        using var scope = server.Services.CreateScope();
-        Assert.True(
-            await scope
-                .ServiceProvider.GetRequiredService<MediaDb>()
-                .Jobs.AnyAsync(x => x.State == "completed")
-        );
         Assert.True(File.Exists(Path.Combine(server.MediaPath, "automatic.webm")));
     }
 }
