@@ -1,5 +1,7 @@
 # Media Server alpha — start here
 
+Follow the [step-by-step first setup guide](https://github.com/Splortch/Media-server/blob/main/docs/GETTING-STARTED.md) for expected results, testing playback/resume, and troubleshooting. It distinguishes released capabilities from unmerged work.
+
 This folder contains a runnable self-contained server and its web UI. You do not need the .NET
 SDK or Node.js. This is early alpha software; back up server data before updating.
 
@@ -29,3 +31,4 @@ FFmpeg/FFprobe. Browser notices are included in licenses/. The separate Docker r
 Ubuntu FFmpeg with its own license configuration, package inventory and corresponding source
 archive. See docs/deployment/RELEASES.md in the source repository for distribution details,
 checksums, source commit and the complete installation/update guide.
+
