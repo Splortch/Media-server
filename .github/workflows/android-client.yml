@@ -27,7 +27,7 @@ jobs:
         with:
           packages: platform-tools platforms;android-36 build-tools;35.0.0
           log-accepted-android-sdk-licenses: false
-      - uses: gradle/actions/setup-gradle@v4
+      - uses: gradle/actions/setup-gradle@v5
       - name: Test Android release safety
         run: node --test scripts/tests/android-release.test.cjs
       - name: Check generated API models
