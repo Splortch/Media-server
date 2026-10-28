@@ -6,6 +6,8 @@ Organization policy must permit repository Actions to write Releases and Package
 
 ## Download and run
 
+New users: follow [Your first Media Server setup](../GETTING-STARTED.md) for numbered instructions, expected results and troubleshooting. The [project review](../development/PROJECT-REVIEW.md) distinguishes automated evidence from hands-on testing still required.
+
 Open the repository's **Releases** page and choose the newest alpha for your platform. These are runnable builds,
 not source zips. No .NET SDK is needed by end users. The web UI is included in both server builds
 and the Docker image; there is no browser-only file:// application to install.
@@ -115,8 +117,9 @@ Download `release-downloads` from the workflow to inspect it before merging. Pol
 failed/stale/fork checks, exact source identity, retries, version overflow and metadata stamping.
 This does not replace physical Windows installation/playback or Android/iOS device tests.
 
-The initial combined alpha publication succeeded. Separate platform publication must still be
-observed after this change reaches main; the PR dry run cannot publish Releases. Repository
+The initial combined alpha publication and subsequent separate platform publication succeeded.
+The reviewed alpha.49 releases identify main commit 32645e5. This historical result does not
+establish that a later PR's release pipeline passed; PR dry runs cannot publish Releases. Repository
 and package visibility remain administrator settings: private repos require sign-in for downloads,
 and a private GHCR package requires `docker login`. Make the package public in GitHub Packages
 settings if anonymous installation is intended. The connector cannot change those admin settings.
@@ -125,3 +128,4 @@ To build manually, run **Automatic prereleases** from Actions. Its default is bu
 `publish=true` on main to publish an already validated main commit; it cannot bypass the CI gate.
 Re-running a failed release can repair its draft. To pause automatic releases, disable that workflow
 in Actions; existing releases/running servers remain unaffected. Do not delete data volumes to update.
+
