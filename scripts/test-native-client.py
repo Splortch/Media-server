@@ -8,7 +8,11 @@ with tempfile.TemporaryDirectory(prefix='media-client-test-') as folder:
     subprocess.run(['ffmpeg','-v','error','-f','lavfi','-i','testsrc=size=320x180:rate=24','-f','lavfi','-i','sine=frequency=440','-t','8','-c:v','libvpx-vp9','-c:a','libopus','-y',str(media/'sample.webm')],check=True)
     env=dict(os.environ,MediaServer__DataDirectory=str(data),MediaServer__AllowedRoots__0=str(media),ASPNETCORE_URLS='http://127.0.0.1:5053')
     with open(pathlib.Path(folder)/'server.log','w+') as log:
-        process=subprocess.Popen(['dotnet','run','--no-build','--project','backend/src/Api'],cwd=root,env=env,stdout=log,stderr=subprocess.STDOUT)
+        # Own the API process itself. `dotnet run` starts a child apphost on Windows;
+        # terminating only its CLI wrapper leaves .server.lock held during cleanup.
+        assembly=root/'backend/src/Api/bin/Debug/net10.0/Api.dll'
+        if not assembly.is_file():raise RuntimeError('Build the backend before running the native integration test')
+        process=subprocess.Popen(['dotnet',str(assembly)],cwd=root,env=env,stdout=log,stderr=subprocess.STDOUT)
         try:
             for _ in range(150):
                 try:
@@ -21,4 +25,10 @@ with tempfile.TemporaryDirectory(prefix='media-client-test-') as folder:
             env.update(MEDIA_CLIENT_TEST_SERVER='http://127.0.0.1:5053',MEDIA_CLIENT_TEST_TOKEN=(data/'setup-token').read_text(),MEDIA_CLIENT_TEST_ROOT=str(media))
             subprocess.run(['cargo','test','--manifest-path','clients/windows/native/Cargo.toml','--test','server','--','--ignored'],cwd=root,env=env,check=True)
         finally:
-            process.terminate();process.wait(timeout=15)
+            if process.poll() is None:
+                process.terminate()
+            try:
+                process.wait(timeout=15)
+            except subprocess.TimeoutExpired:
+                process.kill()
+                process.wait(timeout=5)
