@@ -158,7 +158,7 @@ public sealed class PlaybackPipelineTests
                 "-t",
                 "0.25",
                 "-vf",
-                "format=yuv420p10le",
+                "format=yuv420p10le,setparams=color_primaries=bt2020:color_trc=smpte2084:colorspace=bt2020nc:range=limited",
                 "-c:v",
                 encoder,
                 "-threads",
@@ -180,7 +180,7 @@ public sealed class PlaybackPipelineTests
             var result = await probe.ProbeAsync(Path.Combine(root, "hdr.mkv"), timeout.Token);
             Assert.Equal(codec, result.VideoCodec);
             var color = JsonSerializer.Deserialize<VideoColor>(result.ColorJson)!;
-            Assert.True(color.Hdr);
+            Assert.True(color.Hdr, result.ColorJson);
             Assert.Equal(10, color.BitDepth);
             Assert.Equal("bt2020", color.Primaries);
             var watch = Stopwatch.StartNew();
