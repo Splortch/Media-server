@@ -20,6 +20,7 @@ COPY --chown=app:app LICENSE NOTICE /app/licenses/
 COPY --from=web /web/node_modules/react/LICENSE /app/licenses/react-LICENSE
 COPY --from=web /web/node_modules/react-dom/LICENSE /app/licenses/react-dom-LICENSE
 COPY --from=web /web/node_modules/scheduler/LICENSE /app/licenses/scheduler-LICENSE
+COPY --from=web /web/node_modules/hls.js/LICENSE /app/licenses/hls.js-LICENSE
 USER app
 ENV ASPNETCORE_URLS=http://+:5050 MediaServer__DataDirectory=/data MediaServer__AllowedRoots__0=/media
 EXPOSE 5050

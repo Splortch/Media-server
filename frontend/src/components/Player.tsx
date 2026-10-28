@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import PlaybackSettings from './PlaybackSettings';
 import { api, type Media } from '../services/api';
 export default function Player({
   item,
@@ -15,7 +16,22 @@ export default function Player({
   onSaveProgress?: (seconds: number, completed: boolean) => Promise<void>;
   onPlaybackError?: () => Promise<void>;
 }) {
+  const [source, setSource] = useState(
+    streamUrl ?? `/api/media/${item.id}/stream`,
+  );
+  const [caption, setCaption] = useState('');
   const videoRef = useRef<HTMLVideoElement>(null);
+  const nextPosition = useRef<number | undefined>(undefined);
+  const switching = useRef(false);
+  const changeSource = useCallback(
+    (value: string) => {
+      if (value === source) return;
+      nextPosition.current = videoRef.current?.currentTime ?? 0;
+      switching.current = true;
+      setSource(value);
+    },
+    [source],
+  );
   const surfaceRef = useRef<HTMLDivElement>(null);
   const [paused, setPaused] = useState(true);
   const [position, setPosition] = useState(0);
@@ -151,6 +167,7 @@ export default function Player({
     completed = false,
   ) {
     if (
+      switching.current ||
       !Number.isFinite(video.currentTime) ||
       (!force && Date.now() - lastSaved.current < 5000)
     )
@@ -185,6 +202,15 @@ export default function Player({
 
   return (
     <section aria-label="Video player" className="player-wrap">
+      {!streamUrl && (
+        <PlaybackSettings
+          id={item.id}
+          video={videoRef}
+          source={source}
+          onSource={changeSource}
+          onCaption={setCaption}
+        />
+      )}
       <div
         className="player-surface"
         role="group"
@@ -221,13 +247,16 @@ export default function Player({
           playsInline
           preload="metadata"
           aria-label={item.title}
-          src={streamUrl ?? `/api/media/${item.id}/stream`}
+          src={source.endsWith('.m3u8') ? undefined : source}
           onLoadedMetadata={(e) => {
             const v = e.currentTarget;
             setDuration(Number.isFinite(v.duration) ? v.duration : 0);
             measure(v);
-            if (Number.isFinite(v.duration) && resume < v.duration - 2)
-              v.currentTime = resume;
+            const target = nextPosition.current ?? resume;
+            if (Number.isFinite(v.duration) && target < v.duration - 2)
+              v.currentTime = target;
+            nextPosition.current = undefined;
+            switching.current = false;
           }}
           onTimeUpdate={(e) => {
             setPosition(e.currentTarget.currentTime);
@@ -268,7 +297,17 @@ export default function Player({
           onError={(e) => {
             void playbackFailed(e.currentTarget);
           }}
-        />
+        >
+          {caption && (
+            <track
+              key={caption}
+              src={caption}
+              kind="subtitles"
+              label="Selected subtitles"
+              default
+            />
+          )}
+        </video>
         <div className="player-controls">
           <div className="player-timeline">
             <span>{formatPlaybackTime(position)}</span>

@@ -174,6 +174,7 @@ public sealed class ScanWorker(
                         item.TracksJson = System.Text.Json.JsonSerializer.Serialize(
                             metadata.Tracks ?? []
                         );
+                        item.ColorJson = metadata.ColorJson;
                         item.Title = Path.GetFileNameWithoutExtension(path);
                         item.SearchTitle = item.Title.ToLowerInvariant();
                         item.IsMissing = false;

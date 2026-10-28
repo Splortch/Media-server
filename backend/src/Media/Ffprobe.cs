@@ -24,7 +24,7 @@ public sealed class Ffprobe(string executable) : IMediaProbe
                 "-protocol_whitelist",
                 "file",
                 "-show_entries",
-                "format=duration,format_name:stream=index,codec_type,codec_name:stream_tags=language,title",
+                "format=duration,format_name:stream=index,codec_type,codec_name,width,height,channels,channel_layout,bits_per_raw_sample,pix_fmt,color_primaries,color_transfer,color_space:stream_tags=language,title:stream_disposition=default,forced:stream_side_data",
                 "-of",
                 "json",
                 path,
@@ -96,6 +96,43 @@ public sealed class Ffprobe(string executable) : IMediaProbe
             ?? "";
         if (Codec("video") == "")
             throw new MediaProbeException("no_video");
+        var video = streams.First(x => x.GetProperty("codec_type").GetString() == "video");
+        string? Text(string key) =>
+            video.TryGetProperty(key, out var entry) ? entry.GetString() : null;
+        int Number(string key) =>
+            video.TryGetProperty(key, out var entry) && entry.TryGetInt32(out var n) ? n : 0;
+        var depth =
+            int.TryParse(Text("bits_per_raw_sample"), out var bits) && bits > 0 ? (int?)bits : null;
+        if (depth is null && Text("pix_fmt") is string pixel)
+        {
+            var match = System.Text.RegularExpressions.Regex.Match(
+                pixel,
+                @"(?:p|gbrp)(10|12|16)(?:le|be)?$"
+            );
+            if (match.Success)
+                depth = int.Parse(match.Groups[1].Value, CultureInfo.InvariantCulture);
+            else if (pixel is "yuv420p" or "yuv422p" or "yuv444p" or "nv12")
+                depth = 8;
+        }
+        var color = new VideoColor(
+            Number("width"),
+            Number("height"),
+            depth,
+            Text("pix_fmt"),
+            Text("color_primaries"),
+            Text("color_transfer"),
+            Text("color_space"),
+            video.TryGetProperty("side_data_list", out var sides)
+                && sides
+                    .EnumerateArray()
+                    .Any(x =>
+                        x.TryGetProperty("side_data_type", out var type)
+                        && type.GetString()
+                            is "Mastering display metadata"
+                                or "Content light level metadata"
+                    ),
+            video.TryGetProperty("side_data_list", out var sideData) ? sideData.GetRawText() : null
+        );
         return new ProbeResult(
             double.IsFinite(duration) ? Math.Max(0, duration) : 0,
             format.GetProperty("format_name").GetString() ?? "",
@@ -109,11 +146,21 @@ public sealed class Ffprobe(string executable) : IMediaProbe
                         ? c.GetString() ?? "unknown"
                         : "unknown",
                     Tag(x, "language"),
-                    Tag(x, "title")
+                    Tag(x, "title"),
+                    x.TryGetProperty("channels", out var channels) ? channels.GetInt32() : null,
+                    x.TryGetProperty("channel_layout", out var layout) ? layout.GetString() : null,
+                    Disposition(x, "default"),
+                    Disposition(x, "forced")
                 ))
-                .ToArray()
+                .ToArray(),
+            JsonSerializer.Serialize(color)
         );
     }
+
+    private static bool Disposition(JsonElement stream, string name) =>
+        stream.TryGetProperty("disposition", out var disposition)
+        && disposition.TryGetProperty(name, out var flag)
+        && flag.GetInt32() == 1;
 
     private static string? Tag(JsonElement stream, string name) =>
         stream.TryGetProperty("tags", out var tags) && tags.TryGetProperty(name, out var value)
@@ -155,12 +202,18 @@ public sealed class DirectPlaybackPlanner : IPlaybackPlanner
                 && item.VideoCodec is "vp8" or "vp9" or "av1"
                 && item.AudioCodec is "opus" or "vorbis" or ""
             );
+        if (TranscodeProfile.Color(item)?.Hdr == true)
+            return new(
+                "direct",
+                mime,
+                "HDR source: display compatibility is unverified. Choose HLS SDR conversion to tone-map explicitly."
+            );
         return new(
             "direct",
             mime,
             compatible
                 ? null
-                : "This format may not play in your browser. Transcoding is not available yet."
+                : "This format may not play in your browser. Choose HLS conversion if FFmpeg is enabled on this server."
         );
     }
 }

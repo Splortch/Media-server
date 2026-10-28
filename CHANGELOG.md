@@ -38,3 +38,10 @@ No official stable release has been published. Transcoding, hardware acceleratio
 - Add indexed cursor browsing and per-user smart collections; keep legacy APIs compatible.
 - Add administrator-only process/storage/scan/active-transfer metrics, with unsupported values explicitly unavailable.
 - Add private offline backups, verified copy-only restore and optional staged native updates with rollback checkpoints.
+
+### Playback pipeline and library removal (unreleased)
+
+- Add bounded authenticated HLS conversion, automatic/manual quality controls, operator-authorized hardware encoder probes with software fallback, HDR metadata and explicit SDR tone mapping.
+- Add web audio/text-subtitle selection and sanitized WebVTT captions.
+- Add administrator library removal with explicit confirmation, transactional catalog cleanup, scan protection and source-file preservation.
+- Physical GPU/HDR-display validation, network benchmarks and native-client HLS controls remain unfinished; see the playback architecture guide.

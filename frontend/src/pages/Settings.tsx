@@ -15,6 +15,7 @@ export default function Settings({ admin = true }: { admin?: boolean }) {
   const [path, setPath] = useState('');
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
+  const [removing, setRemoving] = useState<number | null>(null);
   const [jobs, setJobs] = useState<Record<number, Job>>({});
   useEffect(() => {
     if (!admin) return;
@@ -58,6 +59,19 @@ export default function Settings({ admin = true }: { admin?: boolean }) {
       setLibraries((old) => [...old, library]);
       setName('');
       setPath('');
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
+  async function remove(id: number) {
+    setBusy(true);
+    setError('');
+    try {
+      await api(`/libraries/${id}`, 'DELETE');
+      setLibraries((old) => old.filter((library) => library.id !== id));
+      setRemoving(null);
     } catch (e) {
       setError((e as Error).message);
     } finally {
@@ -161,6 +175,33 @@ export default function Settings({ admin = true }: { admin?: boolean }) {
                 >
                   Scan library
                 </button>
+                <button
+                  className="secondary"
+                  disabled={busy}
+                  onClick={() => setRemoving(l.id)}
+                  aria-label={`Remove library ${l.name}`}
+                >
+                  Remove library
+                </button>
+                {removing === l.id && (
+                  <div role="group" aria-label={`Confirm removal of ${l.name}`}>
+                    <p>
+                      Remove {l.name} from the server? Its catalog, grants,
+                      watch history and progress will be removed. Original media
+                      files stay on disk. Active scans must finish first.
+                    </p>
+                    <button disabled={busy} onClick={() => void remove(l.id)}>
+                      Confirm removal
+                    </button>
+                    <button
+                      className="secondary"
+                      disabled={busy}
+                      onClick={() => setRemoving(null)}
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                )}
               </div>
             ))}
             {Object.values(jobs).map((j) => (
@@ -249,7 +290,8 @@ export default function Settings({ admin = true }: { admin?: boolean }) {
           Direct Play · Local accounts · SQLite · No telemetry
         </p>
         <p className="muted">
-          Transcoding, metadata artwork and remote access are planned.
+          Bounded HLS conversion is available in the web player. Metadata
+          artwork and remote access are planned.
         </p>
       </section>
     </>

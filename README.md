@@ -124,3 +124,7 @@ Security and troubleshooting updates: [operator recovery and trust boundaries](d
 
 
 See [desktop installers for Windows, Linux and macOS](docs/deployment/DESKTOP-INSTALLERS.md) for server/client package selection and step-by-step setup.
+
+### Playback and library management
+
+See [HLS conversion, hardware opt-in, HDR, subtitles and library removal](docs/architecture/PLAYBACK-PIPELINE.md) for setup, API details, alpha limits and the physical-device validation still needed.

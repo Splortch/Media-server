@@ -127,6 +127,29 @@ test('setup, accounts, collections, diagnostics, stream ranges and persist resum
   });
   expect(range.status()).toBe(206);
   expect((await range.body()).length).toBe(16);
+  // Use the real authenticated conversion API, then render the generated HLS.
+  await page.getByText('Quality, audio and subtitles', { exact: true }).click();
+  await expect(page.getByLabel('Audio track')).toBeVisible();
+  await accessible(page);
+  await page
+    .getByRole('button', { name: 'Prepare HLS playback', exact: true })
+    .click();
+  await expect(page.getByText(/Conversion: ready/)).toBeVisible({
+    timeout: 60000,
+  });
+  await expect(page.getByLabel('Playback quality')).toBeVisible();
+  await page.getByLabel('Playback quality').selectOption('0');
+  await page.getByRole('button', { name: 'Play', exact: true }).click();
+  await expect
+    .poll(() =>
+      video.evaluate(
+        (v: HTMLVideoElement) => v.getVideoPlaybackQuality().totalVideoFrames,
+      ),
+    )
+    .toBeGreaterThan(0);
+  await page.getByRole('button', { name: 'Pause', exact: true }).click();
+  await page.getByLabel('Playback quality').selectOption('-1');
+  await page.getByRole('button', { name: 'Direct Play', exact: true }).click();
   await page.reload();
   await expect
     .poll(() =>

@@ -21,8 +21,11 @@ public sealed class Server : WebApplicationFactory<Program>
     public string MediaPath => Path.Combine(Root, "videos");
     public string DataPath => Path.Combine(Root, "data");
 
-    public Server()
+    private readonly string[]? hardware;
+
+    public Server(string[]? hardware = null)
     {
+        this.hardware = hardware;
         Directory.CreateDirectory(MediaPath);
         Environment.SetEnvironmentVariable("MediaServer__DataDirectory", DataPath);
         Environment.SetEnvironmentVariable("MediaServer__AllowedRoots__0", MediaPath);
@@ -35,6 +38,12 @@ public sealed class Server : WebApplicationFactory<Program>
         {
             services.RemoveAll<IMediaProbe>();
             services.AddSingleton<IMediaProbe, TestProbe>();
+            if (hardware is not null)
+                services.Replace(
+                    ServiceDescriptor.Singleton(
+                        new TranscodeSettings(new[] { "libx264" }.Concat(hardware).ToArray())
+                    )
+                );
         });
     }
 
