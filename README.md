@@ -36,6 +36,8 @@ Verification results and environment limits are recorded in [VALIDATION.md](docs
 
 ## Download and run
 
+**First time? Start with the [step-by-step setup guide](docs/GETTING-STARTED.md).** It covers Windows, Linux, Docker, first login, adding media, playback/resume checks and troubleshooting. For review findings and validation limits, see [the alpha project review](docs/development/PROJECT-REVIEW.md).
+
 Automatic alpha release packaging is configured for Windows/Linux x64 servers, Windows EXE/MSI
 clients and a prebuilt Docker image. The web UI is bundled. Download from [Releases](https://github.com/Splortch/Media-server/releases),
 extract the server, and use its Start launcher. See [installation, updates and release automation](docs/deployment/RELEASES.md).
@@ -114,5 +116,3 @@ Security and troubleshooting updates: [operator recovery and trust boundaries](d
 [playback diagnostics](docs/development/PLAYBACK-DIAGNOSTICS.md), and
 [accessibility validation and remaining manual checks](docs/development/ACCESSIBILITY.md).
 
-See [server operations and permission semantics](docs/architecture/SERVER-OPERATIONS.md) and
-[backups, staged updates and rollback](docs/deployment/BACKUPS-UPDATES.md).
