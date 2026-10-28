@@ -149,7 +149,9 @@ export default function App() {
       if (event.ctrlKey || event.altKey || event.metaKey) return;
       if (
         event.target instanceof HTMLElement &&
-        (event.target.closest('input,textarea,select,button,video') ||
+        (event.target.closest(
+          'input,textarea,select,button,video,.player-surface',
+        ) ||
           event.target.isContentEditable)
       )
         return;
@@ -165,7 +167,7 @@ export default function App() {
         event.preventDefault();
         if (document.fullscreenElement) void document.exitFullscreen();
         else
-          void video
+          void (video.closest('.player-surface') ?? video)
             .requestFullscreen()
             .catch(() => setError('Fullscreen is unavailable.'));
       }

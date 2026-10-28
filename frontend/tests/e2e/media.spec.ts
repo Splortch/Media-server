@@ -102,17 +102,18 @@ test('setup, accounts, collections, diagnostics, stream ranges and persist resum
   await expect
     .poll(() => video.evaluate((v: HTMLVideoElement) => v.readyState))
     .toBeGreaterThanOrEqual(1);
-  await video.evaluate(async (v: HTMLVideoElement) => {
-    v.muted = true;
-    await v.play();
-  });
+  await expect(video).not.toHaveAttribute('controls');
+  await page.getByRole('button', { name: 'Mute', exact: true }).click();
+  await page.getByRole('button', { name: 'Play', exact: true }).click();
   await expect
     .poll(() => video.evaluate((v: HTMLVideoElement) => v.currentTime))
     .toBeGreaterThan(0);
-  await video.evaluate((v: HTMLVideoElement) => {
-    v.currentTime = 3;
-    v.pause();
-  });
+  await page.getByRole('button', { name: 'Pause', exact: true }).click();
+  await page.getByLabel('Seek', { exact: true }).focus();
+  await page.keyboard.press('Home');
+  for (let step = 0; step < 35; step++) await page.keyboard.press('ArrowRight');
+  await page.getByRole('button', { name: 'Play', exact: true }).click();
+  await page.getByRole('button', { name: 'Pause', exact: true }).click();
   await expect
     .poll(async () => {
       const response = await page.request.get('/api/progress');

@@ -136,3 +136,85 @@ it('distinguishes browser network and decode errors', () => {
   fireEvent.error(video);
   expect(screen.getByRole('alert')).toHaveTextContent('could not decode');
 });
+
+it('provides custom controls, bounded seeking, volume and container fullscreen', async () => {
+  const save = vi.fn().mockResolvedValue(undefined);
+  render(
+    <Player
+      item={{
+        id: 10,
+        title: 'Controls video',
+        duration: 100,
+        size: 100,
+        container: 'mp4',
+        videoCodec: 'h264',
+        audioCodec: 'aac',
+      }}
+      resume={20}
+      onSaveProgress={save}
+    />,
+  );
+  const video = screen.getByLabelText('Controls video') as HTMLVideoElement;
+  expect(video.controls).toBe(false);
+  expect(
+    screen.getByRole('button', { name: 'Rewind 10 seconds' }),
+  ).toHaveTextContent('Rewind 10 seconds');
+  expect(
+    screen.getByRole('button', { name: 'Forward 10 seconds' }),
+  ).toHaveTextContent('Forward 10 seconds');
+  Object.defineProperty(video, 'duration', { value: 100, configurable: true });
+  fireEvent.loadedMetadata(video);
+  expect(video.currentTime).toBe(20);
+  fireEvent.change(screen.getByLabelText('Seek'), { target: { value: '95' } });
+  expect(video.currentTime).toBe(95);
+  fireEvent.click(screen.getByRole('button', { name: 'Forward 10 seconds' }));
+  expect(video.currentTime).toBe(100);
+  fireEvent.change(screen.getByLabelText('Volume'), {
+    target: { value: '0.3' },
+  });
+  expect(video.volume).toBe(0.3);
+  fireEvent.click(screen.getByRole('button', { name: 'Mute' }));
+  expect(video.muted).toBe(true);
+  const play = vi.spyOn(video, 'play').mockResolvedValue();
+  fireEvent.click(screen.getByRole('button', { name: 'Play' }));
+  expect(play).toHaveBeenCalledOnce();
+  fireEvent.play(video);
+  expect(screen.getByRole('button', { name: 'Pause' })).toBeInTheDocument();
+  const surface = screen.getByLabelText('Playback controls');
+  const fullscreen = vi.fn().mockResolvedValue(undefined);
+  Object.defineProperty(surface, 'requestFullscreen', { value: fullscreen });
+  fireEvent.click(screen.getByRole('button', { name: 'Fullscreen' }));
+  expect(fullscreen).toHaveBeenCalledOnce();
+  fireEvent.keyDown(surface, { key: 'ArrowLeft' });
+  expect(video.currentTime).toBe(90);
+  fireEvent.keyDown(screen.getByLabelText('Seek'), { key: 'ArrowLeft' });
+  expect(video.currentTime).toBe(90);
+  fireEvent.pause(video);
+  await waitFor(() => expect(save).toHaveBeenCalledWith(90, false));
+});
+
+it('shows rejected play requests and disables seeking before metadata', async () => {
+  render(
+    <Player
+      item={{
+        id: 11,
+        title: 'Unavailable video',
+        duration: 0,
+        size: 0,
+        container: 'mp4',
+        videoCodec: '',
+        audioCodec: '',
+      }}
+      resume={0}
+    />,
+  );
+  expect(screen.getByLabelText('Seek')).toBeDisabled();
+  const video = screen.getByLabelText('Unavailable video') as HTMLVideoElement;
+  vi.spyOn(video, 'play').mockRejectedValue(new Error('blocked'));
+  fireEvent.click(screen.getByRole('button', { name: 'Play' }));
+  await waitFor(() =>
+    expect(screen.getByRole('alert')).toHaveTextContent(
+      'Playback could not start',
+    ),
+  );
+});
