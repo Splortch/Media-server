@@ -21,7 +21,9 @@
       }
     ],
     "security": {
-      "capabilities": ["main-window"],
+      "capabilities": [
+        "main-window"
+      ],
       "csp": "default-src 'self'; script-src 'self'; style-src 'self'; connect-src ipc: http://ipc.localhost; media-src http://127.0.0.1:*; img-src 'self' data:; object-src 'none'; base-uri 'none'; frame-src 'none'",
       "devCsp": "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; connect-src ipc: http://ipc.localhost ws://127.0.0.1:1420; media-src http://127.0.0.1:*; img-src 'self' data:; object-src 'none'; base-uri 'none'; frame-src 'none'"
     }
@@ -40,7 +42,10 @@
         "version": "0.1.0.1"
       }
     },
-    "icon": ["icons/icon.ico", "icons/icon.png"],
+    "icon": [
+      "icons/icon.ico",
+      "icons/icon.png"
+    ],
     "licenseFile": "../../../LICENSE",
     "resources": {
       "../../../LICENSE": "LICENSE",
@@ -53,6 +58,15 @@
     "macOS": {
       "minimumSystemVersion": "14.0",
       "infoPlist": "Info.plist"
+    },
+    "linux": {
+      "deb": {
+        "depends": [
+          "gstreamer1.0-plugins-base",
+          "gstreamer1.0-plugins-good",
+          "gstreamer1.0-libav"
+        ]
+      }
     }
   }
 }

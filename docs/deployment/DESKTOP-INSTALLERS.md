@@ -54,8 +54,8 @@ root/system service or enable startup automatically.
    Local testing can use `http://127.0.0.1:5050` on the same machine.
 4. Sign in, browse, and play. Progress is saved on the server for other devices.
 
-Linux playback uses WebKitGTK/GStreamer. Install your distribution's codec plugins
-if a compatible file cannot play; this does not add transcoding. Sessions remain
+Linux playback uses WebKitGTK/GStreamer. The DEB declares the base/good/libav
+media plugins as dependencies. Additional codec needs depend on the file; this does not add transcoding. Sessions remain
 in memory, so sign in again after closing the app. There is no plaintext password
 storage or fallback credential file. Use the package name reported by
 `dpkg-deb -f <download.deb> Package` when removing it with apt.
