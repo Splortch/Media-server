@@ -141,6 +141,7 @@ export default function Accounts() {
             <label>
               Role for {account.name}
               <select
+                aria-label={`Role for ${account.name}`}
                 disabled={account.id === 1 || busy}
                 value={account.role}
                 onChange={(e) => update(account.id, { role: e.target.value })}
@@ -193,6 +194,7 @@ export default function Accounts() {
             <label>
               Maximum rating for {account.name}
               <select
+                aria-label={`Maximum rating for ${account.name}`}
                 value={account.maximumRating ?? ''}
                 onChange={(e) =>
                   update(account.id, {

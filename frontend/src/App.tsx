@@ -469,6 +469,7 @@ export default function App() {
                   <label>
                     Content rating
                     <select
+                      aria-label="Content rating"
                       defaultValue={item.contentRating ?? 0}
                       onChange={(e) => {
                         void api(`/media/${item.id}/rating`, 'PUT', {
@@ -555,6 +556,7 @@ export default function App() {
                   <label>
                     Smart collection
                     <select
+                      aria-label="Smart collection"
                       value={collection}
                       onChange={(e) => setCollection(e.target.value)}
                     >

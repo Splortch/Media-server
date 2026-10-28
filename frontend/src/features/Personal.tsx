@@ -58,7 +58,7 @@ export function Collections() {
         </label>
         <label>
           Video codec
-          <select name="codec">
+          <select aria-label="Video codec" name="codec">
             <option value="">Any codec</option>
             <option value="h264">H.264</option>
             <option value="vp9">VP9</option>

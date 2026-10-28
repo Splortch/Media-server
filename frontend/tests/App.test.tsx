@@ -57,6 +57,9 @@ it('ignores a previous account’s delayed page after session expiration and a n
   state.user = 'Alice';
   render(<App />);
   await screen.findByRole('heading', { name: 'Alice private collection' });
+  expect(
+    screen.getByRole('combobox', { name: 'Smart collection' }),
+  ).toBeInTheDocument();
   fireEvent.click(screen.getByRole('button', { name: 'Load more videos' }));
   await waitFor(() => expect(state.deferred).toBeTypeOf('function'));
   act(() => window.dispatchEvent(new Event('session-expired')));

@@ -73,7 +73,11 @@ function Options({
       <div className="settings-form">
         <label>
           Library type for {library.name}
-          <select value={kind} onChange={(e) => setKind(e.target.value)}>
+          <select
+            aria-label={`Library type for ${library.name}`}
+            value={kind}
+            onChange={(e) => setKind(e.target.value)}
+          >
             <option value="movies">Movies</option>
             <option value="tv">TV</option>
           </select>

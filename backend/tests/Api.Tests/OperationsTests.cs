@@ -283,6 +283,15 @@ public sealed class OperationsTests(ITestOutputHelper output)
                 "WITH RECURSIVE n(x) AS (VALUES(1) UNION ALL SELECT x+1 FROM n WHERE x<100000) INSERT INTO Items(LibraryId,RelativePath,Title,SearchTitle,Container,VideoCodec,AudioCodec,Duration,Size,TracksJson,ContentRating,IsMissing,Fingerprint,ModifiedTicks) SELECT 1,printf('%06d.webm',x),printf('Movie %06d',x),printf('movie %06d',x),'webm','vp9','opus',100,100,'[]',10,0,'',0 FROM n"
             );
         }
+        Assert.Equal(
+            HttpStatusCode.BadRequest,
+            (
+                await admin.PostAsJsonAsync(
+                    "/api/collections",
+                    new { name = "Invalid null prefix", prefix = (string?)null }
+                )
+            ).StatusCode
+        );
         var timer = Stopwatch.StartNew();
         var first = await admin.GetFromJsonAsync<JsonElement>(
             "/api/media-page?prefix=movie%20099&limit=20"

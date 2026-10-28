@@ -32,10 +32,11 @@ public static partial class Operations
             )
         ) + "*";
 
-    private static void ValidateSearch(string prefix, string? codec)
+    private static void ValidateSearch(string? prefix, string? codec)
     {
         if (
-            prefix.Length > 128
+            prefix is null
+            || prefix.Length > 128
             || prefix.Any(char.IsControl)
             || codec is { Length: > 32 }
             || codec?.Any(c => !char.IsAsciiLetterOrDigit(c) && c != '_') == true
