@@ -20,7 +20,8 @@ Legacy users retain previous library visibility during migration; new accounts r
 New account names use ASCII letters/digits/underscore/dash/dot, with case-insensitive uniqueness.
 
 Watch history has its own per-user/media record (last played, last position, last completion), independent
-of mutable resume positions. The history API returns the last 200 visible titles. It is not a complete event
+of mutable resume positions. Accepted progress and history writes share a transaction; a failed history
+write cannot leave a partial resume update. The history API returns the last 200 visible titles. It is not a complete event
 log of every rewatch. Session/device lists expose non-bearer handles; no password hash or raw cookie is returned.
 The web client clears private state on expiration/logout and ignores delayed pagination responses from the
 previous account.

@@ -56,7 +56,7 @@ on subsequent commits must still pass before merging; these run IDs identify the
 
 Local validation for the accounts (#13), reconciliation (#11), indexed browsing (#12), monitoring (#21)
 and backup/update (#22) batch: 28 backend tests pass. The 100,000-item HTTP search test measured 57.1 ms
-for its first bounded page in this environment (not a general production latency guarantee). Five frontend
+for its first bounded page in this environment (not a general production latency guarantee). Six frontend
 component tests pass, including an expired-session/delayed-page regression that prevents an old account's
 results from appearing after another account signs in. Fifteen Python script tests pass, including failed
 migration, interrupted pointer replacement, archive traversal and copy-only rollback policies.
@@ -68,5 +68,9 @@ retaining the original data directory. These are local test builds, not publishe
 
 Restores intentionally revoke sessions; integrity/dry-run/private-mode/tampering/future-schema checks are
 covered by backend tests. The release workflow now runs the real archive's staged-update checks on both
-Windows and Linux. Hosted results for this batch are pending review CI; physical-device testing, GPU
-adapters, codec sandboxing, signed installers and power-loss validation are not claimed.
+Windows and Linux. On revision 11e9bcf, hosted backend tests passed on both operating systems, alongside
+web checks, real-backend browser/account/collection/accessibility tests and Docker smoke checks. Both actual
+native server archive/update gates passed in packaging run 40614233787. Subsequent commits must pass their
+own PR checks; the final change adds failure-injection tests proving both progress APIs roll back a resume
+write if its paired history write fails. Physical-device testing, GPU adapters, codec sandboxing, signed
+installers and power-loss validation are not claimed.
