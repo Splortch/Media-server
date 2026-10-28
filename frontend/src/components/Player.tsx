@@ -187,6 +187,7 @@ export default function Player({
     <section aria-label="Video player" className="player-wrap">
       <div
         className="player-surface"
+        role="group"
         ref={surfaceRef}
         tabIndex={0}
         aria-label="Playback controls"
