@@ -24,10 +24,11 @@ if (process.argv[2] === '--capture') {
     try {
       instance = await browser();
       for (const [name,width,height] of [['desktop',1440,1150],['mobile',390,844]]) {
-        const page = await instance.newPage({viewport:{width,height}});
+        const context = await instance.newContext({viewport:{width,height}});
+        const page = await context.newPage();
         await page.goto(server.url);
         await page.screenshot({path:`artifacts/downloads-${name}.png`,fullPage:true});
-        await page.close();
+        await context.close();
       }
     } finally { await instance?.close(); await server.close(); }
   })().catch(error=>{console.error(error);process.exitCode=1;});
@@ -40,7 +41,8 @@ if (process.argv[2] === '--capture') {
     try {
       instance = await browser();
       for (const [width,height] of [[1440,1000],[390,844]]) {
-        const page = await instance.newPage({viewport:{width,height}});
+        const context = await instance.newContext({viewport:{width,height}});
+        const page = await context.newPage();
         await page.goto(server.url);
         assert.equal(await page.locator('.platform-card:visible').count(),5);
         const windows = page.locator('[data-platform="server-windows"]');
@@ -57,7 +59,7 @@ if (process.argv[2] === '--capture') {
         assert.equal(await page.locator('.platform-card:visible').count(),5);
         assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth),true);
         assert.deepEqual((await new AxeBuilder({page}).withTags(['wcag2a','wcag2aa','wcag21aa']).analyze()).violations,[]);
-        await page.close();
+        await context.close();
       }
     } finally { await instance?.close(); await server.close(); fs.rmSync(directory,{recursive:true}); }
   });
