@@ -83,6 +83,12 @@ Docker · Linux amd64 — Run the Linux amd64 server with Compose.
 
 </details>
 
+### macOS server
+
+macOS · Apple Silicon / Intel — Host media on Apple Silicon or Intel macOS.
+
+No published build available yet.
+
 ## Clients
 
 Connect these applications to your existing server.
@@ -129,6 +135,18 @@ The debug APK is the installable testing build. Unsigned release APK/AAB files n
 - [v0.1.0-alpha.7](https://github.com/Splortch/Media-server/releases/tag/client-android/v0.1.0-alpha.7)
 
 </details>
+
+### Linux desktop client
+
+Ubuntu 24.04 · x64 — Connect Ubuntu 24.04 x64 to your server.
+
+No published build available yet.
+
+### macOS desktop client
+
+macOS · Apple Silicon / Intel — Connect Apple Silicon or Intel macOS to your server.
+
+No published build available yet.
 
 ## Browser
 
