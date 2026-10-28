@@ -15,8 +15,8 @@ android {
 }
 
 dependencies {
-    api("com.squareup.retrofit2:retrofit:2.11.0")
-    implementation("com.squareup.retrofit2:converter-kotlinx-serialization:2.11.0")
+    api("com.squareup.retrofit2:retrofit:3.0.0")
+    implementation("com.squareup.retrofit2:converter-kotlinx-serialization:3.0.0")
     api("com.squareup.okhttp3:okhttp:4.12.0")
     api("org.jetbrains.kotlinx:kotlinx-serialization-json:1.8.1")
     api("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.10.2")
