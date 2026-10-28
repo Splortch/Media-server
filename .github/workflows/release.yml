@@ -81,7 +81,7 @@ jobs:
           global-json-file: global.json
           cache: true
           cache-dependency-path: backend/**/packages.lock.json
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: '24'
           cache: npm
