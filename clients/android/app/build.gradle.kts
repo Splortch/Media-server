@@ -1,19 +1,39 @@
-plugins { id("com.android.application"); kotlin("android"); kotlin("plugin.compose") }
-val buildNumber = providers.gradleProperty("androidBuildNumber").orElse("1").get().toInt().also { require(it in 1..65535) }
+plugins {
+    id("com.android.application")
+    kotlin("android")
+    kotlin("plugin.compose")
+}
+
+val buildNumber =
+    providers.gradleProperty("androidBuildNumber").orElse("1").get().toInt().also {
+        require(it in 1..65535)
+    }
+
 android {
     namespace = "org.splortch.mediaserver.android"
     compileSdk = 36
     defaultConfig {
         applicationId = "org.splortch.mediaserver.android"
-        minSdk = 26; targetSdk = 36
+        minSdk = 26
+        targetSdk = 36
         versionCode = buildNumber
         versionName = "0.1.0-alpha.$buildNumber"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
-    buildTypes { debug { applicationIdSuffix = ".debug" }; release { isMinifyEnabled = false } }
-    compileOptions { sourceCompatibility = JavaVersion.VERSION_17; targetCompatibility = JavaVersion.VERSION_17 }
-    buildFeatures { compose = true; buildConfig = true }
+    buildTypes {
+        debug { applicationIdSuffix = ".debug" }
+        release { isMinifyEnabled = false }
+    }
+    compileOptions {
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
+    }
+    buildFeatures {
+        compose = true
+        buildConfig = true
+    }
 }
+
 dependencies {
     implementation(project(":core"))
     implementation(platform("androidx.compose:compose-bom:2025.10.01"))

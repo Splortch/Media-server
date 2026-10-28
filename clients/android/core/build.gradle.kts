@@ -1,10 +1,19 @@
-plugins { id("com.android.library"); kotlin("android"); kotlin("plugin.serialization") }
+plugins {
+    id("com.android.library")
+    kotlin("android")
+    kotlin("plugin.serialization")
+}
+
 android {
     namespace = "org.splortch.mediaserver.core"
     compileSdk = 36
     defaultConfig { minSdk = 26 }
-    compileOptions { sourceCompatibility = JavaVersion.VERSION_17; targetCompatibility = JavaVersion.VERSION_17 }
+    compileOptions {
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
+    }
 }
+
 dependencies {
     api("com.squareup.retrofit2:retrofit:2.11.0")
     implementation("com.squareup.retrofit2:converter-kotlinx-serialization:2.11.0")
