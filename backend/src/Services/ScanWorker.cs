@@ -1,3 +1,4 @@
+using System.Text.Json;
 using System.Threading.Channels;
 using MediaServer.Core;
 using MediaServer.Infrastructure;
@@ -28,6 +29,46 @@ public sealed class ScanWorker(
     ILogger<ScanWorker> logger
 ) : BackgroundService
 {
+    private async Task RecordIssue(
+        MediaDb db,
+        ScanJob job,
+        string name,
+        Exception error,
+        CancellationToken ct
+    )
+    {
+        var correlation = Guid.NewGuid().ToString("N");
+        var code = error switch
+        {
+            MediaProbeException probe => probe.Code,
+            OperationCanceledException => "probe_timeout",
+            JsonException => "invalid_media",
+            UnauthorizedAccessException => "access_denied",
+            FileNotFoundException or DirectoryNotFoundException => "file_missing",
+            ArgumentException => "unsafe_path",
+            _ => "probe_failed",
+        };
+        // Names only, no directory paths, exception messages, or raw probe output.
+        var safeName = new string(name.Where(c => !char.IsControl(c)).Take(128).ToArray());
+        if (await db.ScanIssues.CountAsync(x => x.ScanJobId == job.Id, ct) < 100)
+            db.ScanIssues.Add(
+                new ScanIssue
+                {
+                    ScanJobId = job.Id,
+                    FileName = safeName,
+                    Code = code,
+                    CorrelationId = correlation,
+                }
+            );
+        logger.LogWarning(
+            "Scan job {JobId}: {Code}; reference {CorrelationId}",
+            job.Id,
+            code,
+            correlation
+        );
+        await db.SaveChangesAsync(ct);
+    }
+
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         using (var startup = scopes.CreateScope())
@@ -111,11 +152,7 @@ public sealed class ScanWorker(
                         )
                     {
                         job.Failed++;
-                        logger.LogWarning(
-                            "Scan job {JobId}: a file could not be identified ({ErrorType})",
-                            id,
-                            ex.GetType().Name
-                        );
+                        await RecordIssue(db, job, Path.GetFileName(path), ex, stoppingToken);
                     }
                 }
                 job.State = "completed";
@@ -127,7 +164,7 @@ public sealed class ScanWorker(
             catch (Exception ex)
             {
                 job.State = "failed";
-                logger.LogError("Scan job {JobId} failed ({ErrorType})", id, ex.GetType().Name);
+                await RecordIssue(db, job, "(library)", ex, stoppingToken);
             }
             await db.SaveChangesAsync(stoppingToken);
             await events.PublishAsync(job, stoppingToken);

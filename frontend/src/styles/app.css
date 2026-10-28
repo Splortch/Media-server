@@ -61,7 +61,8 @@ input {
 input:focus-visible,
 button:focus-visible,
 a:focus-visible,
-video:focus-visible {
+video:focus-visible,
+summary:focus-visible {
   outline: 3px solid #c8f279;
   outline-offset: 4px;
 }
@@ -616,4 +617,25 @@ footer {
     font-size: 12px;
     padding: 8px;
   }
+}
+
+summary {
+  cursor: pointer;
+  padding: 12px 0;
+}
+main:focus,
+h2:focus {
+  outline: none;
+}
+.diagnostics dl {
+  display: grid;
+  grid-template-columns: minmax(9em, 1fr) 2fr;
+  gap: 10px;
+}
+.diagnostics dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+.diagnostics li {
+  margin: 10px 0;
 }

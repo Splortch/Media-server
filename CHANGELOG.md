@@ -16,3 +16,11 @@
 - Automated tests, dependency audits, development container configuration and alpha release workflows.
 
 No official stable release has been published. Transcoding, hardware acceleration and native clients remain planned.
+
+
+## Unreleased — security, diagnostics and accessibility
+
+- Consume setup tokens, serialize credential mutations, revoke sessions on password change and add local recovery.
+- Stream through pinned, regular-file handles with Linux no-follow traversal and Windows handle validation.
+- Add bounded admin-only scan reasons, playback availability references and browser buffering diagnostics.
+- Improve route focus, navigation/form semantics and keyboard feedback; add real-flow axe coverage.

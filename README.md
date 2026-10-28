@@ -12,19 +12,21 @@ The [client ecosystem](docs/clients/README.md) adds a dedicated Windows Tauri cl
 
 | Capability | Status | Scope |
 |---|---|---|
-| First-run setup and login | Implemented | One local administrator; Argon2id, revocable cookie sessions, CSRF |
-| Libraries and scanning | Implemented | Explicit allowed roots, background jobs, FFprobe metadata, idempotent updates |
+| First-run setup and login | Implemented | One local administrator; Argon2id, password change/local recovery, session revocation, consumed setup token, CSRF |
+| Libraries and scanning | Implemented | Explicit allowed roots, background jobs, FFprobe metadata, idempotent updates, admin-only scan failure references |
 | Media browsing | Implemented | Responsive React UI, search, technical details, honest empty states |
-| Direct Play | Implemented | Authenticated byte ranges; browser-native controls and resume |
+| Direct Play | Implemented | Authenticated byte ranges through validated handles on Windows/Linux; controls, resume and playback diagnostics |
 | Continue Watching | Implemented | Per-user persisted position; completed titles excluded |
 | SQLite schema migrations | Implemented | Versioned EF Core migration, applied at startup |
 | REST/OpenAPI and scan status | Implemented | Protected OpenAPI; scan polling and SignalR event transport |
 | Automated quality checks | Implemented configuration | Backend, frontend, browser integration, audits and Docker build |
-| Native alpha releases | Implemented workflow | Self-contained Windows/Linux builds, bundled web UI, draft prereleases |
+| Native alpha releases | Implemented workflow | Self-contained Windows/Linux builds, bundled web UI, separate automatic alpha releases |
 | Hardware acceleration / HLS / transcoding | Planned | Direct Play only in this alpha |
 | Artwork / online metadata / TV matching | Planned | Current titles derive from filenames; no fabricated posters |
 | Multi-user administration / parental controls | Planned | Role authorization exists; no account-management UI yet |
-| Native clients / plugins / secure remote streaming | Planned | Browser client only; localhost deployment by default |
+| Windows desktop client | Alpha | Separate Tauri client; Windows build and actual-backend tests in CI |
+| Android / TV / iOS / plugins / secure remote streaming | Planned | No mobile binaries yet; localhost deployment by default |
+| Accessibility | In progress | Automated axe and keyboard regressions; manual assistive-technology review still required |
 
 Verification results and environment limits are recorded in [VALIDATION.md](docs/development/VALIDATION.md). Workflow presence is not a claim that hosted CI passed.
 
@@ -33,14 +35,13 @@ Verification results and environment limits are recorded in [VALIDATION.md](docs
 Automatic alpha release packaging is configured for Windows/Linux x64 servers, Windows EXE/MSI
 clients and a prebuilt Docker image. The web UI is bundled. Download from [Releases](https://github.com/Splortch/Media-server/releases),
 extract the server, and use its Start launcher. See [installation, updates and release automation](docs/deployment/RELEASES.md).
-No SDK is needed for downloaded server builds. The first publication is only available after the
-release workflow reaches main and its checks pass; workflow configuration alone is not a published build.
+No SDK is needed for downloaded server builds. Publication requires all main checks to pass on the same source commit.
 
 ## Quick start: local development
 
 Install the .NET SDK selected in `global.json`, Node.js 24, and FFprobe (usually supplied with FFmpeg). Git and npm are required. Ensure `dotnet`, `node`, `npm`, `ffprobe` are on PATH.
 
-From the repository root, on Linux/macOS:
+From the repository root, on Linux (Windows instructions are linked below):
 
 ```bash
 export MediaServer__DataDirectory="$HOME/.local/share/media-server-dev"
@@ -103,3 +104,8 @@ The browser test starts a fresh API database and generates its own short test vi
 One maintainer can own backend/media and the other frontend/experience. Share security-sensitive API and playback reviews. Use focused issues, feature branches, Conventional Commits and pull requests. Require CI; one review is recommended with an administrator bypass for urgent fixes or an unavailable teammate. No bureaucracy collection minigame required.
 
 Approved AI implementation tasks use the [issue-to-PR workflow](docs/development/AUTONOMY.md): a maintainer approves one issue, Copilot proposes a tested PR, and a human reviews it. Repository configuration is required before activation; no automatic merges are enabled.
+
+
+Security and troubleshooting updates: [operator recovery and trust boundaries](docs/architecture/HARDENING.md),
+[playback diagnostics](docs/development/PLAYBACK-DIAGNOSTICS.md), and
+[accessibility validation and remaining manual checks](docs/development/ACCESSIBILITY.md).

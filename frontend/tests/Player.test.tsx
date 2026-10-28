@@ -66,3 +66,73 @@ it('saves real playback progress with an antiforgery token', async () => {
     ),
   );
 });
+
+it('shows buffering and browser playback diagnostics without claiming measured network throughput', () => {
+  vi.spyOn(HTMLMediaElement.prototype, 'canPlayType').mockReturnValue(
+    'probably',
+  );
+  render(
+    <Player
+      item={{
+        id: 8,
+        title: 'Diagnostics video',
+        duration: 100,
+        size: 1000000,
+        container: 'webm',
+        videoCodec: 'vp9',
+        audioCodec: 'opus',
+      }}
+      resume={0}
+    />,
+  );
+  const video = screen.getByLabelText('Diagnostics video');
+  Object.defineProperty(video, 'buffered', {
+    value: { length: 1, start: () => 0, end: () => 30 },
+    configurable: true,
+  });
+  Object.defineProperty(video, 'getVideoPlaybackQuality', {
+    value: () => ({ droppedVideoFrames: 2, totalVideoFrames: 20 }),
+    configurable: true,
+  });
+  fireEvent.loadedMetadata(video);
+  expect(screen.getByText('30.0 seconds')).toBeInTheDocument();
+  expect(screen.getByText('2 / 20')).toBeInTheDocument();
+  expect(
+    screen.getByText(/not measured network throughput/),
+  ).toBeInTheDocument();
+  fireEvent.waiting(video);
+  expect(screen.getByRole('status')).toHaveTextContent('Buffering');
+  fireEvent.playing(video);
+  expect(screen.queryByRole('status')).not.toBeInTheDocument();
+});
+
+it('distinguishes browser network and decode errors', () => {
+  render(
+    <Player
+      item={{
+        id: 9,
+        title: 'Error video',
+        duration: 100,
+        size: 100,
+        container: 'mp4',
+        videoCodec: 'h264',
+        audioCodec: 'aac',
+      }}
+      resume={0}
+      onPlaybackError={async () => {}}
+    />,
+  );
+  const video = screen.getByLabelText('Error video');
+  Object.defineProperty(video, 'error', {
+    value: { code: 2 },
+    configurable: true,
+  });
+  fireEvent.error(video);
+  expect(screen.getByRole('alert')).toHaveTextContent('Check your connection');
+  Object.defineProperty(video, 'error', {
+    value: { code: 3 },
+    configurable: true,
+  });
+  fireEvent.error(video);
+  expect(screen.getByRole('alert')).toHaveTextContent('could not decode');
+});

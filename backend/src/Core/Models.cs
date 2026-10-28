@@ -95,3 +95,17 @@ public class PlaybackReport
     public string Client { get; set; } = "";
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 }
+
+public class ScanIssue
+{
+    public int Id { get; set; }
+    public int ScanJobId { get; set; }
+    public string FileName { get; set; } = "";
+    public string Code { get; set; } = "probe_failed";
+    public string CorrelationId { get; set; } = "";
+}
+
+public class MediaProbeException(string code) : IOException("Media identification failed.")
+{
+    public string Code { get; } = code;
+}

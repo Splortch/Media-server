@@ -12,10 +12,14 @@ public class MediaDb(DbContextOptions<MediaDb> options) : DbContext(options)
     public DbSet<Session> Sessions => Set<Session>();
     public DbSet<ScanJob> Jobs => Set<ScanJob>();
 
+    public DbSet<ScanIssue> ScanIssues => Set<ScanIssue>();
+
     public DbSet<PlaybackReport> Reports => Set<PlaybackReport>();
 
     protected override void OnModelCreating(ModelBuilder b)
     {
+        b.Entity<ScanIssue>().HasOne<ScanJob>().WithMany().HasForeignKey(x => x.ScanJobId);
+        b.Entity<ScanIssue>().HasIndex(x => x.ScanJobId);
         b.Entity<PlaybackReport>().HasOne<User>().WithMany().HasForeignKey(x => x.UserId);
         b.Entity<PlaybackReport>().HasOne<MediaItem>().WithMany().HasForeignKey(x => x.MediaItemId);
         b.Entity<User>().Property(x => x.Id).ValueGeneratedNever();

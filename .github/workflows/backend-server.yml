@@ -32,6 +32,9 @@ jobs:
       - if: steps.changes.outputs.changed == 'true'
         run: dotnet test MediaServer.sln --no-build --logger trx
       - if: steps.changes.outputs.changed == 'true'
+        name: Test real credential recovery and exclusive data-directory lock
+        run: python scripts/test-credential-recovery.py
+      - if: steps.changes.outputs.changed == 'true'
         run: dotnet tool restore
       - if: steps.changes.outputs.changed == 'true'
         run: dotnet csharpier check backend
@@ -42,3 +45,4 @@ jobs:
         with:
           name: backend-results-${{ matrix.os }}
           path: '**/TestResults/*.trx'
+

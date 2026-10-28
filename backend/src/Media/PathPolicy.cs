@@ -31,6 +31,9 @@ public sealed class PathPolicy(string[] allowedRoots)
         return full;
     }
 
+    public FileStream OpenRead(string root, string relative) =>
+        SafeMediaFile.Open(Resolve(root, relative));
+
     public static bool Within(string root, string candidate)
     {
         var fullRoot = Path.TrimEndingDirectorySeparator(Path.GetFullPath(root));
