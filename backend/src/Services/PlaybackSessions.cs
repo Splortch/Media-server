@@ -342,6 +342,9 @@ public sealed class PlaybackSessions(
                         or OperationCanceledException
                         or System.ComponentModel.Win32Exception
                         or ArgumentException
+                        or JsonException
+                        or UnauthorizedAccessException
+                        or RegexMatchTimeoutException
             )
         {
             job.Error = ct.IsCancellationRequested

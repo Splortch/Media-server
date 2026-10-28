@@ -95,7 +95,11 @@ data class MediaTrack(
     val type: String,
     val codec: String,
     val language: String?,
-    val title: String?
+    val title: String?,
+    val channels: Int? = null,
+    val channelLayout: String? = null,
+    val default: Boolean = false,
+    val forced: Boolean = false
 )
 
 @Serializable

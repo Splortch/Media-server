@@ -300,6 +300,16 @@ public sealed class PlaybackPipelineTests
             );
             await db.SaveChangesAsync();
         }
+        var denied = await admin.PostAsJsonAsync(
+            "/api/v1/media/1/playback-sessions",
+            new PlaybackSelection(Encoder: "h264_amf")
+        );
+        Assert.Equal(HttpStatusCode.BadRequest, denied.StatusCode);
+        var options = await admin.GetFromJsonAsync<JsonElement>("/api/v1/media/1/playback-options");
+        Assert.Contains(
+            options.GetProperty("tracks").EnumerateArray(),
+            x => x.GetProperty("language").GetString() == "swe"
+        );
         var created = await admin.PostAsJsonAsync(
             "/api/v1/media/1/playback-sessions",
             new PlaybackSelection(AudioTrack: 2, SubtitleTrack: -1, Encoder: "h264_nvenc")

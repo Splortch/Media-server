@@ -172,7 +172,10 @@ export default function PlaybackSettings({
           if (next.state === 'failed')
             setError(next.error || 'Conversion failed.');
         })
-        .catch((e) => setError((e as Error).message));
+        .catch((e) => {
+          setError((e as Error).message);
+          if (mounted.current) setSession({ ...session });
+        });
     }, 1500);
     return () => clearTimeout(timer);
   }, [session, onSource, onCaption, subtitle, video]);

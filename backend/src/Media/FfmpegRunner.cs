@@ -63,7 +63,7 @@ public record TranscodeSettings(string[] AllowedEncoders);
 
 public record EncoderCapability(string Encoder, bool Available, string Diagnostic);
 
-public sealed class EncoderDiscovery(FfmpegRunner runner)
+public sealed class EncoderDiscovery(FfmpegRunner runner, TranscodeSettings settings)
 {
     public static readonly string[] Encoders =
     [
@@ -86,6 +86,11 @@ public sealed class EncoderDiscovery(FfmpegRunner runner)
             var result = new List<EncoderCapability>();
             foreach (var encoder in Encoders)
             {
+                if (!settings.AllowedEncoders.Contains(encoder))
+                {
+                    result.Add(new(encoder, false, "Disabled by the server operator."));
+                    continue;
+                }
                 using var timeout = CancellationTokenSource.CreateLinkedTokenSource(ct);
                 timeout.CancelAfter(TimeSpan.FromSeconds(8));
                 var args = new List<string>();

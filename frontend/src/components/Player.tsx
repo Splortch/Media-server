@@ -442,10 +442,10 @@ export function playbackErrorMessage(code?: number) {
   if (code === 2)
     return 'The video could not be downloaded. Check your connection and that the server is still running.';
   if (code === 3)
-    return 'The browser could not decode this video. The file may be damaged or use an unsupported codec. Transcoding is not available in this alpha.';
+    return 'The browser could not decode this video. The file may be damaged or use an unsupported codec. In the web player, try Prepare HLS playback under Quality, audio and subtitles. Native clients currently use Direct Play.';
   if (code === 4)
-    return 'This container or codec is not supported by this browser, or the media is unavailable. Try a browser-compatible MP4 or WebM file. Transcoding is not available in this alpha.';
-  return 'This video could not be played. Check that the file is available and its container and codecs are supported by your browser. Transcoding is not available in this alpha.';
+    return 'This container or codec is not supported by this browser, or the media is unavailable. Try a browser-compatible MP4 or WebM file. In the web player, try Prepare HLS playback under Quality, audio and subtitles. Native clients currently use Direct Play.';
+  return 'This video could not be played. Check that the file is available and its container and codecs are supported by your browser. In the web player, try Prepare HLS playback under Quality, audio and subtitles. Native clients currently use Direct Play.';
 }
 
 export function formatPlaybackTime(seconds: number) {

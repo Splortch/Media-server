@@ -20,9 +20,7 @@ it('uses the authenticated stream endpoint and reports unsupported playback', ()
   const video = screen.getByLabelText('Own video');
   expect(video).toHaveAttribute('src', '/api/media/3/stream');
   fireEvent.error(video);
-  expect(screen.getByRole('alert')).toHaveTextContent(
-    'Transcoding is not available',
-  );
+  expect(screen.getByRole('alert')).toHaveTextContent('Prepare HLS playback');
 });
 it('saves real playback progress with an antiforgery token', async () => {
   const fetch = vi
