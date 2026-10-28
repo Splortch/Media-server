@@ -9,16 +9,22 @@ public sealed class Ffprobe(string executable) : IMediaProbe
 {
     public async Task<ProbeResult> ProbeAsync(string path, CancellationToken ct)
     {
-        var start = new ProcessStartInfo(executable)
+        using var deadline = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        deadline.CancelAfter(TimeSpan.FromSeconds(20));
+        try
         {
-            RedirectStandardOutput = true,
-            RedirectStandardError = true,
-            UseShellExecute = false,
-            CreateNoWindow = true,
-        };
-        foreach (
-            var arg in new[]
-            {
+            return await ProbeCoreAsync(path, deadline.Token);
+        }
+        catch (OperationCanceledException) when (!ct.IsCancellationRequested)
+        {
+            throw new MediaProbeException("probe_timeout");
+        }
+    }
+
+    private async Task<ProbeResult> ProbeCoreAsync(string path, CancellationToken ct)
+    {
+        using var doc = await ReadJsonAsync(
+            [
                 "-v",
                 "error",
                 "-protocol_whitelist",
@@ -28,8 +34,136 @@ public sealed class Ffprobe(string executable) : IMediaProbe
                 "-of",
                 "json",
                 path,
-            }
-        )
+            ],
+            ct
+        );
+        var format = doc.RootElement.GetProperty("format");
+        var duration =
+            format.TryGetProperty("duration", out var d)
+            && double.TryParse(d.GetString(), CultureInfo.InvariantCulture, out var value)
+                ? value
+                : 0;
+        var streams = doc.RootElement.GetProperty("streams").EnumerateArray().ToArray();
+        string Codec(string type) =>
+            streams
+                .Where(x => x.GetProperty("codec_type").GetString() == type)
+                .Select(x => x.TryGetProperty("codec_name", out var c) ? c.GetString() ?? "" : "")
+                .FirstOrDefault()
+            ?? "";
+        if (Codec("video") == "")
+            throw new MediaProbeException("no_video");
+        var video = streams.First(x => x.GetProperty("codec_type").GetString() == "video");
+        string? Text(string key) =>
+            video.TryGetProperty(key, out var entry) ? entry.GetString() : null;
+        int Number(string key) =>
+            video.TryGetProperty(key, out var entry) && entry.TryGetInt32(out var n) ? n : 0;
+        var depth =
+            int.TryParse(Text("bits_per_raw_sample"), out var bits) && bits > 0 ? (int?)bits : null;
+        if (depth is null && Text("pix_fmt") is string pixel)
+        {
+            var match = System.Text.RegularExpressions.Regex.Match(
+                pixel,
+                @"(?:p|gbrp)(10|12|16)(?:le|be)?$"
+            );
+            if (match.Success)
+                depth = int.Parse(match.Groups[1].Value, CultureInfo.InvariantCulture);
+            else if (pixel is "yuv420p" or "yuv422p" or "yuv444p" or "nv12")
+                depth = 8;
+        }
+        var sideDataJson = video.TryGetProperty("side_data_list", out var streamSides)
+            ? streamSides.GetRawText()
+            : null;
+        if (Text("color_transfer") is "smpte2084" or "arib-std-b67")
+        {
+            // HDR mastering/CLL commonly lives on decoded frames, not stream metadata.
+            // Inspect only a few selected-video packets; SDR scans do not pay this cost.
+            using var frames = await ReadJsonAsync(
+                [
+                    "-v",
+                    "error",
+                    "-protocol_whitelist",
+                    "file",
+                    "-threads",
+                    "1",
+                    "-select_streams",
+                    "v:0",
+                    "-read_intervals",
+                    "%+#8",
+                    "-show_entries",
+                    "frame_side_data",
+                    "-of",
+                    "json",
+                    path,
+                ],
+                ct
+            );
+            if (frames.RootElement.TryGetProperty("frames", out var entries))
+                foreach (var frame in entries.EnumerateArray())
+                    if (
+                        frame.TryGetProperty("side_data_list", out var frameSides)
+                        && HasHdrMetadata(frameSides)
+                    )
+                    {
+                        sideDataJson = frameSides.GetRawText();
+                        break;
+                    }
+        }
+        using var sideDocument = JsonDocument.Parse(sideDataJson ?? "[]");
+        var color = new VideoColor(
+            Number("width"),
+            Number("height"),
+            depth,
+            Text("pix_fmt"),
+            Text("color_primaries"),
+            Text("color_transfer"),
+            Text("color_space"),
+            HasHdrMetadata(sideDocument.RootElement),
+            sideDataJson
+        );
+        return new ProbeResult(
+            double.IsFinite(duration) ? Math.Max(0, duration) : 0,
+            format.GetProperty("format_name").GetString() ?? "",
+            Codec("video"),
+            Codec("audio"),
+            streams
+                .Select(x => new MediaTrack(
+                    x.GetProperty("index").GetInt32(),
+                    x.GetProperty("codec_type").GetString() ?? "unknown",
+                    x.TryGetProperty("codec_name", out var c)
+                        ? c.GetString() ?? "unknown"
+                        : "unknown",
+                    Tag(x, "language"),
+                    Tag(x, "title"),
+                    x.TryGetProperty("channels", out var channels) ? channels.GetInt32() : null,
+                    x.TryGetProperty("channel_layout", out var layout) ? layout.GetString() : null,
+                    Disposition(x, "default"),
+                    Disposition(x, "forced")
+                ))
+                .ToArray(),
+            JsonSerializer.Serialize(color)
+        );
+    }
+
+    private static bool HasHdrMetadata(JsonElement array) =>
+        array
+            .EnumerateArray()
+            .Any(x =>
+                x.TryGetProperty("side_data_type", out var type)
+                && type.GetString()
+                    is "Mastering display metadata"
+                        or "Content light level metadata"
+            );
+
+    private async Task<JsonDocument> ReadJsonAsync(string[] arguments, CancellationToken ct)
+    {
+        var start = new ProcessStartInfo(executable)
+        {
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+            UseShellExecute = false,
+            CreateNoWindow = true,
+        };
+        foreach (var arg in arguments)
             start.ArgumentList.Add(arg);
         Process process;
         try
@@ -80,81 +214,7 @@ public sealed class Ffprobe(string executable) : IMediaProbe
         }
         if (process.ExitCode != 0)
             throw new MediaProbeException("invalid_media");
-        using var doc = JsonDocument.Parse(json);
-        var format = doc.RootElement.GetProperty("format");
-        var duration =
-            format.TryGetProperty("duration", out var d)
-            && double.TryParse(d.GetString(), CultureInfo.InvariantCulture, out var value)
-                ? value
-                : 0;
-        var streams = doc.RootElement.GetProperty("streams").EnumerateArray().ToArray();
-        string Codec(string type) =>
-            streams
-                .Where(x => x.GetProperty("codec_type").GetString() == type)
-                .Select(x => x.TryGetProperty("codec_name", out var c) ? c.GetString() ?? "" : "")
-                .FirstOrDefault()
-            ?? "";
-        if (Codec("video") == "")
-            throw new MediaProbeException("no_video");
-        var video = streams.First(x => x.GetProperty("codec_type").GetString() == "video");
-        string? Text(string key) =>
-            video.TryGetProperty(key, out var entry) ? entry.GetString() : null;
-        int Number(string key) =>
-            video.TryGetProperty(key, out var entry) && entry.TryGetInt32(out var n) ? n : 0;
-        var depth =
-            int.TryParse(Text("bits_per_raw_sample"), out var bits) && bits > 0 ? (int?)bits : null;
-        if (depth is null && Text("pix_fmt") is string pixel)
-        {
-            var match = System.Text.RegularExpressions.Regex.Match(
-                pixel,
-                @"(?:p|gbrp)(10|12|16)(?:le|be)?$"
-            );
-            if (match.Success)
-                depth = int.Parse(match.Groups[1].Value, CultureInfo.InvariantCulture);
-            else if (pixel is "yuv420p" or "yuv422p" or "yuv444p" or "nv12")
-                depth = 8;
-        }
-        var color = new VideoColor(
-            Number("width"),
-            Number("height"),
-            depth,
-            Text("pix_fmt"),
-            Text("color_primaries"),
-            Text("color_transfer"),
-            Text("color_space"),
-            video.TryGetProperty("side_data_list", out var sides)
-                && sides
-                    .EnumerateArray()
-                    .Any(x =>
-                        x.TryGetProperty("side_data_type", out var type)
-                        && type.GetString()
-                            is "Mastering display metadata"
-                                or "Content light level metadata"
-                    ),
-            video.TryGetProperty("side_data_list", out var sideData) ? sideData.GetRawText() : null
-        );
-        return new ProbeResult(
-            double.IsFinite(duration) ? Math.Max(0, duration) : 0,
-            format.GetProperty("format_name").GetString() ?? "",
-            Codec("video"),
-            Codec("audio"),
-            streams
-                .Select(x => new MediaTrack(
-                    x.GetProperty("index").GetInt32(),
-                    x.GetProperty("codec_type").GetString() ?? "unknown",
-                    x.TryGetProperty("codec_name", out var c)
-                        ? c.GetString() ?? "unknown"
-                        : "unknown",
-                    Tag(x, "language"),
-                    Tag(x, "title"),
-                    x.TryGetProperty("channels", out var channels) ? channels.GetInt32() : null,
-                    x.TryGetProperty("channel_layout", out var layout) ? layout.GetString() : null,
-                    Disposition(x, "default"),
-                    Disposition(x, "forced")
-                ))
-                .ToArray(),
-            JsonSerializer.Serialize(color)
-        );
+        return JsonDocument.Parse(json);
     }
 
     private static bool Disposition(JsonElement stream, string name) =>

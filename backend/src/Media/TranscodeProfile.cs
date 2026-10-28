@@ -44,7 +44,7 @@ public static class TranscodeProfile
     public static string Filter(Rendition rendition, bool hdr) =>
         (
             hdr
-                ? "zscale=t=linear:npl=100,format=gbrpf32le,zscale=p=bt709,tonemap=tonemap=hable:desat=0,zscale=t=bt709:m=bt709:r=tv,"
+                ? "zscale=t=linear:npl=100,format=gbrpf32le,zscale=p=bt709,tonemap=tonemap=hable:desat=0,zscale=t=bt709:m=bt709:r=tv,sidedata=mode=delete,"
                 : ""
         )
         + $"scale=w=-2:h='min({rendition.Height},ih)':force_original_aspect_ratio=decrease,format=yuv420p";

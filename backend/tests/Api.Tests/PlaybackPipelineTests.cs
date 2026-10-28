@@ -171,7 +171,10 @@ public sealed class PlaybackPipelineTests
                 "bt2020nc",
             };
             if (encoder == "libx265")
-                args.AddRange(["-x265-params", "pools=none:frame-threads=1"]);
+                args.AddRange([
+                    "-x265-params",
+                    "pools=none:frame-threads=1:master-display=G(13250,34500)B(7500,3000)R(34000,16000)WP(15635,16450)L(10000000,1):max-cll=1000,400",
+                ]);
             else
                 args.AddRange(["-cpu-used", "8"]);
             args.Add("hdr.mkv");
@@ -183,6 +186,8 @@ public sealed class PlaybackPipelineTests
             Assert.True(color.Hdr, result.ColorJson);
             Assert.Equal(10, color.BitDepth);
             Assert.Equal("bt2020", color.Primaries);
+            if (encoder == "libx265")
+                Assert.True(color.HasMasteringMetadata, result.ColorJson);
             var watch = Stopwatch.StartNew();
             await runner.RunAsync(
                 [
@@ -211,8 +216,40 @@ public sealed class PlaybackPipelineTests
             var sdr = await probe.ProbeAsync(Path.Combine(root, "sdr.mkv"), timeout.Token);
             var output = JsonSerializer.Deserialize<VideoColor>(sdr.ColorJson)!;
             Assert.False(output.Hdr);
+            Assert.False(output.HasMasteringMetadata);
             Assert.Equal(8, output.BitDepth);
             Assert.Equal("bt709", output.Primaries);
+            var inspect = new ProcessStartInfo("ffprobe")
+            {
+                UseShellExecute = false,
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+            };
+            foreach (
+                var arg in new[]
+                {
+                    "-v",
+                    "error",
+                    "-select_streams",
+                    "v:0",
+                    "-read_intervals",
+                    "%+#8",
+                    "-show_entries",
+                    "frame_side_data",
+                    "-of",
+                    "json",
+                    Path.Combine(root, "sdr.mkv"),
+                }
+            )
+                inspect.ArgumentList.Add(arg);
+            using var inspection = Process.Start(inspect)!;
+            var frameData = inspection.StandardOutput.ReadToEndAsync(timeout.Token);
+            var inspectionError = inspection.StandardError.ReadToEndAsync(timeout.Token);
+            await inspection.WaitForExitAsync(timeout.Token);
+            Assert.True(inspection.ExitCode == 0, await inspectionError);
+            var inspectedFrames = await frameData;
+            Assert.DoesNotContain("Mastering display metadata", inspectedFrames);
+            Assert.DoesNotContain("Content light level metadata", inspectedFrames);
         }
         finally
         {

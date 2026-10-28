@@ -8,7 +8,7 @@ def main():
     executable = os.environ.get('MediaServer__FfmpegPath', 'ffmpeg')
     required = {
         '-encoders': ('libx264', 'libx265', 'libaom-av1', 'aac', 'webvtt'),
-        '-filters': ('zscale', 'tonemap'),
+        '-filters': ('zscale', 'tonemap', 'sidedata'),
     }
     missing = []
     for option, names in required.items():
