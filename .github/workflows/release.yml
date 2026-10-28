@@ -34,8 +34,8 @@ permissions:
   contents: read
   actions: read
 concurrency:
-  group: prerelease-${{ github.event.workflow_run.head_sha || github.sha }}
-  cancel-in-progress: false
+  group: prerelease-${{ github.event_name == 'pull_request' && github.ref || github.event.workflow_run.head_sha || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 jobs:
   plan:
     runs-on: ubuntu-24.04
