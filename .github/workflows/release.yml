@@ -10,6 +10,10 @@ on:
       - '.github/workflows/windows-client.yml'
       - 'scripts/*release*'
       - 'scripts/stamp-windows-version.cjs'
+      - 'scripts/build-server-installer.py'
+      - 'scripts/test-server-installer.ps1'
+      - 'scripts/test-installed-server.py'
+      - 'scripts/tests/test_server_installer.py'
       - 'scripts/update-server.py'
       - 'scripts/test-native-update.py'
       - 'scripts/tests/*release*'
@@ -98,8 +102,10 @@ jobs:
         shell: pwsh
         run: |
           $tokens = $null; $errors = $null
-          [void][System.Management.Automation.Language.Parser]::ParseFile((Resolve-Path 'release-resources/windows/Start-MediaServer.ps1'), [ref]$tokens, [ref]$errors)
-          if ($errors.Count) { throw ($errors | Out-String) }
+          foreach ($script in (Get-ChildItem release-resources/windows/*.ps1) + (Get-Item scripts/test-server-installer.ps1)) {
+            [void][System.Management.Automation.Language.Parser]::ParseFile($script.FullName, [ref]$tokens, [ref]$errors)
+            if ($errors.Count) { throw ($errors | Out-String) }
+          }
       - name: Install pinned media tooling for Windows update validation
         if: runner.os == 'Windows'
         shell: pwsh
@@ -120,6 +126,21 @@ jobs:
           python scripts/package-release.py server
           python scripts/smoke-release.py
           python scripts/test-native-update.py
+      - name: Build and test the actual Windows server setup.exe
+        if: runner.os == 'Windows'
+        env:
+          SERVER_VERSION: ${{ needs.plan.outputs.server }}
+        shell: pwsh
+        run: |
+          $compiler = Join-Path ${env:ProgramFiles(x86)} 'NSIS/makensis.exe'
+          if (-not (Test-Path $compiler)) {
+            choco install nsis --version=3.11 --yes --no-progress
+            if ($LASTEXITCODE -notin @(0, 3010)) { throw 'NSIS installation failed' }
+          }
+          $env:MAKENSIS = $compiler
+          python scripts/build-server-installer.py
+          if ($LASTEXITCODE -ne 0) { throw 'Server installer build failed' }
+          ./scripts/test-server-installer.ps1 -Installer (Resolve-Path "artifacts/packages/MediaServer-v$env:SERVER_VERSION-win-x64-setup.exe")
       - uses: actions/upload-artifact@v7
         with:
           name: release-server-${{ matrix.rid }}
@@ -269,4 +290,3 @@ jobs:
           IMAGE="ghcr.io/${GITHUB_REPOSITORY,,}"
           docker tag media-server:release "$IMAGE:alpha"
           docker push "$IMAGE:alpha"
-

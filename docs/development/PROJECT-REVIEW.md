@@ -2,7 +2,9 @@
 
 ## Scope and conclusion
 
-Reviewed the source, deployment configuration, launchers, web/client flows, test coverage, published asset names and hosted workflow results for main commit [`32645e5`](https://github.com/Splortch/Media-server/commit/32645e571b6d28568a9da42c6b2ca169c8157d00). The four separate `alpha.49` platform releases identify that source commit. [PR #55](https://github.com/Splortch/Media-server/pull/55) remains unmerged and is assessed separately below.
+Update: PR #55 has since merged into main. The findings below describe the original reviewed alpha.49 snapshot and are retained as that historical review; use a release whose source includes the merge to obtain its fixes.
+
+Reviewed the source, deployment configuration, launchers, web/client flows, test coverage, published asset names and hosted workflow results for main commit [`32645e5`](https://github.com/Splortch/Media-server/commit/32645e571b6d28568a9da42c6b2ca169c8157d00). The four separate `alpha.49` platform releases identify that source commit. [PR #55](https://github.com/Splortch/Media-server/pull/55) was unmerged at the original review and is assessed separately below.
 
 **Suitable for a cautious, local, single-administrator alpha trial with copies of media. Not established as production-ready or safe for direct internet exposure.** The project has working server/API/browser/native-client code and real integration tests, rather than a static demonstration. The next useful milestone is a maintainer completing the [first-run acceptance checklist](../GETTING-STARTED.md#9-your-first-hands-on-acceptance-checklist) on their own computer.
 

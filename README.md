@@ -40,7 +40,7 @@ Verification results and environment limits are recorded in [VALIDATION.md](docs
 
 Automatic alpha release packaging is configured for Windows/Linux x64 servers, Windows EXE/MSI
 clients and a prebuilt Docker image. The web UI is bundled. Download from [Releases](https://github.com/Splortch/Media-server/releases),
-extract the server, and use its Start launcher. See [installation, updates and release automation](docs/deployment/RELEASES.md).
+choose the Windows server setup.exe when available, or extract the portable server and use its Start launcher. The [server installer guide](docs/deployment/WINDOWS-SERVER-INSTALLER.md) explains tray control and data preservation. See [installation, updates and release automation](docs/deployment/RELEASES.md).
 No SDK is needed for downloaded server builds. Publication requires all main checks to pass on the same source commit.
 
 ## Quick start: local development

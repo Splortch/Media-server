@@ -73,8 +73,8 @@ test('planner retries a partial platform release set',async()=>{
 test('platform release tags are unique and contain only relevant downloads',()=>{
  const all=require('../release-targets.cjs').targets('0.2.0-alpha.50','0.1.0-alpha.50');
  assert.deepEqual(all.map(t=>t.tag),['server-windows/v0.2.0-alpha.50','server-linux/v0.2.0-alpha.50','client-windows/v0.1.0-alpha.50','docker/v0.2.0-alpha.50']);
- assert.equal(new Set(all.flatMap(t=>t.files)).size,8);
- assert.equal(all[0].files.length,1);assert.equal(all[1].files.length,1);assert.equal(all[2].files.length,2);assert.equal(all[3].files.length,4);
+ assert.equal(new Set(all.flatMap(t=>t.files)).size,9);
+ assert.equal(all[0].files.length,2);assert.equal(all[1].files.length,1);assert.equal(all[2].files.length,2);assert.equal(all[3].files.length,4);
 });
 test('publisher produces four releases with independent integrity manifests and resumes partial success',async()=>{
  const publish=require('../publish-release.cjs');const crypto=require('node:crypto');
@@ -127,4 +127,11 @@ test('release descriptions explain each real platform and only synchronize recog
  await syncReleaseNotes({github,context:{repo:{owner:'Splortch',repo:'Media-server'}}});
  assert.deepEqual(changed.map(p=>p.release_id),[1,2,3,4,5]);
  for(const p of changed){assert.deepEqual(Object.keys(p).sort(),['body','owner','release_id','repo']);assert.match(p.body,/Get started/);}
+});
+
+test('server installer notes are limited to releases containing that actual asset',()=>{
+ const {platformNotes}=require('../release-notes.cjs');const target=require('../release-targets.cjs').targets('0.2.0-alpha.50','0.1.0-alpha.50')[0];
+ assert.doesNotMatch(platformNotes(target,sha,'Splortch/Media-server','image'), /win-x64-setup\.exe/);
+ const notes=platformNotes(target,sha,'Splortch/Media-server','image',{serverInstaller:true});
+ assert.match(notes,/MediaServer-v0\.2\.0-alpha\.50-win-x64-setup\.exe/);assert.match(notes,/tray controller/);
 });

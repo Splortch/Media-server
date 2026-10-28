@@ -14,6 +14,7 @@ and the Docker image; there is no browser-only file:// application to install.
 
 | Download | What to do |
 | --- | --- |
+| `MediaServer-v0.2.0-alpha.N-win-x64-setup.exe` | Install the per-user server, start its tray controller, then complete the browser setup. See [server installer](WINDOWS-SERVER-INSTALLER.md). Available only in releases that actually contain this asset. |
 | `MediaServer-v0.2.0-alpha.N-win-x64.zip` | Extract to a folder, then double-click `Start-MediaServer.cmd`. Choose a media folder, optionally download verified FFprobe tools, and complete setup in the browser it opens. Leave the console open. |
 | `MediaServer-v0.2.0-alpha.N-linux-x64.tar.gz` | Extract, install FFprobe (`sudo apt install ffmpeg` on Ubuntu), then run `./start-media-server.sh`. Choose an absolute media folder. Open the displayed local URL and read the setup-token file. |
 | `MediaServer-Windows-Client-v0.1.0-alpha.N-win-x64-setup.exe` or `.msi` | Install the desktop client and connect it to a running server. Installing the client does not install/start the server. |
@@ -54,7 +55,7 @@ checksums and provenance manifests:
 
 | Release | Tag | Downloads |
 | --- | --- | --- |
-| Media Server for Windows | `server-windows/v0.2.0-alpha.N` | Windows x64 server ZIP |
+| Media Server for Windows | `server-windows/v0.2.0-alpha.N` | Windows x64 server setup.exe and portable ZIP |
 | Media Server for Linux | `server-linux/v0.2.0-alpha.N` | Linux x64 server tar.gz |
 | Media Server Windows Client | `client-windows/v0.1.0-alpha.N` | EXE and MSI installers |
 | Media Server Docker | `docker/v0.2.0-alpha.N` | Compose setup ZIP, package/license inventory and corresponding source |
