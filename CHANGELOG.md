@@ -30,3 +30,11 @@ No official stable release has been published. Transcoding, hardware acceleratio
 - Stream through pinned, regular-file handles with Linux no-follow traversal and Windows handle validation.
 - Add bounded admin-only scan reasons, playback availability references and browser buffering diagnostics.
 - Improve route focus, navigation/form semantics and keyboard feedback; add real-flow axe coverage.
+
+## Unreleased — server operations
+
+- Add local multi-user administration, library grants, manual content-rating restrictions, watch history and device revocation.
+- Add opt-in library watching, conservative reconciliation, hash-based move preservation and non-destructive duplicate views.
+- Add indexed cursor browsing and per-user smart collections; keep legacy APIs compatible.
+- Add administrator-only process/storage/scan/active-transfer metrics, with unsupported values explicitly unavailable.
+- Add private offline backups, verified copy-only restore and optional staged native updates with rollback checkpoints.

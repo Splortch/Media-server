@@ -639,3 +639,43 @@ h2:focus {
 .diagnostics li {
   margin: 10px 0;
 }
+
+select {
+  font: inherit;
+  color: inherit;
+  background: #15181e;
+  border: 1px solid #353942;
+  border-radius: 8px;
+  padding: 12px 14px;
+  max-width: 100%;
+}
+select:focus-visible {
+  outline: 3px solid #c8f279;
+  outline-offset: 4px;
+}
+input[type='checkbox'] {
+  width: auto;
+}
+label:has(input[type='checkbox']) {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+fieldset {
+  border: 1px solid #353942;
+  padding: 15px;
+  display: grid;
+  gap: 12px;
+}
+.panel li {
+  margin: 12px 0;
+  overflow-wrap: anywhere;
+}
+@media (max-width: 600px) {
+  nav {
+    flex-wrap: wrap;
+  }
+  nav a {
+    min-width: 40%;
+  }
+}
