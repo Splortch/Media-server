@@ -98,6 +98,9 @@ jobs:
       - run: npm run build --prefix frontend
       - run: python scripts/check-release-locks.py
       - run: dotnet restore MediaServer.sln --locked-mode
+      - name: Verify macOS secure media ABI
+        if: runner.os == 'macOS'
+        run: cc -std=c11 tests/security/darwin-media-abi.c -o "$RUNNER_TEMP/media-abi" && "$RUNNER_TEMP/media-abi"
       - run: dotnet test MediaServer.sln -c Release --no-restore
       - name: Publish self-contained server
         env:

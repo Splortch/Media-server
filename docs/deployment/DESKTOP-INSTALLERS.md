@@ -120,6 +120,13 @@ Windows/Docker/Android releases remain separate; new Linux client and macOS serv
 client releases get their own platform tags and category cards. A failed package
 build blocks publication rather than releasing source archives as installers.
 
+The macOS server uses descriptor-relative no-follow opens plus the platform's
+64-bit-inode fstat ABI, preserving pinned reads and rejecting symlinks/directories.
+The existing file-replacement security test runs on both Unix platforms. ABI
+references: [Apple fcntl.h](https://github.com/apple-oss-distributions/xnu/blob/main/bsd/sys/fcntl.h),
+[stat.h](https://github.com/apple-oss-distributions/xnu/blob/main/bsd/sys/stat.h), and
+[cdefs.h](https://github.com/apple-oss-distributions/xnu/blob/main/bsd/sys/cdefs.h).
+
 Hosted install/process/API tests are not physical desktop testing. In particular,
 Finder/Gatekeeper prompts, touch/keyboard UX and codec playback on real Macs/Linux
 machines still need manual checks. See PR CI for actual results; configuration alone

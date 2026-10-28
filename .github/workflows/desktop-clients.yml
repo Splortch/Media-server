@@ -92,6 +92,9 @@ jobs:
         run: npm test --prefix clients/windows && npm run lint --prefix clients/windows && npm run format:check --prefix clients/windows
       - if: steps.changes.outputs.changed == 'true'
         run: cargo fmt --manifest-path clients/windows/native/Cargo.toml --check && cargo clippy --locked --manifest-path clients/windows/native/Cargo.toml --all-targets -- -D warnings && cargo test --locked --manifest-path clients/windows/native/Cargo.toml
+      - name: Verify macOS secure media ABI
+        if: steps.changes.outputs.changed == 'true' && runner.os == 'macOS'
+        run: cc -std=c11 tests/security/darwin-media-abi.c -o "$RUNNER_TEMP/media-abi" && "$RUNNER_TEMP/media-abi"
       - if: steps.changes.outputs.changed == 'true'
         run: dotnet build MediaServer.sln && python3 scripts/test-native-client.py
       - name: Generate macOS icon from the existing project icon

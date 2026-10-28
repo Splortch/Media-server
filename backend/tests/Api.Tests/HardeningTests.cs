@@ -272,7 +272,7 @@ public sealed class HardeningTests
         await File.WriteAllTextAsync(outside, "private");
         using (var stream = policy.OpenRead(server.MediaPath, "movie.webm"))
         {
-            if (OperatingSystem.IsLinux())
+            if (OperatingSystem.IsLinux() || OperatingSystem.IsMacOS())
             {
                 File.Move(file, file + ".old");
                 File.CreateSymbolicLink(file, outside);
@@ -282,12 +282,12 @@ public sealed class HardeningTests
             using var reader = new StreamReader(stream);
             Assert.Equal("authorized", await reader.ReadToEndAsync());
         }
-        if (OperatingSystem.IsLinux())
+        if (OperatingSystem.IsLinux() || OperatingSystem.IsMacOS())
             Assert.Throws<ArgumentException>(() => policy.OpenRead(server.MediaPath, "movie.webm"));
         var directory = Path.Combine(server.MediaPath, "directory");
         Directory.CreateDirectory(directory);
         Assert.Throws<IOException>(() => policy.OpenRead(server.MediaPath, "directory"));
-        if (OperatingSystem.IsLinux())
+        if (OperatingSystem.IsLinux() || OperatingSystem.IsMacOS())
         {
             Directory.CreateSymbolicLink(Path.Combine(server.MediaPath, "link"), server.Root);
             Assert.Throws<ArgumentException>(() =>
