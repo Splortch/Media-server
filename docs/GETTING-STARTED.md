@@ -170,7 +170,7 @@ The scanner considers `.mp4`, `.m4v`, `.webm`, `.mkv`, `.mov` and `.avi` files, 
 1. Choose a test video longer than about 30 seconds. Start with VP9/Opus WebM or H.264/AAC MP4; support still depends on browser, WebView2 and OS codecs. An `.mp4` extension alone does not guarantee H.264/AAC.
 2. Open its details card and press Play. Confirm a moving picture and sound.
 3. Use the player controls to pause/resume, seek forward, change volume and enter/leave fullscreen.
-4. Open **Playback diagnostics** if it stalls. It shows the container/codecs and buffering information. This alpha does not transcode or provide HLS, alternate audio/subtitle selection, HDR conversion or universal codec support.
+4. Open **Playback diagnostics** if it stalls. It shows the container/codecs and buffering information. Direct Play remains the default. The web player now offers bounded HLS preparation, audio/text-subtitle selection and explicit HDR-to-SDR conversion when FFmpeg is installed. See [the playback setup guide](architecture/PLAYBACK-PIPELINE.md) for limits and hardware opt-in. Native clients currently retain Direct Play; universal codec support is not claimed.
 5. Play to roughly one-third of the video, **pause**, wait a few seconds, then return to Home. Avoid reaching the last 5% during this check; that counts as completed.
 6. Confirm the title appears in **Continue Watching**. Reopen it and verify that playback starts near the saved position.
 7. Refresh the browser and repeat. A progress-synchronization warning means persistence was not confirmed: reopen the video before trying again, rather than assuming the position was saved.
@@ -220,7 +220,7 @@ For a different Windows allowed media folder, stop the server, privately back up
 | FFprobe missing or every scan fails | Run `ffprobe -version`, reconnect the tools/media drive, or check the verified downloader's error. Native and Docker have different tool locations. |
 | Library path rejected | Use a real absolute directory beneath the configured root. Avoid filesystem roots, symlinks/junctions and cloud-only folders. Docker requires `/media`. |
 | No files identified | Confirm supported extensions, readable local files, a completed scan and that the folder actually contains video. Check scan problems and refresh Library. |
-| Video appears but does not play | Inspect codec/container and diagnostics. Try the synthetic WebM or known H.264/AAC MP4; scanning success does not imply decoding support. No transcoding fallback exists. |
+| Video appears but does not play | Inspect codec/container and diagnostics. Try the synthetic WebM or known H.264/AAC MP4; scanning success does not imply decoding support. In the web player, try **Prepare HLS playback** after installing FFmpeg on the server; see the [playback setup guide](architecture/PLAYBACK-PIPELINE.md). |
 | Wrong password / 401 | Setup and login are separate. Use the local account. Reload after an expired/revoked session; use documented offline recovery if needed. |
 | 400 after changing sessions | Reload to obtain fresh cookies/CSRF state, using the same hostname. Do not disable CSRF. |
 | 429 after repeated login attempts | Wait at least a minute; authentication is rate-limited. |

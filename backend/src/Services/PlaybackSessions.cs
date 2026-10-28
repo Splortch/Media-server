@@ -368,7 +368,7 @@ public sealed class PlaybackSessions(
         var hdr = TranscodeProfile.Color(item)?.Hdr == true;
         foreach (var level in TranscodeProfile.Ladder)
         {
-            var args = new List<string>();
+            var args = new List<string> { "-filter_threads", hdr ? "1" : "2" };
             if (encoder == "h264_vaapi")
                 args.AddRange(["-vaapi_device", "/dev/dri/renderD128"]);
             args.AddRange([
@@ -429,8 +429,6 @@ public sealed class PlaybackSessions(
                     args.Count - 1,
                     ["-color_primaries", "bt709", "-color_trc", "bt709", "-colorspace", "bt709"]
                 );
-            if (hdr)
-                args.InsertRange(0, ["-filter_threads", "1"]);
             await runner.RunAsync(args, job.Directory, ct);
             master.Append(
                 $"#EXT-X-STREAM-INF:BANDWIDTH={(level.Kilobits + 160) * 1000},NAME=\"{level.Name}\"\n{level.Name}.m3u8\n"

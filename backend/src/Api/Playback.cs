@@ -115,7 +115,8 @@ public static class PlaybackApi
                     var media = sessions.MediaId(session, uid, sid);
                     if (media is null || !await db.Items.AnyAsync(x => x.Id == media))
                         return Results.NotFound();
-                    return Results.Ok(sessions.Get(session, media.Value, uid, sid));
+                    var state = sessions.Get(session, media.Value, uid, sid);
+                    return state is null ? Results.NotFound() : Results.Ok(state);
                 }
             )
             .Produces<ConversionState>();

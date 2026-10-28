@@ -552,8 +552,8 @@ void MapApi(RouteGroupBuilder root)
                 version = ClientV1.ServerVersion,
                 mediaCount = await db.Items.CountAsync(),
                 libraryCount = await db.Libraries.CountAsync(),
-                streaming = "Direct Play",
-                transcoding = false,
+                streaming = "Direct Play + bounded HLS (FFmpeg required)",
+                transcoding = true,
             }
     );
     api.MapGet(
