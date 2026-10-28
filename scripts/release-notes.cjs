@@ -1,5 +1,6 @@
 
 const {targets} = require('./release-targets.cjs');
+const {downloadTable, withDownloads} = require('./platform-downloads.cjs');
 function platformNotes(target, sha, repository, image, {serverInstaller = false} = {}) {
   const docs = 'https://github.com/' + repository + '/blob/' + sha + '/docs/deployment/RELEASES.md';
   const common = '\n\n### Before you install\n\nThis is an early alpha, intended for testing. Builds are unsigned. Back up existing server data before upgrading. HTTPS is required for safe remote access; server downloads bind to localhost by default.\n\n### Verify your download\n\nDownload SHA256SUMS to check file integrity. release.json records the platform, version and source commit. GitHub’s automatically added source archives are project source code, not installers.\n\n[Full setup and troubleshooting](' + docs + ') · [Source commit](https://github.com/' + repository + '/commit/' + sha + ')';
@@ -40,15 +41,22 @@ function combinedNotes(server, client, sha, repository) {
 async function syncReleaseNotes({github, context}) {
   const releases = await github.paginate(github.rest.repos.listReleases,{...context.repo,per_page:100});
   const repository = context.repo.owner + '/' + context.repo.repo;
+  const table = downloadTable(repository, releases);
   for (const release of releases) {
     if (release.draft || !release.prerelease || !/^[a-f0-9]{40}$/.test(release.target_commitish)) continue;
+    if (/^client-android\/v0\.1\.0-alpha\.[1-9][0-9]{0,4}$/.test(release.tag_name)) {
+      const body = withDownloads(release.body, table);
+      if (release.body !== body) await github.rest.repos.updateRelease({...context.repo,release_id:release.id,body});
+      continue;
+    }
     const match = /^(?:(server-windows|server-linux|client-windows|docker)\/)?v0\.([12])\.0-alpha\.([1-9][0-9]{0,4})$/.exec(release.tag_name);
     if (!match) continue;
     const [,id,minor,number] = match;
     if ((id === 'client-windows' ? minor !== '1' : minor !== '2')) continue;
     const server = '0.2.0-alpha.'+number, client='0.1.0-alpha.'+number;
     const target = targets(server,client).find(t=>t.id===id);
-    const body = id ? platformNotes(target,release.target_commitish,repository,'ghcr.io/'+repository.toLowerCase()+':v'+server,{serverInstaller:(release.assets||[]).some(a=>a.name===`MediaServer-v${server}-win-x64-setup.exe`)}) : combinedNotes(server,client,release.target_commitish,repository);
+    const description = id ? platformNotes(target,release.target_commitish,repository,'ghcr.io/'+repository.toLowerCase()+':v'+server,{serverInstaller:(release.assets||[]).some(a=>a.name===`MediaServer-v${server}-win-x64-setup.exe`)}) : combinedNotes(server,client,release.target_commitish,repository);
+    const body = withDownloads(description, table);
     if (release.body !== body) await github.rest.repos.updateRelease({...context.repo,release_id:release.id,body});
   }
 }

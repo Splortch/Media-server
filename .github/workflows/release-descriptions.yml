@@ -5,16 +5,32 @@ on:
     paths:
       - scripts/release-notes.cjs
       - scripts/release-targets.cjs
+      - scripts/platform-downloads.cjs
+      - .github/workflows/release-descriptions.yml
+  workflow_run:
+    workflows: [Automatic prereleases, Android client]
+    types: [completed]
+    branches: [main]
+  schedule:
+    - cron: '23 5 * * *'
+  pull_request:
+    paths:
+      - scripts/platform-downloads.cjs
+      - scripts/release-notes.cjs
+      - scripts/tests/platform-downloads.test.cjs
       - .github/workflows/release-descriptions.yml
   workflow_dispatch:
 permissions:
-  contents: write
+  contents: read
 concurrency:
   group: release-descriptions
   cancel-in-progress: false
 jobs:
   descriptions:
-    if: github.ref == 'refs/heads/main'
+    needs: test
+    permissions:
+      contents: write
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request' && (github.event_name != 'workflow_run' || (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.head_repository.full_name == github.repository))
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     steps:
@@ -25,3 +41,16 @@ jobs:
         with:
           script: |
             await require('./scripts/release-notes.cjs').syncReleaseNotes({github,context});
+
+  test:
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+      - run: node --test scripts/tests/platform-downloads.test.cjs scripts/tests/release-plan.test.cjs
