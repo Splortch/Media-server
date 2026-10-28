@@ -44,6 +44,62 @@ public sealed class OperationsTests(ITestOutputHelper output)
             .GetInt32();
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task FailedHistoryWriteRollsBackPlaybackProgress(bool versioned)
+    {
+        using var server = new Server();
+        using var admin = await server.Admin();
+        using (var scope = server.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<MediaDb>();
+            db.Libraries.Add(
+                new Library
+                {
+                    Id = 1,
+                    Name = "Fixture",
+                    Path = server.MediaPath,
+                }
+            );
+            db.Items.Add(
+                new MediaItem
+                {
+                    Id = 1,
+                    LibraryId = 1,
+                    Title = "Fixture",
+                    RelativePath = "fixture.webm",
+                    Duration = 100,
+                }
+            );
+            await db.SaveChangesAsync();
+            await db.Database.ExecuteSqlRawAsync(
+                "CREATE TRIGGER RejectHistory BEFORE INSERT ON History BEGIN SELECT RAISE(ABORT,'explicit test fixture'); END;"
+            );
+        }
+        var path = versioned ? "/api/v1/media/1/progress-sync" : "/api/media/1/progress";
+        var input = new { seconds = 25, expectedRevision = 0 };
+        Assert.Equal(
+            HttpStatusCode.InternalServerError,
+            (await admin.PutAsJsonAsync(path, input)).StatusCode
+        );
+        using (var scope = server.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<MediaDb>();
+            Assert.Empty(await db.Progress.ToListAsync());
+            Assert.Empty(await db.History.ToListAsync());
+            await db.Database.ExecuteSqlRawAsync("DROP TRIGGER RejectHistory;");
+        }
+        var retry = await admin.PutAsJsonAsync(path, input);
+        Assert.Equal(versioned ? HttpStatusCode.OK : HttpStatusCode.NoContent, retry.StatusCode);
+        using (var scope = server.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<MediaDb>();
+            Assert.Equal(25, (await db.Progress.SingleAsync()).Seconds);
+            Assert.Single(await db.History.ToListAsync());
+        }
+    }
+
     [Fact]
     public async Task LibraryAndRatingRestrictionsCoverLegacyAndVersionedMediaRoutes()
     {

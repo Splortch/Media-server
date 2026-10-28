@@ -128,6 +128,7 @@ public static class ClientV1
                     var completed =
                         input.Completed
                         || (item.Duration > 0 && input.Seconds >= item.Duration * .95);
+                    await using var transaction = await db.Database.BeginTransactionAsync();
                     var count = await db.Database.ExecuteSqlInterpolatedAsync(
                         $"INSERT INTO Progress (UserId, MediaItemId, Seconds, UpdatedAt, Revision, Completed) SELECT {uid}, {id}, {input.Seconds}, {updated}, 1, {completed} WHERE {input.ExpectedRevision} = 0 OR EXISTS (SELECT 1 FROM Progress WHERE UserId={uid} AND MediaItemId={id} AND Revision={input.ExpectedRevision}) ON CONFLICT(UserId, MediaItemId) DO UPDATE SET Seconds=excluded.Seconds, UpdatedAt=excluded.UpdatedAt, Completed=excluded.Completed, Revision=Progress.Revision+1 WHERE Progress.Revision={input.ExpectedRevision}"
                     );
@@ -146,6 +147,7 @@ public static class ClientV1
                             .Progress.AsNoTracking()
                             .SingleOrDefaultAsync(x => x.UserId == uid && x.MediaItemId == id)
                     );
+                    await transaction.CommitAsync();
                     // Lost-response retries are idempotent; stale, different positions are never silently replayed.
                     return
                         count > 0

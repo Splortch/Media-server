@@ -763,6 +763,7 @@ void MapApi(RouteGroupBuilder root)
                 throw new ArgumentException("Invalid playback position.");
             var uid = UserId(u);
             var updated = DateTime.UtcNow;
+            await using var transaction = await db.Database.BeginTransactionAsync();
             await db.Database.ExecuteSqlInterpolatedAsync(
                 $"INSERT INTO Progress (UserId, MediaItemId, Seconds, UpdatedAt, Revision, Completed) VALUES ({uid}, {id}, {input.Seconds}, {updated}, 1, {item.Duration > 0 && input.Seconds >= item.Duration * .95}) ON CONFLICT(UserId, MediaItemId) DO UPDATE SET Seconds=excluded.Seconds, UpdatedAt=excluded.UpdatedAt, Revision=Progress.Revision+1, Completed=excluded.Completed"
             );
@@ -774,6 +775,7 @@ void MapApi(RouteGroupBuilder root)
                 item.Duration > 0 && input.Seconds >= item.Duration * .95,
                 updated
             );
+            await transaction.CommitAsync();
             return Results.NoContent();
         }
     );
