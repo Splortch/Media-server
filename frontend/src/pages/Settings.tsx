@@ -246,7 +246,7 @@ export default function Settings({ admin = true }: { admin?: boolean }) {
       <section className="panel">
         <h2>Alpha capabilities</h2>
         <p className="muted">
-          Direct Play · Local administrator account · SQLite · No telemetry
+          Direct Play · Local accounts · SQLite · No telemetry
         </p>
         <p className="muted">
           Transcoding, metadata artwork and remote access are planned.

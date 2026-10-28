@@ -79,6 +79,9 @@ export default function App() {
     resetCsrf();
     setPhase('login');
     setUser(undefined);
+    setServer(undefined);
+    setError('');
+    setMoreBusy(false);
     setItems([]);
     setProgress([]);
     setItem(undefined);

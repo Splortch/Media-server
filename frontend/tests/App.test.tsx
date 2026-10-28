@@ -10,6 +10,7 @@ import App from '../src/App';
 const state = vi.hoisted(() => ({
   user: 'Alice',
   deferred: undefined as undefined | ((value: unknown) => void),
+  bobStatus: undefined as undefined | ((value: unknown) => void),
 }));
 vi.mock('../src/services/api', () => ({
   resetCsrf: vi.fn(),
@@ -21,8 +22,13 @@ vi.mock('../src/services/api', () => ({
       state.user = 'Bob';
       return { name: 'Bob', role: 'Viewer' };
     }
-    if (path === '/status')
-      return { version: 'fixture', mediaCount: 1, libraryCount: 1 };
+    if (path === '/status') {
+      if (state.user === 'Bob')
+        return new Promise((resolve) => {
+          state.bobStatus = resolve;
+        });
+      return { version: 'fixture', mediaCount: 666, libraryCount: 1 };
+    }
     if (
       path === '/collections' ||
       path === '/continue-watching-media' ||
@@ -72,6 +78,12 @@ it('ignores a previous account’s delayed page after session expiration and a n
   });
   fireEvent.submit(
     screen.getByRole('button', { name: 'Sign in' }).closest('form')!,
+  );
+  await screen.findByText(/Welcome home, Bob/);
+  expect(screen.queryByText('666')).not.toBeInTheDocument();
+  await waitFor(() => expect(state.bobStatus).toBeTypeOf('function'));
+  await act(async () =>
+    state.bobStatus?.({ version: 'fixture', mediaCount: 1, libraryCount: 1 }),
   );
   await screen.findByRole('heading', { name: 'Bob private collection' });
   await act(async () =>
