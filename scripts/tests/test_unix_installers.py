@@ -29,8 +29,11 @@ class UnixInstallerTests(unittest.TestCase):
                 payload = Path(args[args.index('--root') + 1]) if '--root' in args else Path(args[-2])
                 observed.append(args)
                 app = payload / ('opt/media-server' if rid == 'linux-x64' else 'Applications/MediaServer')
-                self.assertTrue((app / 'Api').stat().st_mode & 0o111)
-                self.assertTrue((app / launcher).stat().st_mode & 0o111)
+                self.assertTrue((app / 'Api').is_file())
+                self.assertTrue((app / launcher).is_file())
+                if os.name != 'nt':  # NTFS chmod has no POSIX executable bits.
+                    self.assertTrue((app / 'Api').stat().st_mode & 0o111)
+                    self.assertTrue((app / launcher).stat().st_mode & 0o111)
                 self.assertTrue((app / 'wwwroot/index.html').is_file())
                 # No per-user DB, auto-start root service or privileged postinstall.
                 self.assertFalse(any(payload.rglob('*.db')))

@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
 """Build real .deb/.pkg installers from the already smoke-tested self-contained payload."""
-import importlib.util
 import os
 from pathlib import Path
 import re
