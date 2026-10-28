@@ -2,6 +2,7 @@ package org.splortch.mediaserver.android
 
 import android.app.Application
 import android.media.MediaCodecList
+import androidx.core.content.edit
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.media3.common.AudioAttributes
@@ -93,7 +94,7 @@ class MediaViewModel(app: Application) : AndroidViewModel(app) {
         connection = conn
         try {
             val info = conn.check()
-            prefs.edit().putString("origin", origin.toString()).apply()
+            prefs.edit { putString("origin", origin.toString()) }
             mutable.value = Screen(phase = "login", address = origin.toString(), remember = remember, version = info.serverVersion, busy = true)
             if (restore) {
                 try { val me = conn.api.me(); signedIn(conn, me) }
@@ -135,7 +136,7 @@ class MediaViewModel(app: Application) : AndroidViewModel(app) {
     internal fun details(id: Int) = action {
         val conn = requireNotNull(connection)
         val detail = conn.api.details(id)
-        require(detail.id == id && detail.title.length <= 512 && detail.duration.isFinite() && detail.duration in 0.0..1e9) { "Invalid media details." }
+        require(detail.id == id && detail.title.length <= 512 && detail.duration.isFinite() && detail.duration in 0.0..1e9 && detail.container.length <= 64 && detail.videoCodec.length <= 64 && detail.audioCodec.length <= 64) { "Invalid media details." }
         val tracks = conn.api.tracks(id)
         require(tracks.tracks.size <= 200 && tracks.tracks.all { it.codec.length <= 64 && (it.title?.length ?: 0) <= 512 && (it.language?.length ?: 0) <= 64 }) { "Invalid tracks." }
         mutable.update { it.copy(detail = detail, tracks = tracks) }
@@ -172,7 +173,7 @@ class MediaViewModel(app: Application) : AndroidViewModel(app) {
         active.setMediaItem(MediaItem.fromUri(conn.streamUrl(media.id)))
         if (!saved.completed) active.seekTo((saved.seconds * 1000).toLong())
         active.prepare(); active.play()
-        ticker = viewModelScope.launch { while (isActive) { delay(5000); if (active.isPlaying) save() } }
+        ticker = viewModelScope.launch { while (isActive) { delay(5000); if (active.isPlaying && pendingSaves.value == 0) save() } }
     }
     internal fun save(completed: Boolean = false) {
         val active = player.value ?: return
@@ -184,9 +185,12 @@ class MediaViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch { try { progressMutex.withLock {
             if (generation != playbackGeneration || connection !== conn || mutable.value.syncError != null || progress?.mediaItemId != id) return@withLock
             val previous = progress ?: return@withLock
-            try { progress = conn.api.sync(id, conn.token(), ProgressUpdate(seconds, previous.revision, completed)) }
+            try {
+                val updated = conn.api.sync(id, conn.token(), ProgressUpdate(seconds, previous.revision, completed))
+                if (connection === conn && generation == playbackGeneration) progress = updated
+            }
             catch (e: CancellationException) { throw e }
-            catch (e: Exception) { if (connection === conn) mutable.update { it.copy(syncError = message(e) + " Progress saving is paused; reopen the video to sync.") } }
+            catch (e: Exception) { if (connection === conn && generation == playbackGeneration) mutable.update { it.copy(syncError = message(e) + " Progress saving is paused; reopen the video to sync.") } }
         } } finally { pendingSaves.value -= 1 } }
     }
     internal fun background() { player.value?.pause(); save() }

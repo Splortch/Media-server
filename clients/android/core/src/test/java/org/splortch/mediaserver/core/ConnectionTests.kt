@@ -66,6 +66,15 @@ class ConnectionTests {
             conn.close()
         }
     }
+    @Test fun streamedResponsesAreBoundedAndMediaPathsAreScoped() = runBlocking {
+        MockWebServer().use { server ->
+            server.enqueue(MockResponse().setChunkedBody("x".repeat(2 * 1024 * 1024 + 1), 8192))
+            val conn = ServerConnection(server.url("/"), MemoryVault(), false)
+            try { conn.api.info(); fail() } catch (_: IOException) { }
+            try { conn.mediaClient.newCall(okhttp3.Request.Builder().url(server.url("/redirect")).build()).execute(); fail() } catch (_: IOException) { }
+            conn.close()
+        }
+    }
     @Test fun disconnectedServerFails() = runBlocking {
         val server = MockWebServer(); server.start(); val origin = server.url("/"); server.close()
         val conn = ServerConnection(origin, MemoryVault(), false)

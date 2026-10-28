@@ -28,7 +28,9 @@ for name in names:
     if name == 'LoginRequest': out += ' {\n    override fun toString() = "LoginRequest([redacted])"\n}'
     out += '\n\n'
 p = root / 'clients/android/core/src/main/java/org/splortch/mediaserver/core/Models.kt'
-if argparse.ArgumentParser().parse_known_args()[1] == ['--check']:
+parser = argparse.ArgumentParser()
+parser.add_argument('--check', action='store_true')
+if parser.parse_args().check:
     if not p.exists() or p.read_text() != out: raise SystemExit('Android API models differ; run python scripts/generate-android-models.py')
 else:
     p.parent.mkdir(parents=True, exist_ok=True); p.write_text(out)

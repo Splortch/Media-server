@@ -8,6 +8,7 @@ import subprocess
 import tempfile
 import time
 import urllib.request
+import urllib.error
 root = Path(__file__).resolve().parents[1]
 base = 'http://127.0.0.1:5050'
 opener = urllib.request.build_opener(urllib.request.HTTPCookieProcessor(http.cookiejar.CookieJar()))
@@ -45,6 +46,11 @@ with tempfile.TemporaryDirectory(prefix='android-real-server-') as temp:
                 time.sleep(.2)
             else: raise RuntimeError('Fixture scan timed out')
             assert request('/media-page')['items'][0]['id'] == 1
+            try:
+                urllib.request.urlopen(base + '/api/v1/media/1/stream', timeout=10).close()
+                raise AssertionError('Unauthenticated media stream was accessible')
+            except urllib.error.HTTPError as error:
+                assert error.code == 401
             request('/media/1/progress-sync', {'seconds': 3, 'expectedRevision': 0}, 'PUT')
             subprocess.run(['adb', 'reverse', 'tcp:5050', 'tcp:5050'], check=True)
             outputs = root / 'clients/android/app/build/outputs'
