@@ -77,7 +77,7 @@ jobs:
           CLIENT_VERSION: ${{ inputs.client_version }}
           MSI_VERSION: ${{ inputs.msi_version }}
         run: node scripts/stamp-windows-version.cjs
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         if: steps.changes.outputs.changed == 'true'
         with:
           node-version: '24'
