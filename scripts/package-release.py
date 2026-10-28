@@ -57,6 +57,8 @@ def package_server():
         shutil.copyfile(ROOT / path, folder / path)
     shutil.copyfile(ROOT / 'docs/deployment/RELEASE-NOTES.md', folder / 'README.md')
     browser_licenses(folder)
+    shutil.copyfile(ROOT / 'scripts/update-server.py', folder / 'update-server.py')
+    shutil.copyfile(ROOT / 'docs/deployment/BACKUPS-UPDATES.md', folder / 'BACKUPS-UPDATES.md')
     resources = ROOT / 'release-resources' / ('linux' if linux else 'windows')
     for path in resources.iterdir():
         shutil.copyfile(path, folder / path.name)
@@ -128,3 +130,4 @@ volumes:
 
 if __name__ == '__main__':
     {'server': package_server, 'assemble': assemble}[sys.argv[1]]()
+

@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Security.Claims;
 using System.Security.Cryptography;
+using System.Text.Json;
 using System.Threading.RateLimiting;
 using MediaServer.Core;
 using MediaServer.Infrastructure;
@@ -10,12 +11,30 @@ using Microsoft.AspNetCore.Antiforgery;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.DataProtection;
+using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 
 var recovery = args.Contains("--reset-admin-password", StringComparer.Ordinal);
-var builder = WebApplication.CreateBuilder(
-    args.Where(x => x != "--reset-admin-password").ToArray()
-);
+var maintenance = args.Select((value, index) => (value, index))
+    .Where(x => x.value is "--backup" or "--restore-check" or "--restore")
+    .ToArray();
+if (
+    maintenance.Length > 1
+    || (recovery && maintenance.Length > 0)
+    || maintenance.Any(x => x.index + 1 >= args.Length)
+)
+{
+    Console.Error.WriteLine("Choose one maintenance command and archive path.");
+    Environment.ExitCode = 1;
+    return;
+}
+var filtered = args.Where(
+        (value, index) =>
+            value != "--reset-admin-password"
+            && !maintenance.Any(x => index == x.index || index == x.index + 1)
+    )
+    .ToArray();
+var builder = WebApplication.CreateBuilder(filtered);
 builder.WebHost.ConfigureKestrel(o => o.Limits.MaxRequestBodySize = 64 * 1024);
 builder.WebHost.UseUrls(builder.Configuration["Urls"] ?? "http://127.0.0.1:5050");
 builder.Services.ConfigureHttpJsonOptions(o =>
@@ -52,10 +71,75 @@ catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
     return;
 }
 using var instanceLease = instanceLock;
+if (File.Exists(Path.Combine(data, ".restore-in-progress")))
+{
+    Console.Error.WriteLine(
+        "An interrupted restore was detected. Preserve this directory and restore into an empty directory."
+    );
+    Environment.ExitCode = 1;
+    return;
+}
+if (maintenance.Length > 0)
+{
+    try
+    {
+        var service = new BackupService(
+            data,
+            builder.Configuration.GetValue<long?>("MediaServer:BackupMaxBytes")
+                ?? 4L * 1024 * 1024 * 1024
+        );
+        var (action, index) = maintenance[0];
+        var archive = args[index + 1];
+        if (action == "--backup")
+            await service.CreateAsync(
+                archive,
+                ClientV1.ServerVersion,
+                new
+                {
+                    AllowedRoots = builder
+                        .Configuration.GetSection("MediaServer:AllowedRoots")
+                        .Get<string[]>()
+                        ?? [],
+                    FfprobePath = builder.Configuration["MediaServer:FfprobePath"] ?? "ffprobe",
+                    SecureCookies = builder.Configuration.GetValue<bool>(
+                        "MediaServer:SecureCookies"
+                    ),
+                    AllowedHosts = builder.Configuration["AllowedHosts"],
+                    Urls = builder.Configuration["Urls"],
+                }
+            );
+        else if (action == "--restore")
+            await service.RestoreAsync(archive);
+        else
+            await service.InspectAsync(archive);
+        Console.WriteLine(
+            "Maintenance completed. Configuration in the archive is reference-only; review it before starting."
+        );
+    }
+    catch (Exception ex)
+        when (ex
+                is IOException
+                    or ArgumentException
+                    or SqliteException
+                    or JsonException
+                    or UnauthorizedAccessException
+        )
+    {
+        Console.Error.WriteLine(
+            "Maintenance failed: "
+                + ex.GetType().Name
+                + ". Check the archive, permissions, size limit, schema compatibility and empty restore destination."
+        );
+        Environment.ExitCode = 1;
+    }
+    return;
+}
 var setupPath = Path.Combine(data, "setup-token");
 builder
     .Services.AddDataProtection()
     .PersistKeysToFileSystem(new DirectoryInfo(Path.Combine(data, "keys")));
+builder.Services.AddHttpContextAccessor();
+builder.Services.AddScoped<IUserContext, RequestUser>();
 builder.Services.AddDbContext<MediaDb>(o =>
     o.UseSqlite(
         new Microsoft.Data.Sqlite.SqliteConnectionStringBuilder
@@ -75,6 +159,10 @@ builder.Services.AddSingleton<IMediaProbe>(
 );
 builder.Services.AddSingleton<IPlaybackPlanner, DirectPlaybackPlanner>();
 builder.Services.AddSingleton<ScanQueue>();
+builder.Services.AddSingleton<StreamRegistry>();
+builder.Services.AddSingleton(new ResourceMonitor(data));
+builder.Services.AddSingleton<ScanScheduler>();
+builder.Services.AddHostedService<LibraryMonitor>();
 builder.Services.AddHostedService<ScanWorker>();
 builder.Services.AddAntiforgery(o =>
 {
@@ -112,7 +200,15 @@ builder
             var db = c.HttpContext.RequestServices.GetRequiredService<MediaDb>();
             if (
                 id is null
-                || !await db.Sessions.AnyAsync(x => x.Id == id && x.ExpiresAt > DateTime.UtcNow)
+                || !await db.Sessions.AnyAsync(x =>
+                    x.Id == id
+                    && x.ExpiresAt > DateTime.UtcNow
+                    && db.Users.Any(u =>
+                        u.Id == x.UserId
+                        && !u.Disabled
+                        && u.Role == c.Principal!.FindFirstValue(ClaimTypes.Role)
+                    )
+                )
             )
                 c.RejectPrincipal();
         };
@@ -179,6 +275,17 @@ using (var scope = app.Services.CreateScope())
     }
     if (await db.Users.AnyAsync() && File.Exists(setupPath))
         File.Delete(setupPath);
+    // Migration SQL uses SQLite's ASCII lower(); normalize existing Unicode titles once with .NET.
+    var searchIndex = Path.Combine(data, "search-index-v1");
+    if (!File.Exists(searchIndex))
+    {
+        var connection = (SqliteConnection)db.Database.GetDbConnection();
+        await connection.OpenAsync();
+        connection.CreateFunction("media_fold", (string title) => title.ToLowerInvariant());
+        await db.Database.ExecuteSqlRawAsync("UPDATE Items SET SearchTitle=media_fold(Title)");
+        await connection.CloseAsync();
+        await File.WriteAllTextAsync(searchIndex, "1");
+    }
 }
 app.Use(
     async (context, next) =>
@@ -243,6 +350,7 @@ app.MapGet("/health", () => Results.Ok(new { status = "ok" }));
 MapApi(app.MapGroup("/api"));
 MapApi(app.MapGroup("/api/v1").WithGroupName("client-v1"));
 app.MapClientV1();
+app.MapOperations(credentialGate);
 void MapApi(RouteGroupBuilder root)
 {
     root.MapGet(
@@ -315,7 +423,7 @@ void MapApi(RouteGroupBuilder root)
                         input.Password,
                         user?.PasswordHash ?? dummyHash
                     );
-                    if (user is null || !valid)
+                    if (user is null || user.Disabled || !valid)
                         return Results.Unauthorized();
                     await db
                         .Sessions.Where(x => x.ExpiresAt <= DateTime.UtcNow)
@@ -438,10 +546,19 @@ void MapApi(RouteGroupBuilder root)
             {
                 if (string.IsNullOrWhiteSpace(input.Name) || input.Name.Length > 100)
                     throw new ArgumentException("Library name must be 1–100 characters.");
+                if (input.Kind is not ("movies" or "tv"))
+                    throw new ArgumentException("Choose movies or tv.");
                 var path = policy.ValidateDirectory(input.Path);
                 if (await db.Libraries.AnyAsync(x => x.Path == path))
                     return Results.Conflict(new { message = "Directory already configured." });
-                var library = new Library { Name = input.Name.Trim(), Path = path };
+                var library = new Library
+                {
+                    Name = input.Name.Trim(),
+                    Path = path,
+                    Kind = input.Kind,
+                    WatchEnabled = input.WatchEnabled,
+                    ComputeHashes = input.ComputeHashes,
+                };
                 db.Libraries.Add(library);
                 await db.SaveChangesAsync();
                 return Results.Created($"/api/libraries/{library.Id}", library);
@@ -450,26 +567,16 @@ void MapApi(RouteGroupBuilder root)
         .RequireAuthorization("admin");
     api.MapPost(
             "/libraries/{id:int}/scan",
-            async (int id, MediaDb db, ScanQueue queue) =>
+            async (int id, MediaDb db, ScanScheduler scheduler, CancellationToken ct) =>
             {
-                if (!await db.Libraries.AnyAsync(x => x.Id == id))
+                if (!await db.Libraries.AnyAsync(x => x.Id == id, ct))
                     return Results.NotFound();
-                if (
-                    await db.Jobs.AnyAsync(x =>
-                        x.LibraryId == id && (x.State == "queued" || x.State == "running")
-                    )
-                )
+                var job = await scheduler.EnqueueAsync(id, ct);
+                if (job is null)
                     return Results.Conflict(new { message = "A scan is already pending." });
-                var job = new ScanJob { LibraryId = id };
-                db.Jobs.Add(job);
-                await db.SaveChangesAsync();
-                if (!queue.Channel.Writer.TryWrite(job.Id))
-                {
-                    job.State = "rejected";
-                    await db.SaveChangesAsync();
-                    return Results.StatusCode(503);
-                }
-                return Results.Accepted($"/api/scans/{job.Id}", new { job.Id });
+                return job.State == "rejected"
+                    ? Results.StatusCode(503)
+                    : Results.Accepted($"/api/scans/{job.Id}", new { job.Id });
             }
         )
         .RequireAuthorization("admin");
@@ -575,7 +682,8 @@ void MapApi(RouteGroupBuilder root)
                             item.AudioCodec,
                             item.Container,
                             item.Size,
-                            planner.Plan(item)
+                            planner.Plan(item),
+                            item.ContentRating
                         )
                     )
                     : Results.NotFound()
@@ -584,7 +692,14 @@ void MapApi(RouteGroupBuilder root)
     api.MapMethods(
         "/media/{id:int}/stream",
         ["GET", "HEAD"],
-        async (int id, MediaDb db, PathPolicy policy, IPlaybackPlanner planner) =>
+        async (
+            int id,
+            MediaDb db,
+            PathPolicy policy,
+            IPlaybackPlanner planner,
+            StreamRegistry registry,
+            ClaimsPrincipal user
+        ) =>
         {
             var item = await db.Items.FindAsync(id);
             if (item is null)
@@ -596,7 +711,7 @@ void MapApi(RouteGroupBuilder root)
             {
                 var stream = policy.OpenRead(library.Path, item.RelativePath);
                 return Results.File(
-                    stream,
+                    registry.Track(stream, UserId(user), item.Id),
                     planner.Plan(item).MimeType,
                     enableRangeProcessing: true
                 );
@@ -610,12 +725,24 @@ void MapApi(RouteGroupBuilder root)
     );
     api.MapGet(
         "/progress",
-        async (MediaDb db, ClaimsPrincipal u) =>
+        async (MediaDb db, ClaimsPrincipal u, string? mediaIds) =>
         {
             var uid = UserId(u);
+            int[]? ids = null;
+            if (mediaIds is not null)
+            {
+                var parts = mediaIds.Split(',');
+                if (parts.Length > 200 || parts.Any(x => !int.TryParse(x, out var id) || id < 1))
+                    throw new ArgumentException("Invalid progress item IDs.");
+                ids = parts.Select(int.Parse).ToArray();
+            }
             return Results.Ok(
                 await db
-                    .Progress.Where(x => x.UserId == uid)
+                    .Progress.Where(x =>
+                        x.UserId == uid
+                        && (ids == null || ids.Contains(x.MediaItemId))
+                        && db.Items.Any(item => item.Id == x.MediaItemId)
+                    )
                     .OrderByDescending(x => x.UpdatedAt)
                     .ToListAsync()
             );
@@ -638,6 +765,14 @@ void MapApi(RouteGroupBuilder root)
             var updated = DateTime.UtcNow;
             await db.Database.ExecuteSqlInterpolatedAsync(
                 $"INSERT INTO Progress (UserId, MediaItemId, Seconds, UpdatedAt, Revision, Completed) VALUES ({uid}, {id}, {input.Seconds}, {updated}, 1, {item.Duration > 0 && input.Seconds >= item.Duration * .95}) ON CONFLICT(UserId, MediaItemId) DO UPDATE SET Seconds=excluded.Seconds, UpdatedAt=excluded.UpdatedAt, Revision=Progress.Revision+1, Completed=excluded.Completed"
+            );
+            await HistoryWriter.RecordAsync(
+                db,
+                uid,
+                id,
+                input.Seconds,
+                item.Duration > 0 && input.Seconds >= item.Duration * .95,
+                updated
             );
             return Results.NoContent();
         }
@@ -678,7 +813,13 @@ public record SetupRequest(string Name, string Password, string Token);
 
 public record LoginRequest(string Name, string Password, string? DeviceName = null);
 
-public record LibraryRequest(string Name, string Path);
+public record LibraryRequest(
+    string Name,
+    string Path,
+    string Kind = "movies",
+    bool WatchEnabled = false,
+    bool ComputeHashes = false
+);
 
 public record ProgressRequest(double Seconds);
 

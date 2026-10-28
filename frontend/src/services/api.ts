@@ -6,6 +6,7 @@ export type Media = {
   videoCodec: string;
   audioCodec: string;
   size: number;
+  contentRating?: number;
   playback?: { mode: string; mimeType: string; warning?: string | null };
 };
 export type Progress = {
@@ -15,7 +16,14 @@ export type Progress = {
   revision: number;
   completed: boolean;
 };
-export type Library = { id: number; name: string; path: string };
+export type Library = {
+  kind?: string;
+  watchEnabled?: boolean;
+  computeHashes?: boolean;
+  id: number;
+  name: string;
+  path: string;
+};
 let csrf: string | undefined;
 export function resetCsrf() {
   csrf = undefined;

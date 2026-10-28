@@ -1,4 +1,10 @@
-import { useEffect, useRef, useState, type FormEvent } from 'react';
+import {
+  useEffect,
+  useRef,
+  useState,
+  useCallback,
+  type FormEvent,
+} from 'react';
 import {
   api,
   duration,
@@ -8,6 +14,7 @@ import {
 } from './services/api';
 import Player from './components/Player';
 import Settings from './pages/Settings';
+import { History, type Collection } from './features/Personal';
 type User = { name: string; role: string };
 export default function App() {
   const mainRef = useRef<HTMLElement>(null);
@@ -22,6 +29,14 @@ export default function App() {
   const [items, setItems] = useState<Media[]>([]);
   const [progress, setProgress] = useState<Progress[]>([]);
   const [item, setItem] = useState<Media>();
+  const focusedRoute = useRef('');
+  const requestEpoch = useRef(0);
+  const [watching, setWatching] = useState<Media[]>([]);
+  const [collections, setCollections] = useState<Collection[]>([]);
+  const [collection, setCollection] = useState('');
+  const [nextCursor, setNextCursor] = useState<string | null>(null);
+  const [moreBusy, setMoreBusy] = useState(false);
+  const [debouncedQuery, setDebouncedQuery] = useState('');
   const [query, setQuery] = useState('');
   const [loading, setLoading] = useState(true);
   const [server, setServer] = useState<{
@@ -59,6 +74,26 @@ export default function App() {
       active = false;
     };
   }, []);
+  const endSession = useCallback(() => {
+    requestEpoch.current++;
+    resetCsrf();
+    setPhase('login');
+    setUser(undefined);
+    setItems([]);
+    setProgress([]);
+    setItem(undefined);
+    setWatching([]);
+    setCollections([]);
+    setNextCursor(null);
+    setQuery('');
+    setCollection('');
+    setLoading(true);
+    location.hash = 'home';
+  }, []);
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedQuery(query), 250);
+    return () => clearTimeout(timer);
+  }, [query]);
   useEffect(() => {
     const change = () => {
       setRoute(location.hash.slice(1) || 'home');
@@ -66,46 +101,57 @@ export default function App() {
       setError('');
       setItem(undefined);
     };
-    const expired = () => {
-      setPhase('login');
-      setUser(undefined);
-      resetCsrf();
-    };
     window.addEventListener('hashchange', change);
-    window.addEventListener('session-expired', expired);
+    window.addEventListener('session-expired', endSession);
     return () => {
       window.removeEventListener('hashchange', change);
-      window.removeEventListener('session-expired', expired);
+      window.removeEventListener('session-expired', endSession);
     };
-  }, []);
+  }, [endSession]);
+  const pageUrl = (cursor?: string) =>
+    `/media-page?limit=60&prefix=${encodeURIComponent(debouncedQuery)}${collection ? '&collectionId=' + collection : ''}${cursor ? '&cursor=' + encodeURIComponent(cursor) : ''}`;
   useEffect(() => {
     if (phase !== 'ready') return;
     let active = true;
+    requestEpoch.current++;
     (async () => {
+      setLoading(true);
       try {
-        const [p, s] = await Promise.all([
-          api<Progress[]>('/progress'),
+        const [s, c, w] = await Promise.all([
           api<{ version: string; mediaCount: number; libraryCount: number }>(
             '/status',
           ),
+          api<Collection[]>('/collections'),
+          api<Media[]>('/continue-watching-media'),
         ]);
-        if (active) {
-          setProgress(p);
-          setServer(s);
+        let visible: Media[] = [];
+        let detail: Media | undefined;
+        let next: string | null = null;
+        if (route.startsWith('media/')) detail = await api<Media>('/' + route);
+        else if (route === 'home' || route === 'library') {
+          const page = await api<{ items: Media[]; nextCursor: string | null }>(
+            pageUrl(),
+          );
+          visible = page.items;
+          next = page.nextCursor;
         }
-        if (route.startsWith('media/')) {
-          const detail = await api<Media>('/' + route);
-          if (active) setItem(detail);
-        } else if (route !== 'settings') {
-          let all: Media[] = [];
-          for (let offset = 0; ; offset += 200) {
-            const page = await api<Media[]>(
-              `/media?offset=${offset}&limit=200`,
-            );
-            all = all.concat(page);
-            if (page.length < 200) break;
-          }
-          if (active) setItems(all);
+        const ids = [
+          ...new Set(
+            [...visible, ...w, ...(detail ? [detail] : [])].map((x) => x.id),
+          ),
+        ];
+        const p = ids.length
+          ? await api<Progress[]>('/progress?mediaIds=' + ids.join(','))
+          : [];
+        if (active) {
+          setMoreBusy(false);
+          setServer(s);
+          setCollections(c);
+          setWatching(w);
+          setItems(visible);
+          setItem(detail);
+          setNextCursor(next);
+          setProgress(p);
         }
       } catch (e) {
         if (active) setError((e as Error).message);
@@ -116,13 +162,47 @@ export default function App() {
     return () => {
       active = false;
     };
-  }, [phase, route]);
+    // The URL builder uses only these query inputs.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [phase, route, debouncedQuery, collection]);
+  async function loadMore() {
+    if (!nextCursor || moreBusy) return;
+    const epoch = requestEpoch.current;
+    setMoreBusy(true);
+    try {
+      const page = await api<{ items: Media[]; nextCursor: string | null }>(
+        pageUrl(nextCursor),
+      );
+      const ids = page.items.map((x) => x.id);
+      const p = ids.length
+        ? await api<Progress[]>('/progress?mediaIds=' + ids.join(','))
+        : [];
+      if (epoch !== requestEpoch.current) return;
+      setItems((old) => [...old, ...page.items]);
+      setProgress((old) => [
+        ...old.filter((x) => !ids.includes(x.mediaItemId)),
+        ...p,
+      ]);
+      setNextCursor(page.nextCursor);
+    } catch (e) {
+      if (epoch === requestEpoch.current) setError((e as Error).message);
+    } finally {
+      if (epoch === requestEpoch.current) setMoreBusy(false);
+    }
+  }
   useEffect(() => {
+    const key = phase + ':' + route;
     if (phase === 'ready' && !loading) {
-      mainRef.current?.focus();
-      document.title = `${route === 'settings' ? 'Settings' : item?.title || (route === 'library' ? 'Library' : 'Home')} · Media Server`;
+      if (focusedRoute.current !== key) {
+        mainRef.current?.focus();
+        focusedRoute.current = key;
+      }
+      document.title = `${route === 'settings' ? 'Settings' : route === 'history' ? 'Watch history' : item?.title || (route === 'library' ? 'Library' : 'Home')} · Media Server`;
     } else if (phase === 'setup' || phase === 'login') {
-      authHeading.current?.focus();
+      if (focusedRoute.current !== key) {
+        authHeading.current?.focus();
+        focusedRoute.current = key;
+      }
       document.title = `${phase === 'setup' ? 'Set up your server' : 'Sign in'} · Media Server`;
     }
   }, [phase, route, loading, item]);
@@ -155,9 +235,7 @@ export default function App() {
   async function logout() {
     try {
       await api('/auth/logout', 'POST');
-      resetCsrf();
-      setPhase('login');
-      setUser(undefined);
+      endSession();
     } catch (e) {
       setError((e as Error).message);
     }
@@ -300,10 +378,6 @@ export default function App() {
         </form>
       </main>
     );
-  const watching = items.filter(
-    (m) =>
-      position(m.id) > 0 && (!m.duration || position(m.id) < m.duration * 0.95),
-  );
   return (
     <div className="app-shell">
       <a
@@ -343,6 +417,13 @@ export default function App() {
           >
             <span aria-hidden="true">⚙</span> <span>Settings</span>
           </a>
+          <a
+            aria-current={route === 'history' ? 'page' : undefined}
+            className={route === 'history' ? 'active' : ''}
+            href="#history"
+          >
+            Watch history
+          </a>
         </nav>
         <div className="sidebar-bottom">
           <span className="status-dot" /> Connected locally
@@ -368,7 +449,9 @@ export default function App() {
           )}
           {loading && <p role="status">Loading your collection…</p>}
           {route === 'settings' ? (
-            <Settings />
+            <Settings admin={user?.role === 'Admin'} />
+          ) : route === 'history' ? (
+            <History />
           ) : route.startsWith('media/') ? (
             item && (
               <>
@@ -382,6 +465,27 @@ export default function App() {
                   {item.audioCodec.toUpperCase() || 'No audio'} ·{' '}
                   {(item.size / 1024 ** 3).toFixed(2)} GB
                 </p>
+                {user?.role === 'Admin' && (
+                  <label>
+                    Content rating
+                    <select
+                      defaultValue={item.contentRating ?? 0}
+                      onChange={(e) => {
+                        void api(`/media/${item.id}/rating`, 'PUT', {
+                          rating: Number(e.target.value),
+                        }).catch((error) => setError(error.message));
+                      }}
+                    >
+                      <option value="0">
+                        Unrated (hidden from restricted accounts)
+                      </option>
+                      <option value="10">General (10)</option>
+                      <option value="13">Teen (13)</option>
+                      <option value="16">Mature (16)</option>
+                      <option value="18">Adult (18)</option>
+                    </select>
+                  </label>
+                )}
                 <Player
                   item={item}
                   resume={position(item.id)}
@@ -407,9 +511,13 @@ export default function App() {
                   </p>
                   <a
                     className="button"
-                    href={items.length ? '#library' : '#settings'}
+                    href={
+                      items.length || user?.role !== 'Admin'
+                        ? '#library'
+                        : '#settings'
+                    }
                   >
-                    {items.length
+                    {items.length || user?.role !== 'Admin'
                       ? 'Explore library'
                       : 'Add your first library'}{' '}
                     <span aria-hidden="true">↗</span>
@@ -444,11 +552,25 @@ export default function App() {
                       <h1>Media library</h1>
                     )}
                   </div>
+                  <label>
+                    Smart collection
+                    <select
+                      value={collection}
+                      onChange={(e) => setCollection(e.target.value)}
+                    >
+                      <option value="">All media</option>
+                      {collections.map((c) => (
+                        <option value={c.id} key={c.id}>
+                          {c.name}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
                   <label className="search-label">
                     <span className="sr-only">Search library</span>
                     <input
                       type="search"
-                      placeholder="Search your collection…"
+                      placeholder="Search title prefix…"
                       value={query}
                       onChange={(e) => setQuery(e.target.value)}
                     />
@@ -456,32 +578,55 @@ export default function App() {
                 </div>
                 {query && (
                   <p role="status">
-                    {
-                      items.filter((m) =>
-                        m.title.toLowerCase().includes(query.toLowerCase()),
-                      ).length
-                    }{' '}
-                    matching videos
+                    {query !== debouncedQuery || loading
+                      ? 'Searching…'
+                      : `${items.length} matching videos${nextCursor ? ' loaded' : ''}`}
                   </p>
                 )}
                 {!items.length && !loading ? (
                   <div className="empty-state">
                     <span aria-hidden="true">▦</span>
-                    <h2>A great collection starts somewhere.</h2>
+                    <h2>
+                      {query || collection
+                        ? 'No matching videos.'
+                        : user?.role === 'Admin'
+                          ? 'A great collection starts somewhere.'
+                          : 'No media available to this account.'}
+                    </h2>
                     <p className="muted">
-                      Add a media directory in Settings, then scan it. Real
-                      files will appear here.
+                      {query || collection
+                        ? 'Try a different title prefix or collection rule.'
+                        : user?.role === 'Admin'
+                          ? 'Add a media directory in Settings, then scan it. Real files will appear here.'
+                          : 'Ask your administrator for library access. Rating-restricted accounts cannot see unclassified media.'}
                     </p>
-                    <a href="#settings" className="button">
-                      Set up a library
-                    </a>
+                    {query || collection ? (
+                      <button
+                        onClick={() => {
+                          setQuery('');
+                          setCollection('');
+                        }}
+                      >
+                        Clear filters
+                      </button>
+                    ) : (
+                      user?.role === 'Admin' && (
+                        <a href="#settings" className="button">
+                          Set up a library
+                        </a>
+                      )
+                    )}
                   </div>
                 ) : (
-                  cards(
-                    items.filter((m) =>
-                      m.title.toLowerCase().includes(query.toLowerCase()),
-                    ),
-                  )
+                  cards(items)
+                )}
+                {nextCursor && (
+                  <button
+                    disabled={moreBusy || loading}
+                    onClick={() => void loadMore()}
+                  >
+                    {moreBusy ? 'Loading more…' : 'Load more videos'}
+                  </button>
                 )}
               </section>
             </>

@@ -51,3 +51,22 @@ browser result above is hosted CI, not a local browser or physical-device claim.
 Manual assistive-technology testing, hostile-writer-safe scan handles and independent security
 review remain outstanding. See [HARDENING.md](../architecture/HARDENING.md) and [ACCESSIBILITY.md](ACCESSIBILITY.md) for the exact limits. New CI runs
 on subsequent commits must still pass before merging; these run IDs identify the evidence checked.
+
+## Five server-operations issues — 2026-10-28
+
+Local validation for the accounts (#13), reconciliation (#11), indexed browsing (#12), monitoring (#21)
+and backup/update (#22) batch: 28 backend tests pass. The 100,000-item HTTP search test measured 57.1 ms
+for its first bounded page in this environment (not a general production latency guarantee). Five frontend
+component tests pass, including an expired-session/delayed-page regression that prevents an old account's
+results from appearing after another account signs in. Fifteen Python script tests pass, including failed
+migration, interrupted pointer replacement, archive traversal and copy-only rollback policies.
+
+An actual self-contained Linux archive passed synthetic video probing, authenticated ranges, progress,
+version/UI/startup, offline checkpoint, clone migration and restore gates. A separate test staged actual
+0.2.0-alpha.1 and 0.2.0-alpha.2 native builds, activated both in sequence and rolled back to the first,
+retaining the original data directory. These are local test builds, not published stable releases.
+
+Restores intentionally revoke sessions; integrity/dry-run/private-mode/tampering/future-schema checks are
+covered by backend tests. The release workflow now runs the real archive's staged-update checks on both
+Windows and Linux. Hosted results for this batch are pending review CI; physical-device testing, GPU
+adapters, codec sandboxing, signed installers and power-loss validation are not claimed.
