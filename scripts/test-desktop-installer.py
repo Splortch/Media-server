@@ -26,10 +26,14 @@ with tempfile.TemporaryDirectory(prefix='media-desktop-installed-') as temp:
     else:
         package_name = subprocess.check_output(['dpkg-deb', '-f', str(package), 'Package'], text=True).strip()
         subprocess.run(['sudo', 'dpkg', '-i', str(package)], check=True)
-        files = subprocess.check_output(['dpkg-deb', '-c', str(package)], text=True)
-        if '/usr/bin/media-server-windows-client' not in files:
-            raise RuntimeError('Installed native executable missing')
-        command = ['xvfb-run', '-a', 'dbus-run-session', '--', '/usr/bin/media-server-windows-client']
+        files = subprocess.check_output(['dpkg-query', '-L', package_name], text=True).splitlines()
+        executables = [Path(p) for p in files if Path(p).parent == Path('/usr/bin') and Path(p).is_file() and os.access(p, os.X_OK)]
+        if len(executables) != 1:
+            raise RuntimeError('Expected one installed native executable')
+        with executables[0].open('rb') as binary:
+            if binary.read(4) != b'\x7fELF':
+                raise RuntimeError('Installed application is not an ELF native executable')
+        command = ['xvfb-run', '-a', 'dbus-run-session', '--', str(executables[0])]
     try:
         with (directory / 'startup.log').open('w') as log:
             process = subprocess.Popen(command, stdout=log, stderr=subprocess.STDOUT, start_new_session=True)

@@ -17,7 +17,7 @@ archives = list((root / 'artifacts/packages').iterdir())
 if len(archives) != 1:
     raise RuntimeError('Expected exactly one packaged server')
 with tempfile.TemporaryDirectory(prefix='media release smoke ') as temporary:
-    folder = Path(temporary)
+    folder = Path(temporary).resolve()
     shutil.unpack_archive(archives[0], folder / 'unpacked')
     package, = (folder / 'unpacked').iterdir()
     executable = package / ('Api.exe' if os.name == 'nt' else 'Api')

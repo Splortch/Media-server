@@ -16,7 +16,7 @@ installer, = (ROOT / 'artifacts/packages').glob('*.pkg' if mac else '*.deb')
 app = Path('/Applications/MediaServer' if mac else '/opt/media-server')
 install = ['sudo', 'installer', '-pkg', str(installer), '-target', '/'] if mac else ['sudo', 'dpkg', '-i', str(installer)]
 with tempfile.TemporaryDirectory(prefix='media installed server ') as temp:
-    folder = Path(temp)
+    folder = Path(temp).resolve()
     media = folder / 'media'
     media.mkdir()
     data = folder / 'data'

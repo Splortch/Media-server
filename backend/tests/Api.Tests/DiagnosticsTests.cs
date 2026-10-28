@@ -141,7 +141,7 @@ public sealed class DiagnosticsTests
     public async Task MissingProbeIsCategorizedWithoutExposingExecutableOrMediaPaths()
     {
         var probe = new Ffprobe(
-            Path.Combine(Path.GetTempPath(), "does-not-exist-" + Guid.NewGuid())
+            Path.Combine(TestPaths.TempRoot, "does-not-exist-" + Guid.NewGuid())
         );
         var error = await Assert.ThrowsAsync<MediaProbeException>(() =>
             probe.ProbeAsync("private-file.mp4", CancellationToken.None)

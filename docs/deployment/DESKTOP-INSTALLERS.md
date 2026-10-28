@@ -102,7 +102,7 @@ credentials, kept in GitHub secrets, not source control. No signing keys are com
 
 If startup fails, run the launcher/executable from Terminal to see the error. Check
 FFprobe availability, media-folder permissions, supported OS/CPU and whether port
-5050 is already occupied. Clients require a running server; installing a client alone
+5050 is already occupied. Media directories containing symlinks/junctions are rejected; on macOS use the canonical directory path, for example `/private/var/...` rather than its `/var/...` alias. Clients require a running server; installing a client alone
 does not create an account/server. Servers listen only on localhost by default;
 see existing HTTPS/reverse-proxy guidance before enabling remote access.
 
