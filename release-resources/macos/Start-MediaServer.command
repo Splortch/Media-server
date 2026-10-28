@@ -18,7 +18,7 @@ if [[ -z "${MediaServer__AllowedRoots__0:-}" ]]; then
 fi
 [[ -d "$MediaServer__AllowedRoots__0" ]] || { echo 'The configured media folder is unavailable.' >&2; exit 1; }
 # Finder/Terminal does not always inherit Homebrew's path.
-export PATH="/opt/homebrew/bin:/usr/local/bin:$PATH"
+export PATH="/opt/homebrew/opt/ffmpeg-full/bin:/usr/local/opt/ffmpeg-full/bin:/opt/homebrew/opt/ffmpeg@7/bin:/usr/local/opt/ffmpeg@7/bin:/opt/homebrew/bin:/usr/local/bin:$PATH"
 export MediaServer__FfprobePath="${MediaServer__FfprobePath:-ffprobe}"
 command -v "$MediaServer__FfprobePath" >/dev/null || { echo 'Install FFmpeg first: brew install ffmpeg' >&2; read -r -p 'Press Return to close.'; exit 1; }
 export ASPNETCORE_URLS='http://127.0.0.1:5050'

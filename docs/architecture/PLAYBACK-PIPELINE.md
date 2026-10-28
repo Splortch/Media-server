@@ -17,7 +17,7 @@ The web player has the new controls. Desktop and Android retain their existing D
 
 ## Try it
 
-1. Install FFmpeg **and** FFprobe on the server and ensure both executables are on its PATH. Docker already includes them. Windows server setup currently bundles FFprobe; install FFmpeg separately for conversion, or set `MediaServer__FfmpegPath` to its absolute executable path. macOS: `brew install ffmpeg`; Ubuntu: `sudo apt install ffmpeg`.
+1. Install FFmpeg **and** FFprobe on the server and ensure both executables are on its PATH. Docker already includes them. Windows server setup currently bundles FFprobe; install FFmpeg separately for conversion, or set `MediaServer__FfmpegPath` to its absolute executable path. macOS: `brew install ffmpeg@7` (the maintained versioned formula includes `zscale` and `libaom`, which the regular lean formula omits); the server launcher also searches its keg-only bin directory. For terminal development, prepend `$(brew --prefix ffmpeg@7)/bin` to PATH or set `MediaServer__FfmpegPath` and `MediaServer__FfprobePath` to those executables. Ubuntu: `sudo apt install ffmpeg`.
 2. Start the server normally. Existing databases migrate automatically; back up the database before updating.
 3. Sign in as an administrator, add a library in Settings and scan it. Rescan existing media to populate color and track metadata. Conversion also reprobes its staged source to prevent stale HDR classification.
 4. Open a video in the web client. Expand **Quality, audio and subtitles**. Direct Play is still the default.
@@ -27,6 +27,8 @@ The web player has the new controls. Desktop and Android retain their existing D
 8. Closing the player requests cache cancellation/removal. If that request cannot reach the server, the private cache expires after 30 minutes without access. Restart also clears stale conversion directories.
 
 Limits: two conversion/cache jobs globally, 8 GiB source per job, six-hour source duration, 4 GiB output per job, two encoder threads and 30-minute conversion deadline. Files are sampled for output quota every 500 ms; reserve extra disk space for that interval. At most 24 GiB plus quota overshoot is required for two full staged+output jobs. Full-file staging costs time and disk but keeps FFmpeg away from attacker-replaceable library paths. There is no source modification, download authorization shortcut or public cache directory.
+
+Run `python scripts/check-media-tools.py` to verify the selected FFmpeg build provides the conversion encoders and HDR filters used by the tests. Missing filters cause an explicit conversion error; they never trigger an un-tone-mapped SDR fallback.
 
 ## Hardware opt-in
 
