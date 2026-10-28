@@ -144,6 +144,14 @@ test('setup, accounts, collections, diagnostics, stream ranges and persist resum
   await page
     .getByRole('button', { name: 'Save smart collection', exact: true })
     .click();
+  // Navigation fetches the library's collection list. Wait for the confirmed
+  // creation UI so that GET cannot overtake the still-pending POST.
+  await expect(
+    page.getByRole('button', {
+      name: 'Delete collection Samples',
+      exact: true,
+    }),
+  ).toBeVisible();
   await page.getByRole('link', { name: 'Library', exact: true }).click();
   await expect(
     page.getByRole('heading', { name: 'Media library', exact: true }),

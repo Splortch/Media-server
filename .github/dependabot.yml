@@ -39,7 +39,26 @@ updates:
     schedule:
       interval: weekly
     open-pull-requests-limit: 5
+    # SDK/compiler migrations must update Gradle, AGP, Kotlin and SDK together.
+    # Review these temporary compatibility ceilings in docs/development/ANDROID-UPDATES.md.
+    ignore:
+      - dependency-name: "com.android.*"
+        versions: ["[9.0,)"]
+      - dependency-name: "org.jetbrains.kotlin.*"
+        versions: ["[2.3,)"]
+      - dependency-name: "org.jetbrains.kotlin:*"
+        versions: ["[2.3,)"]
+      - dependency-name: "org.jetbrains.kotlinx:kotlinx-serialization-json"
+        versions: ["[1.10,)"]
+      - dependency-name: "org.jetbrains.kotlinx:kotlinx-coroutines-android"
+        versions: ["[1.11,)"]
+      - dependency-name: "androidx.compose:compose-bom"
+        versions: ["[2026,)"]
+      - dependency-name: "androidx.core:core-ktx"
+        versions: ["[1.18,)"]
     groups:
+      android-gradle-plugin:
+        patterns: ["com.android.*"]
       androidx:
         patterns: ["androidx.*"]
       kotlin:
