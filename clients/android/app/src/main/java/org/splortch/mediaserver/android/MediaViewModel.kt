@@ -42,6 +42,7 @@ class MediaViewModel(app: Application) : AndroidViewModel(app) {
     private val mutable = MutableStateFlow(Screen(address = prefs.getString("origin", "") ?: ""))
     internal val screen = mutable.asStateFlow()
     internal val player = MutableStateFlow<ExoPlayer?>(null)
+    internal val pendingSaves = MutableStateFlow(0)
     private var session: MediaSession? = null
     private var connection: ServerConnection? = null
     private var operation: Job? = null
@@ -119,7 +120,7 @@ class MediaViewModel(app: Application) : AndroidViewModel(app) {
     private suspend fun refreshNow(conn: ServerConnection, more: Boolean = false) {
         val old = mutable.value
         val page = conn.api.page(old.prefix, if (more) old.cursor else null, old.libraryId)
-        require(page.nextCursor == null || page.nextCursor.length <= 4096) { "Invalid page cursor." }
+        require((page.nextCursor?.length ?: 0) <= 4096) { "Invalid page cursor." }
         val items = validate(page.items)
         val continuing = validate(conn.api.continuing())
         val libraries = conn.api.libraries().also { require(it.size <= 200 && it.all { l -> l.id > 0 && l.name.length <= 128 }) { "Invalid libraries." } }
@@ -179,13 +180,14 @@ class MediaViewModel(app: Application) : AndroidViewModel(app) {
         val id = mutable.value.detail?.id ?: return
         val generation = playbackGeneration
         val seconds = (active.currentPosition.coerceAtLeast(0) / 1000.0).coerceAtMost(mutable.value.detail!!.duration.coerceAtLeast(0.0))
-        viewModelScope.launch { progressMutex.withLock {
+        pendingSaves.value += 1
+        viewModelScope.launch { try { progressMutex.withLock {
             if (generation != playbackGeneration || connection !== conn || mutable.value.syncError != null || progress?.mediaItemId != id) return@withLock
             val previous = progress ?: return@withLock
             try { progress = conn.api.sync(id, conn.token(), ProgressUpdate(seconds, previous.revision, completed)) }
             catch (e: CancellationException) { throw e }
             catch (e: Exception) { if (connection === conn) mutable.update { it.copy(syncError = message(e) + " Progress saving is paused; reopen the video to sync.") } }
-        } }
+        } } finally { pendingSaves.value -= 1 } }
     }
     internal fun background() { player.value?.pause(); save() }
     private fun stopPlayer(persist: Boolean = true) {

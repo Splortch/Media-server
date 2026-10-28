@@ -48,7 +48,7 @@ class RealServerTest {
             control.api.login(control.token(), LoginRequest("android-fixture", "android-fixture-password", "instrumentation-control"))
             compose.runOnUiThread { compose.activity.model.player.value!!.pause() }
             // Let the pause-triggered write settle before a competing device changes the revision.
-            compose.waitUntil(10000) { !compose.activity.model.player.value!!.isPlaying }
+            compose.waitUntil(10000) { compose.activity.model.pendingSaves.value == 0 }
             var updated = false
             repeat(10) {
                 if (!updated) {
