@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { api, type Media } from '../services/api';
 export default function Player({
   item,
@@ -16,6 +16,51 @@ export default function Player({
   onPlaybackError?: () => Promise<void>;
 }) {
   const videoRef = useRef<HTMLVideoElement>(null);
+  const surfaceRef = useRef<HTMLDivElement>(null);
+  const [paused, setPaused] = useState(true);
+  const [position, setPosition] = useState(0);
+  const [duration, setDuration] = useState(0);
+  const [volume, setVolume] = useState(1);
+  const [muted, setMuted] = useState(false);
+  const [fullscreen, setFullscreen] = useState(false);
+  useEffect(() => {
+    const changed = () =>
+      setFullscreen(document.fullscreenElement === surfaceRef.current);
+    document.addEventListener('fullscreenchange', changed);
+    return () => document.removeEventListener('fullscreenchange', changed);
+  }, []);
+  async function togglePlay() {
+    const video = videoRef.current;
+    if (!video) return;
+    if (!video.paused) video.pause();
+    else {
+      try {
+        await video.play();
+        setError('');
+      } catch {
+        setError(
+          'Playback could not start. Try again or check the playback diagnostics.',
+        );
+      }
+    }
+  }
+  function seek(seconds: number) {
+    const video = videoRef.current;
+    if (!video || !Number.isFinite(video.duration) || video.duration <= 0)
+      return;
+    video.currentTime = Math.max(0, Math.min(video.duration, seconds));
+    setPosition(video.currentTime);
+  }
+  async function toggleFullscreen() {
+    try {
+      if (document.fullscreenElement) await document.exitFullscreen();
+      else if (surfaceRef.current?.requestFullscreen)
+        await surfaceRef.current.requestFullscreen();
+      else setError('Fullscreen is unavailable in this browser.');
+    } catch {
+      setError('Fullscreen could not be opened.');
+    }
+  }
   const sample = useRef<{ time: number; end: number } | undefined>(undefined);
   const [buffering, setBuffering] = useState(false);
   const [metrics, setMetrics] = useState<{
@@ -140,44 +185,164 @@ export default function Player({
 
   return (
     <section aria-label="Video player" className="player-wrap">
-      <video
-        ref={videoRef}
-        controls
-        playsInline
-        preload="metadata"
-        aria-label={item.title}
-        src={streamUrl ?? `/api/media/${item.id}/stream`}
-        onLoadedMetadata={(e) => {
-          const v = e.currentTarget;
-          measure(v);
-          if (Number.isFinite(v.duration) && resume < v.duration - 2)
-            v.currentTime = resume;
+      <div
+        className="player-surface"
+        ref={surfaceRef}
+        tabIndex={0}
+        aria-label="Playback controls"
+        onKeyDown={(event) => {
+          if (
+            event.ctrlKey ||
+            event.altKey ||
+            event.metaKey ||
+            (event.target instanceof HTMLElement &&
+              event.target.closest('button,input,select,textarea'))
+          )
+            return;
+          const key = event.key.toLowerCase();
+          if (![' ', 'k', 'f', 'm', 'arrowleft', 'arrowright'].includes(key))
+            return;
+          event.preventDefault();
+          event.stopPropagation();
+          if (key === ' ' || key === 'k') void togglePlay();
+          if (key === 'f') void toggleFullscreen();
+          if (key === 'm' && videoRef.current)
+            videoRef.current.muted = !videoRef.current.muted;
+          if (key === 'arrowleft' || key === 'arrowright')
+            seek(
+              (videoRef.current?.currentTime ?? 0) +
+                (key === 'arrowright' ? 10 : -10),
+            );
         }}
-        onTimeUpdate={(e) => {
-          void save(e.currentTarget);
-          measure(e.currentTarget);
-        }}
-        onPause={(e) => {
-          void save(e.currentTarget, true);
-        }}
-        onEnded={(e) => {
-          void save(e.currentTarget, true, true);
-        }}
-        onProgress={(e) => measure(e.currentTarget)}
-        onWaiting={() => setBuffering(true)}
-        onPlaying={() => setBuffering(false)}
-        onCanPlay={() => setBuffering(false)}
-        onSeeking={() => {
-          sample.current = undefined;
-        }}
-        onSeeked={(e) => {
-          sample.current = undefined;
-          measure(e.currentTarget);
-        }}
-        onError={(e) => {
-          void playbackFailed(e.currentTarget);
-        }}
-      />
+      >
+        <video
+          ref={videoRef}
+          playsInline
+          preload="metadata"
+          aria-label={item.title}
+          src={streamUrl ?? `/api/media/${item.id}/stream`}
+          onLoadedMetadata={(e) => {
+            const v = e.currentTarget;
+            setDuration(Number.isFinite(v.duration) ? v.duration : 0);
+            measure(v);
+            if (Number.isFinite(v.duration) && resume < v.duration - 2)
+              v.currentTime = resume;
+          }}
+          onTimeUpdate={(e) => {
+            setPosition(e.currentTarget.currentTime);
+            void save(e.currentTarget);
+            measure(e.currentTarget);
+          }}
+          onPlay={() => setPaused(false)}
+          onVolumeChange={(e) => {
+            setVolume(e.currentTarget.volume);
+            setMuted(e.currentTarget.muted);
+          }}
+          onDurationChange={(e) =>
+            setDuration(
+              Number.isFinite(e.currentTarget.duration)
+                ? e.currentTarget.duration
+                : 0,
+            )
+          }
+          onPause={(e) => {
+            setPaused(true);
+            void save(e.currentTarget, true);
+          }}
+          onEnded={(e) => {
+            setPaused(true);
+            void save(e.currentTarget, true, true);
+          }}
+          onProgress={(e) => measure(e.currentTarget)}
+          onWaiting={() => setBuffering(true)}
+          onPlaying={() => setBuffering(false)}
+          onCanPlay={() => setBuffering(false)}
+          onSeeking={() => {
+            sample.current = undefined;
+          }}
+          onSeeked={(e) => {
+            sample.current = undefined;
+            measure(e.currentTarget);
+          }}
+          onError={(e) => {
+            void playbackFailed(e.currentTarget);
+          }}
+        />
+        <div className="player-controls">
+          <div className="player-timeline">
+            <span>{formatPlaybackTime(position)}</span>
+            <input
+              aria-label="Seek"
+              type="range"
+              min="0"
+              max={duration || 1}
+              step="0.1"
+              value={Math.min(position, duration || 0)}
+              disabled={!duration}
+              aria-valuetext={`${formatPlaybackTime(position)} of ${formatPlaybackTime(duration)}`}
+              onChange={(e) => seek(Number(e.target.value))}
+            />
+            <span>{formatPlaybackTime(duration)}</span>
+          </div>
+          <div className="player-buttons">
+            <button
+              type="button"
+              className="player-play"
+              onClick={() => void togglePlay()}
+              aria-label={paused ? 'Play' : 'Pause'}
+            >
+              {paused ? '▶ Play' : 'Ⅱ Pause'}
+            </button>
+            <button
+              type="button"
+              disabled={!duration}
+              onClick={() => seek((videoRef.current?.currentTime ?? 0) - 10)}
+              aria-label="Rewind 10 seconds"
+            >
+              −10s
+            </button>
+            <button
+              type="button"
+              disabled={!duration}
+              onClick={() => seek((videoRef.current?.currentTime ?? 0) + 10)}
+              aria-label="Forward 10 seconds"
+            >
+              +10s
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                if (videoRef.current)
+                  videoRef.current.muted = !videoRef.current.muted;
+              }}
+              aria-label={muted ? 'Unmute' : 'Mute'}
+            >
+              {muted ? 'Unmute' : 'Mute'}
+            </button>
+            <input
+              aria-label="Volume"
+              type="range"
+              min="0"
+              max="1"
+              step="0.05"
+              value={muted ? 0 : volume}
+              onChange={(e) => {
+                if (videoRef.current) {
+                  videoRef.current.volume = Number(e.target.value);
+                  videoRef.current.muted = false;
+                }
+              }}
+            />
+            <button
+              type="button"
+              className="player-fullscreen"
+              onClick={() => void toggleFullscreen()}
+            >
+              {fullscreen ? 'Exit fullscreen' : 'Fullscreen'}
+            </button>
+          </div>
+        </div>
+      </div>
       {error && (
         <p role="alert" className="error">
           {error}
@@ -241,4 +406,11 @@ export function playbackErrorMessage(code?: number) {
   if (code === 4)
     return 'This container or codec is not supported by this browser, or the media is unavailable. Try a browser-compatible MP4 or WebM file. Transcoding is not available in this alpha.';
   return 'This video could not be played. Check that the file is available and its container and codecs are supported by your browser. Transcoding is not available in this alpha.';
+}
+
+export function formatPlaybackTime(seconds: number) {
+  const total = Number.isFinite(seconds) ? Math.max(0, Math.floor(seconds)) : 0;
+  const hours = Math.floor(total / 3600);
+  const minutes = Math.floor((total % 3600) / 60);
+  return `${hours ? `${hours}:${String(minutes).padStart(2, '0')}` : minutes}:${String(total % 60).padStart(2, '0')}`;
 }
