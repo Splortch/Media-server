@@ -1,1 +1,0 @@
-{"name":"@media-server/api-contract","private":true,"version":"1.0.0","type":"module","scripts":{"generate":"openapi-typescript openapi-v1.json --properties-required -o src/generated.ts"},"devDependencies":{"openapi-typescript":"7.13.0"}}
