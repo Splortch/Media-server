@@ -9,11 +9,12 @@ The original walkthrough was checked against source `32645e5` and the `alpha.49`
 | Your goal | Choose | What it does |
 | --- | --- | --- |
 | Try it on a Windows x64 PC | **Windows server setup.exe (when available), or ZIP** | Runs the server and includes the browser interface. Recommended first test. |
-| Run on a Linux x64 computer | **Linux server tar.gz** | Same server and browser interface; requires FFprobe and a compatible glibc-based Linux installation. |
+| Run on Ubuntu 24.04 x64 | **Linux server DEB**, or portable tar.gz | DEB installs prerequisites; both include the web interface. See the [installer guide](deployment/DESKTOP-INSTALLERS.md#linux-server). |
+| Run on a Mac | **macOS server PKG** for Apple Silicon or Intel | Self-contained server and browser interface; install FFprobe separately. See the [Mac guide](deployment/DESKTOP-INSTALLERS.md#macos-server). |
 | You already use Docker | **Docker setup ZIP** | Runs a prebuilt Linux amd64 image through Docker Compose. |
 | Watch through a dedicated Windows window | **Windows client EXE or MSI** | Connects to an already running server. Install later, after browser playback works. |
 
-There are no Android, Android TV, iOS, macOS desktop or ARM64 downloads yet. The web interface is bundled; there is no separate web installer. GitHub's **Source code (zip/tar.gz)** assets are for developers, not runnable applications.
+Linux DEB and macOS DMG desktop clients connect to an existing server; see [desktop setup](deployment/DESKTOP-INSTALLERS.md). The [Android phone alpha](clients/ANDROID.md) has an installable testing APK. Android TV, iOS, Windows ARM and Linux ARM packages are not built. New installers appear only when their CI validation and release publication succeed; the [categorized Downloads page](https://github.com/Splortch/Media-server/blob/downloads/README.md) shows actual availability. The web interface is bundled; there is no separate web installer. GitHub's **Source code (zip/tar.gz)** assets are for developers, not runnable applications.
 
 Open [Releases](https://github.com/Splortch/Media-server/releases). Releases are separate by platform, so the first release on the page may not be yours. Choose the matching title and read its notes. Download its application asset and `SHA256SUMS` if you want to verify integrity. These alpha builds are unsigned: a checksum is not a publisher signature. Do not disable Windows protection or antivirus to install them; stop and investigate unexpected warnings.
 
@@ -44,6 +45,8 @@ If your Windows **server** release includes `MediaServer-vVERSION-win-x64-setup.
 Windows data is stored in `%LOCALAPPDATA%\Splortch\MediaServer`, outside the extracted application. You can paste that path into File Explorer. It contains the database, protection keys, `launcher.json` and the setup token until setup succeeds. Keep it private. The launcher currently uses this fixed location even if you previously set a different `MediaServer__DataDirectory` environment variable; custom native configuration requires direct launch as described in [development setup](development/SETUP.md).
 
 ## 2B. Linux server
+
+For an installer on Ubuntu 24.04 x64, follow the [server DEB steps](deployment/DESKTOP-INSTALLERS.md#linux-server), then continue at step 3. The following steps are the portable archive alternative.
 
 These commands target an Ubuntu-style x64/glibc system. Other distributions need their equivalent package manager and .NET native dependencies; Alpine/musl and ARM64 are not supported by this archive.
 
@@ -127,6 +130,10 @@ Use Docker Engine with Compose on Linux, or Docker Desktop in **Linux containers
 If image pulling says unauthorized, the GHCR package may still be private even after the repository becomes public. A maintainer must make that package public for anonymous pulls, or you must authenticate using GitHub's supported registry login. Do not paste tokens into a Compose file or issue. As a source-build alternative, clone the repository and follow the README's `docker compose up --build -d` route; it is a different Compose file from the release ZIP.
 
 The `server-data` named volume stores accounts, database and keys. Keep the Compose directory/project name stable across restarts and updates. **Never use `docker compose down -v` as a troubleshooting step**: it deletes the data volume. Media is mounted separately and read-only.
+
+## 2D. macOS server
+
+Follow the [macOS server PKG steps](deployment/DESKTOP-INSTALLERS.md#macos-server), choosing Apple Silicon or Intel as appropriate. The guide covers FFprobe, the Terminal launcher, the setup token, updates and signing limitations. Then continue below.
 
 ## 3. Create your administrator and sign in
 
@@ -241,3 +248,6 @@ Record pass/fail and versions when you try it. These boxes are intentionally unc
 - [ ] Stopped/restarted without losing the library or accidentally reopening setup.
 
 Known review findings and the limits of automated validation are in [PROJECT-REVIEW.md](development/PROJECT-REVIEW.md). Developer/source setup is in [SETUP.md](development/SETUP.md); it requires .NET/Node tooling and is not needed for downloaded builds.
+
+
+See [desktop installers for Windows, Linux and macOS](deployment/DESKTOP-INSTALLERS.md) for server/client package selection and step-by-step setup.

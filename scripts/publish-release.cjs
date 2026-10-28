@@ -36,7 +36,7 @@ module.exports = async function publish({github, context}) {
     catch(error) { if(error.status !== 404) throw error; }
     if (release && release.target_commitish !== sha) throw new Error('Release tag source mismatch.');
     if (release && !release.draft) continue; // Already published platforms remain immutable on retries.
-    const body = platformNotes(target, sha, `${context.repo.owner}/${context.repo.repo}`, manifest.image, {serverInstaller:true});
+    const body = platformNotes(target, sha, `${context.repo.owner}/${context.repo.repo}`, manifest.image, {serverInstaller:true,unixInstallers:true});
     if (!release) release = (await github.rest.repos.createRelease({...context.repo,tag_name:target.tag,target_commitish:sha,name:`${target.name} ${target.version}`,body,draft:true,prerelease:true,make_latest:'false'})).data;
     const platformManifest = {commit:sha,platform:target.id,version:target.version,channel:'alpha',signed:false,...(target.id === 'docker' ? {image:manifest.image} : {})};
     const manifestData = Buffer.from(JSON.stringify(platformManifest,null,2)+'\n');

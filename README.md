@@ -4,9 +4,9 @@ A modern, open-source, self-hosted media server focused on performance, simplici
 
 **Early alpha foundation.** Independent of Jellyfin, Plex and Emby. No cloud account, subscription, advertising or telemetry. Host only media you are entitled to use. Apache-2.0; see [LICENSE](LICENSE) and [NOTICE](NOTICE).
 
-## Cross-platform clients (proposed alpha)
+## Cross-platform clients (alpha)
 
-The [client ecosystem](docs/clients/README.md) adds a dedicated Windows Tauri client and versioned API without requiring any client on the server. [Windows development](docs/clients/WINDOWS.md) covers actual installer builds and limitations. The [Android phone alpha](docs/clients/ANDROID.md) adds a native Compose/Media3 client, with APK builds and real-backend emulator validation. Android TV and iOS remain separately scoped follow-ups in this monorepo. Existing web installation below remains valid.
+The [client ecosystem](docs/clients/README.md) adds a shared Tauri desktop client for Windows, Linux and macOS and a versioned API without requiring any client on the server. [Windows development](docs/clients/WINDOWS.md) covers actual installer builds and limitations. The [Android phone alpha](docs/clients/ANDROID.md) adds a native Compose/Media3 client, with APK builds and real-backend emulator validation. Android TV and iOS remain separately scoped follow-ups in this monorepo. Existing web installation below remains valid.
 
 ## What works
 
@@ -15,20 +15,20 @@ The [client ecosystem](docs/clients/README.md) adds a dedicated Windows Tauri cl
 | First-run setup and login | Implemented | One local administrator; Argon2id, password change/local recovery, session revocation, consumed setup token, CSRF |
 | Libraries and scanning | Implemented | Explicit allowed roots, background jobs, FFprobe metadata, idempotent updates, admin-only scan failure references |
 | Media browsing | Implemented | Responsive React UI, search, technical details, honest empty states |
-| Direct Play | Implemented | Authenticated byte ranges through validated handles on Windows/Linux; controls, resume and playback diagnostics |
+| Direct Play | Implemented | Authenticated byte ranges through validated handles on Windows/Linux/macOS; controls, resume and playback diagnostics |
 | Continue Watching | Implemented | Per-user persisted position; completed titles excluded |
 | SQLite schema migrations | Implemented | Versioned EF Core migration, applied at startup |
 | REST/OpenAPI and scan status | Implemented | Protected OpenAPI; scan polling and SignalR event transport |
 | Automated quality checks | Implemented configuration | Backend, frontend, browser integration, audits and Docker build |
-| Native alpha releases | Implemented workflow | Self-contained Windows/Linux builds, bundled web UI, separate automatic alpha releases |
+| Native alpha releases | Implemented workflow | Self-contained Windows/Linux/macOS servers, native desktop packages, bundled web UI, separate automatic alpha releases |
 | Hardware acceleration / HLS / transcoding | Planned | Direct Play only in this alpha |
 | Artwork / online metadata / TV matching | Planned | Current titles derive from filenames; no fabricated posters |
 | Accounts / permissions / ratings | Implemented alpha | Admin-managed accounts, library grants, explicit content ratings; unknown ratings denied to restricted viewers |
 | Library watching / reconciliation | Implemented alpha | Opt-in watching, missing-entry tombstones and optional hash-based move/duplicate detection |
 | Indexed browsing / smart collections | Implemented alpha | Prefix search, bounded keyset pages, per-user typed rules |
-| Backups / native updates | Implemented alpha | Offline verified snapshots, empty-directory restore and optional staged update manager |
+| Backups / native updates | Implemented alpha | Offline verified snapshots, empty-directory restore and optional staged update manager on Windows/Linux; manual application replacement on macOS |
 | Server monitoring | Implemented alpha | Admin-only process, storage, scan and HTTP stream metrics; GPU/transcoding unavailable |
-| Windows desktop client | Alpha | Separate Tauri client; Windows build and actual-backend tests in CI |
+| Desktop clients | Alpha implementation | Shared Tauri client; Windows EXE/MSI, Ubuntu 24.04 x64 DEB, Intel/Apple Silicon macOS DMGs; see native CI for build/install evidence |
 | Android phone client | Alpha implementation | Native Compose/Media3, authenticated playback, encrypted sessions and revision-checked progress; see Android CI for build/device evidence |
 | TV / iOS / plugins / secure remote streaming | Planned | Localhost deployment by default; remote clients require trusted HTTPS |
 | Accessibility | In progress | Automated axe and keyboard regressions; manual assistive-technology review still required |
@@ -39,10 +39,12 @@ Verification results and environment limits are recorded in [VALIDATION.md](docs
 
 **[Browse downloads by platform](https://github.com/Splortch/Media-server/blob/downloads/README.md)** — Servers and Clients are grouped separately, with one latest build per platform and older versions collapsed.
 
-**First time? Start with the [step-by-step setup guide](docs/GETTING-STARTED.md).** It covers Windows, Linux, Docker, first login, adding media, playback/resume checks and troubleshooting. For review findings and validation limits, see [the alpha project review](docs/development/PROJECT-REVIEW.md).
+**First time? Start with the [step-by-step setup guide](docs/GETTING-STARTED.md).** It covers Windows, Linux, macOS, Docker, first login, adding media, playback/resume checks and troubleshooting. For review findings and validation limits, see [the alpha project review](docs/development/PROJECT-REVIEW.md).
 
-Automatic alpha release packaging is configured for Windows/Linux x64 servers, Windows EXE/MSI
-clients and a prebuilt Docker image. The web UI is bundled. Download from [Releases](https://github.com/Splortch/Media-server/releases),
+Automatic alpha packaging covers Windows x64 server setup.exe/ZIP, Linux x64 server DEB/archive,
+Intel/Apple Silicon macOS server PKG/archive, Windows EXE/MSI clients, Ubuntu 24.04 x64 client DEB,
+macOS client DMGs and a prebuilt Docker image. New packages appear only after successful validation
+and publication; use the download catalog for actual availability. The web UI is bundled. Download from [Releases](https://github.com/Splortch/Media-server/releases),
 choose the Windows server setup.exe when available, or extract the portable server and use its Start launcher. The [server installer guide](docs/deployment/WINDOWS-SERVER-INSTALLER.md) explains tray control and data preservation. See [installation, updates and release automation](docs/deployment/RELEASES.md).
 No SDK is needed for downloaded server builds. Publication requires all main checks to pass on the same source commit.
 
@@ -119,3 +121,6 @@ Security and troubleshooting updates: [operator recovery and trust boundaries](d
 [playback diagnostics](docs/development/PLAYBACK-DIAGNOSTICS.md), and
 [accessibility validation and remaining manual checks](docs/development/ACCESSIBILITY.md).
 
+
+
+See [desktop installers for Windows, Linux and macOS](docs/deployment/DESKTOP-INSTALLERS.md) for server/client package selection and step-by-step setup.

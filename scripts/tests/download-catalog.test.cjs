@@ -28,15 +28,15 @@ function mock(previous = false) {
     },
   }}};
 }
-test('keeps five fixed categories and independently sorts history without duplicate cards', () => {
+test('keeps eight fixed categories and independently sorts history without duplicate cards', () => {
   const releases = fixtures();
   releases.push({...release('server-windows', 100, ['MediaServer-v0.2.0-alpha.100-win-x64.zip']), draft:true});
   const platforms = catalog(repo, releases);
-  assert.equal(platforms.length, 5);
+  assert.equal(platforms.length, 8);
   assert.equal(platforms[0].latest.version, '0.2.0-alpha.10');
   assert.equal(platforms[0].older[0].version, '0.2.0-alpha.9');
   assert.equal(platforms[4].latest.version, '0.1.0-alpha.17');
-  assert.equal(platforms.filter(p => p.group === 'servers').length, 3);
+  assert.equal(platforms.filter(p => p.group === 'servers').length, 4);
   assert.match(platforms[0].latest.download, /setup\.exe$/);
 });
 test('rejects external, credentialed, mismatched, source-only and unsigned-only primary downloads', () => {
@@ -52,7 +52,7 @@ test('builds real links, collapsed history and an always-usable GitHub Markdown 
     build({repository:repo, releases:input, output:dir, generatedAt:'2026-10-28T12:00:00Z'});
     const html = fs.readFileSync(path.join(dir, 'index.html'),'utf8');
     const md = fs.readFileSync(path.join(dir, 'README.md'),'utf8');
-    assert.equal((html.match(/class="platform-card"/g)||[]).length, 5);
+    assert.equal((html.match(/class="platform-card"/g)||[]).length, 8);
     assert.equal((html.match(/<details class="history">/g)||[]).length, 2);
     assert.doesNotMatch(html, /<details[^>]*\bopen\b/);
     assert.doesNotMatch(html, /alert\(1\)/);

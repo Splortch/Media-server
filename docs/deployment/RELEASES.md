@@ -9,7 +9,7 @@ Organization policy must permit repository Actions to write Releases and Package
 New users: follow [Your first Media Server setup](../GETTING-STARTED.md) for numbered instructions, expected results and troubleshooting. The [project review](../development/PROJECT-REVIEW.md) distinguishes automated evidence from hands-on testing still required.
 
 Open the repository's **Releases** page and choose the newest alpha for your platform. These are runnable builds,
-not source zips. No .NET SDK is needed by end users. The web UI is included in both server builds
+not source zips. No .NET SDK is needed by end users. The web UI is included in all server builds
 and the Docker image; there is no browser-only file:// application to install.
 
 | Download | What to do |
@@ -44,30 +44,35 @@ with a separately installed FFprobe. The server does not require a cloud account
 
 ## Platforms included today
 
-Server: Windows x64 and Linux x64. Desktop client: Windows x64 (EXE/MSI). Container: Linux amd64.
-Web: bundled into the server/container. ARM64, macOS desktop, Android phone/TV and iOS artifacts
-are not generated because this repository has no validated distribution for them yet.
+Server packages: Windows x64, Linux x64 DEB/archive, and macOS Intel/Apple Silicon
+PKG/archive. Desktop clients: Windows EXE/MSI, Ubuntu 24.04 x64 DEB, and macOS
+Intel/Apple Silicon DMG. Android phone APK/AAB has its own workflow/release counter.
+Web is bundled with each server; Docker remains Linux amd64. Availability depends on
+successful CI and a published release containing the actual package. Android TV/iOS,
+Linux ARM and Windows ARM installers are not generated.
 
 ## Separate platform releases
 
-Each validated commit creates four separate GitHub Releases, with independent tags, notes,
+Each validated commit creates seven separate GitHub Releases, with independent tags, notes,
 checksums and provenance manifests:
 
 | Release | Tag | Downloads |
 | --- | --- | --- |
 | Media Server for Windows | `server-windows/v0.2.0-alpha.N` | Windows x64 server setup.exe and portable ZIP |
-| Media Server for Linux | `server-linux/v0.2.0-alpha.N` | Linux x64 server tar.gz |
+| Media Server for Linux | `server-linux/v0.2.0-alpha.N` | Linux x64 server DEB and tar.gz |
 | Media Server Windows Client | `client-windows/v0.1.0-alpha.N` | EXE and MSI installers |
+| Media Server for macOS | `server-macos/v0.2.0-alpha.N` | Intel and Apple Silicon server PKGs and portable archives |
+| Media Server Linux Desktop Client | `client-linux/v0.1.0-alpha.N` | Ubuntu 24.04 x64 client DEB |
+| Media Server macOS Desktop Client | `client-macos/v0.1.0-alpha.N` | Intel and Apple Silicon DMGs |
 | Media Server Docker | `docker/v0.2.0-alpha.N` | Compose setup ZIP, package/license inventory and corresponding source |
 
 EXE and MSI are alternative installers in the same Windows client release. Web remains bundled
-with the server. Future Android/TV/iOS distributions will receive their own release identities
-when functional builds exist. The earlier combined `v0.2.0-alpha.40` release remains unchanged.
+with the server. Android uses its own `client-android` release identity; TV/iOS remain planned. The earlier combined `v0.2.0-alpha.40` release remains unchanged.
 GitHub adds source archive links to each release automatically; those are not application builds.
 
 ## Publication rules
 
-`Automatic prereleases` listens for completion of the five existing main workflows. It requires
+`Automatic prereleases` listens for completion of the six required main workflows (including Desktop clients). It requires
 the latest run of **every** required workflow to pass on the exact same main commit and current
 repository. PR/fork upstream runs, failed/pending checks, stale commits and lookalike workflow
 paths cannot authorize publication. The final publisher checks main again before publication.
@@ -87,10 +92,10 @@ SHA256SUMS. Container images are smoke-tested, saved, then the identical image i
 
 Each platform's assets are uploaded to its own draft first, then that complete platform release
 is made visible. Published releases are not overwritten. A retry skips completed platforms and
-repairs missing platforms or same-source drafts; another-source tag is an error. All four must
+repairs missing platforms or same-source drafts; another-source tag is an error. All seven must
 exist before the coordinator considers the source commit complete. A network interruption can
 leave some complete platform releases visible while the remainder await retry; it cannot expose
-a half-uploaded platform release. The container alpha channel advances only after all four finish.
+a half-uploaded platform release. The container alpha channel advances only after all seven finish.
 The Docker image keeps its version tag `v0.2.0-alpha.N` (Git tag prefixes are not Docker tags).
 Source-commit provenance and the platform version are recorded in each release's `release.json`;
 each SHA256SUMS covers only that release's downloads and manifest, and verifies integrity,
@@ -139,7 +144,7 @@ Install the `-debug.apk` for testing. `-release-unsigned.apk` needs a production
 
 ## Find every supported platform
 
-Each platform has its own published release/tag: `server-windows`, `server-linux`, `docker`, `client-windows` and `client-android`. The release descriptions begin with **All platform downloads**, linking to the latest published alpha for each platform. Version ordering is numeric and independent per platform; a newer Android number is not required to match the server's number. Only releases with actual platform build assets appear as downloadable.
+Each platform has its own published release/tag: `server-windows`, `server-linux`, `server-macos`, `docker`, `client-windows`, `client-linux`, `client-macos` and `client-android`. The release descriptions begin with **All platform downloads**, linking to the latest published alpha for each platform. Version ordering is numeric and independent per platform; a newer Android number is not required to match the server's number. Only releases with actual platform build assets appear as downloadable.
 
 The web interface is included with the server packages. Android TV and iOS do not yet have installable builds or releases. Android's debug APK is the testing installer; its unsigned release APK/AAB need signing.
 
@@ -150,3 +155,6 @@ The Release descriptions workflow refreshes existing descriptions when this chan
 Use **[Browse by platform](https://github.com/Splortch/Media-server/blob/downloads/README.md)** to see Servers and Clients separately. Each platform has one latest-build entry and its own collapsed older-version history, so accumulated Windows or Android releases cannot hide another platform. GitHub's native Releases feed remains the complete archive.
 
 The `Download catalog` workflow refreshes the generated `downloads` branch from actual published releases after validation. This works as a GitHub Markdown page without Pages configuration. The workflow also produces a responsive HTML preview; hosting that preview is separate from the always-available GitHub category index. See [catalog development and publication](../../downloads/README.md).
+
+
+See [desktop installers for Windows, Linux and macOS](DESKTOP-INSTALLERS.md) for server/client package selection and step-by-step setup.

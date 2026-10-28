@@ -12,6 +12,9 @@ const fixtures = () => [
   release('server-linux', 10, 'MediaServer-v0.2.0-alpha.10-linux-x64.tar.gz'),
   release('docker', 10, 'MediaServer-Docker-v0.2.0-alpha.10.zip'),
   release('client-windows', 10, 'MediaServer-Windows-Client-v0.1.0-alpha.10-win-x64.msi'),
+  release('server-macos', 10, 'MediaServer-v0.2.0-alpha.10-osx-arm64.pkg'),
+  release('client-linux', 10, 'MediaServer-Desktop-Client-v0.1.0-alpha.10-linux-x64.deb'),
+  release('client-macos', 10, 'MediaServer-Desktop-Client-v0.1.0-alpha.10-osx-arm64.dmg'),
   release('client-android', 17, 'MediaServer-Android-v0.1.0-alpha.17-debug.apk'),
 ].map((r, i) => ({...r, id: i + 1}));
 test('selects numeric latest versions independently; ignores drafts and empty releases', () => {
@@ -49,7 +52,7 @@ test('sync includes Android and preserves assets and release flags; repeats caus
   const context = {repo: {owner: 'owner', repo: 'repo'}};
   await syncReleaseNotes({github, context});
   assert.equal(writes.length, releases.length);
-  assert.ok(writes.find(w => w.release_id === 6).body.endsWith('Existing Android instructions'));
+  assert.ok(writes.find(w => w.release_id === releases.find(r => r.tag_name.startsWith('client-android/')).id).body.endsWith('Existing Android instructions'));
   for (const w of writes) assert.deepEqual(Object.keys(w).sort(), ['body', 'owner', 'release_id', 'repo']);
   const count = writes.length;
   await syncReleaseNotes({github, context});

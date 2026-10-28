@@ -168,7 +168,10 @@ async fn real_server_cookie_login_ranges_resume_conflicts_revocation_and_disconn
         .as_array()
         .unwrap()
         .iter()
-        .find(|s| s["deviceName"] == "Windows client" && s["current"] == false)
+        .find(|s| {
+            s["deviceName"] == format!("{} desktop client", std::env::consts::OS)
+                && s["current"] == false
+        })
         .unwrap();
     first
         .request(

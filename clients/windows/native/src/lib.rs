@@ -365,7 +365,7 @@ impl DesktopClient {
             .json(
                 Method::POST,
                 "/api/v1/auth/login",
-                Some(json!({"name":name,"password":password,"deviceName":"Windows client"})),
+                Some(json!({"name":name,"password":password,"deviceName":format!("{} desktop client", std::env::consts::OS)})),
             )
             .await;
         password.zeroize();

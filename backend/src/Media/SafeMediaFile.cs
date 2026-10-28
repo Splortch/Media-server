@@ -11,20 +11,30 @@ internal static class SafeMediaFile
     public static FileStream Open(string path)
     {
         if (OperatingSystem.IsLinux())
-            return OpenLinux(path);
+            return OpenUnix(path, false);
         if (OperatingSystem.IsWindows())
             return OpenWindows(path);
+        if (
+            OperatingSystem.IsMacOS()
+            && RuntimeInformation.ProcessArchitecture is Architecture.X64 or Architecture.Arm64
+        )
+            return OpenUnix(path, true);
         // Fail closed until the platform has an audited handle-based implementation.
         throw new IOException("Secure media handles are unsupported on this platform.");
     }
 
-    private static FileStream OpenLinux(string path)
+    private static FileStream OpenUnix(string path, bool mac)
     {
-        const int directory = 0x10000,
-            noFollow = 0x20000,
-            closeOnExec = 0x80000,
-            nonBlock = 0x800;
-        using var root = Handle(OpenAt(-100, "/", directory | noFollow | closeOnExec, 0));
+        // Darwin constants differ from Linux. Both walk from an opened root and
+        // forbid following links at every component; never reopen the pathname.
+        // Apple ABI: xnu/bsd/sys/fcntl.h and stat.h (64-bit inode layout).
+        var directory = mac ? 0x100000 : 0x10000;
+        var noFollow = mac ? 0x100 : 0x20000;
+        var closeOnExec = mac ? 0x1000000 : 0x80000;
+        var nonBlock = mac ? 0x4 : 0x800;
+        using var root = Handle(
+            OpenAt(mac ? -2 : -100, "/", directory | noFollow | closeOnExec, 0)
+        );
         SafeFileHandle parent = root;
         try
         {
@@ -53,11 +63,9 @@ internal static class SafeMediaFile
             );
             try
             {
-                // AT_EMPTY_PATH queries the opened inode; FIFOs/devices/directories are not media.
-                if (
-                    Statx(file.DangerousGetHandle().ToInt32(), "", 0x1000, 1, out var stat) != 0
-                    || (stat.Mode & 0xf000) != 0x8000
-                )
+                // Query the opened inode, not the path. Nonblocking open prevents
+                // a FIFO from hanging validation; devices/directories are rejected.
+                if (!IsRegularFile(file, mac))
                     throw new IOException("Media must be a regular file.");
                 return new FileStream(file, FileAccess.Read, 65536, false);
             }
@@ -72,6 +80,20 @@ internal static class SafeMediaFile
             if (parent != root)
                 parent.Dispose();
         }
+    }
+
+    private static bool IsRegularFile(SafeFileHandle file, bool mac)
+    {
+        var fd = file.DangerousGetHandle().ToInt32();
+        if (!mac)
+            return Statx(fd, "", 0x1000, 1, out var linux) == 0 && (linux.Mode & 0xf000) == 0x8000;
+        // x86_64 exports the inode64 spelling; arm64 only has the modern ABI.
+        DarwinStat stat;
+        var result =
+            RuntimeInformation.ProcessArchitecture == Architecture.X64
+                ? FStatDarwinInode64(fd, out stat)
+                : FStatDarwin(fd, out stat);
+        return result == 0 && (stat.Mode & 0xf000) == 0x8000;
     }
 
     private static FileStream OpenWindows(string path)
@@ -122,6 +144,21 @@ internal static class SafeMediaFile
         [FieldOffset(28)]
         public ushort Mode;
     }
+
+    // struct stat with 64-bit inodes: dev_t is 32-bit and mode_t is 16-bit.
+    // Both supported Darwin architectures use this 144-byte layout.
+    [StructLayout(LayoutKind.Explicit, Size = 144)]
+    private struct DarwinStat
+    {
+        [FieldOffset(4)]
+        public ushort Mode;
+    }
+
+    [DllImport("libSystem.B.dylib", EntryPoint = "fstat$INODE64", SetLastError = true)]
+    private static extern int FStatDarwinInode64(int fd, out DarwinStat stat);
+
+    [DllImport("libSystem.B.dylib", EntryPoint = "fstat", SetLastError = true)]
+    private static extern int FStatDarwin(int fd, out DarwinStat stat);
 
     [StructLayout(LayoutKind.Sequential)]
     private struct Attributes

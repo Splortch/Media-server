@@ -6,6 +6,7 @@ from pathlib import Path
 import shutil
 import socket
 import subprocess
+import sys
 import tempfile
 import time
 import urllib.error
@@ -16,13 +17,13 @@ archives = list((root / 'artifacts/packages').iterdir())
 if len(archives) != 1:
     raise RuntimeError('Expected exactly one packaged server')
 with tempfile.TemporaryDirectory(prefix='media release smoke ') as temporary:
-    folder = Path(temporary)
+    folder = Path(temporary).resolve()
     shutil.unpack_archive(archives[0], folder / 'unpacked')
     package, = (folder / 'unpacked').iterdir()
     executable = package / ('Api.exe' if os.name == 'nt' else 'Api')
-    if os.name != 'nt' and (not os.access(executable, os.X_OK) or not os.access(package / 'start-media-server.sh', os.X_OK)):
+    if os.name != 'nt' and (not os.access(executable, os.X_OK) or not os.access(package / ('Start-MediaServer.command' if sys.platform == 'darwin' else 'start-media-server.sh'), os.X_OK)):
         raise RuntimeError('Linux archive did not preserve executable permissions')
-    runtime = package / ('coreclr.dll' if os.name == 'nt' else 'libcoreclr.so')
+    runtime = package / ('coreclr.dll' if os.name == 'nt' else 'libcoreclr.dylib' if sys.platform == 'darwin' else 'libcoreclr.so')
     if not runtime.is_file() or not (package / 'System.Private.CoreLib.dll').is_file():
         raise RuntimeError('The archive is not self-contained')
     with socket.socket() as available:

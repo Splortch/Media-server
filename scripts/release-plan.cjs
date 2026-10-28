@@ -1,5 +1,5 @@
 const {targets} = require('./release-targets.cjs');
-const required = ['backend-server.yml', 'web-client.yml', 'windows-client.yml', 'ci.yml', 'agent-automation-tests.yml'];
+const required = ['backend-server.yml', 'web-client.yml', 'windows-client.yml', 'ci.yml', 'agent-automation-tests.yml', 'desktop-clients.yml'];
 function versions(number) {
   if (!Number.isSafeInteger(number) || number < 1 || number > 65535) throw new Error('Release build number must fit the Windows installer version (1..65535).');
   return { server: `0.2.0-alpha.${number}`, client: `0.1.0-alpha.${number}`, msi: `0.1.${number}`, tag: `v0.2.0-alpha.${number}` };
@@ -25,6 +25,9 @@ async function plan({ github, context }) {
     sha = context.sha;
   } else return { build: false, publish: false };
   if (!/^[a-f0-9]{40}$/.test(sha)) throw new Error('Invalid source commit.');
+  // Builds always check out the workflow's own immutable event commit. Never
+  // execute a planner-supplied ref in the default branch's cache/security context.
+  if (sha !== context.sha) return { build: false, publish: false };
   const branch = await github.rest.repos.getBranch({ ...context.repo, branch: 'main' });
   if (branch.data.commit.sha !== sha) return { build: false, publish: false };
   const response = await github.rest.actions.listWorkflowRunsForRepo({ ...context.repo, event: 'push', head_sha: sha, per_page: 100 });

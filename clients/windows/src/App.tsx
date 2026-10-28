@@ -5,6 +5,7 @@ import {
   login,
   logout,
   preferences,
+  desktopCapabilities,
   savePreferences,
   errorMessage,
   expired,
@@ -62,6 +63,24 @@ function MediaCards({
 export default function App() {
   const [address, setAddress] = useState('https://');
   const [remember, setRemember] = useState(false);
+  const [persistentSessions, setPersistentSessions] = useState(false);
+  const [clientPlatform, setClientPlatform] = useState('desktop');
+  const playerEngine =
+    clientPlatform === 'windows'
+      ? 'WebView2'
+      : clientPlatform === 'macos'
+        ? 'WKWebView'
+        : clientPlatform === 'linux'
+          ? 'WebKitGTK'
+          : 'HTML video';
+  useEffect(() => {
+    void desktopCapabilities()
+      .then((c) => {
+        setPersistentSessions(c.persistentSessions);
+        setClientPlatform(c.os);
+      })
+      .catch(() => {});
+  }, []);
   const [theme, setTheme] = useState('system');
   const [connected, setConnected] = useState(false);
   const [version, setVersion] = useState('');
@@ -236,7 +255,10 @@ export default function App() {
       const supported = formats
         .filter(([, mime]) => video.canPlayType(mime))
         .map(([name]) => name);
-      await api.capabilities(supported, []);
+      await api.capabilities(supported, [], {
+        platform: clientPlatform,
+        player: playerEngine,
+      });
     } catch (e) {
       failure(e);
     } finally {
@@ -292,7 +314,7 @@ export default function App() {
     } catch (e) {
       setError(
         (e && typeof e === 'object' && 'code' in e && e.code === 'VAULT'
-          ? 'Saved credentials could not be removed. Remove this entry in Windows Credential Manager and revoke the session in the web interface. '
+          ? 'Saved credentials could not be removed. Remove this entry in the operating system credential store and revoke the session in the web interface. '
           : 'Local session cleared; remote revocation may not have completed. ') +
           errorMessage(e),
       );
@@ -346,11 +368,13 @@ export default function App() {
             <label className="check">
               <input
                 type="checkbox"
-                disabled={busy}
+                disabled={busy || !persistentSessions}
                 checked={remember}
                 onChange={(e) => setRemember(e.target.checked)}
               />{' '}
-              Remember this session in Windows Credential Manager
+              {persistentSessions
+                ? 'Remember this session in Windows Credential Manager'
+                : 'Sessions stay in memory on this platform; sign in after restarting'}
             </label>
             <p className="muted">
               HTTPS is required for remote servers. Local HTTP sends credentials
@@ -486,7 +510,11 @@ export default function App() {
                   selection.writer.save(seconds, completed)
                 }
                 onPlaybackError={async () => {
-                  await api.report(selection.item.id, 'unknown');
+                  await api.report(
+                    selection.item.id,
+                    'unknown',
+                    `${clientPlatform}-${playerEngine.toLowerCase()}`,
+                  );
                   await api.me();
                 }}
               />
@@ -528,7 +556,8 @@ export default function App() {
                 </label>
                 <p className="muted">
                   Server: {address}. Passwords are never saved. Remembered
-                  sessions use Windows Credential Manager.
+                  sessions use Windows Credential Manager. Linux/macOS sessions
+                  are kept in memory only.
                 </p>
                 <button onClick={() => void signOut()}>
                   Disconnect and clear saved session
@@ -557,8 +586,9 @@ export default function App() {
                 ))}
               </section>
               <p className="muted">
-                Updates are manual in this alpha. WebView2 playback depends on
-                your Windows codec support; native libmpv playback is planned.
+                Updates are manual in this alpha. Playback support depends on
+                your operating system and installed media codecs; native libmpv
+                playback is planned.
               </p>
             </>
           ) : (

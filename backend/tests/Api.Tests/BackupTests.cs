@@ -58,7 +58,7 @@ public sealed class BackupTests
     [Fact]
     public async Task BackupIsConsistentPrivateAndRestoreDryRunDoesNotTouchExistingData()
     {
-        var root = Path.Combine(Path.GetTempPath(), "backup-tests-" + Guid.NewGuid());
+        var root = Path.Combine(TestPaths.TempRoot, "backup-tests-" + Guid.NewGuid());
         Directory.CreateDirectory(root);
         try
         {
@@ -117,7 +117,7 @@ public sealed class BackupTests
     [Fact]
     public async Task TamperedUnsafeAndFutureSchemaArchivesAreRejectedBeforeRestoring()
     {
-        var root = Path.Combine(Path.GetTempPath(), "backup-tests-" + Guid.NewGuid());
+        var root = Path.Combine(TestPaths.TempRoot, "backup-tests-" + Guid.NewGuid());
         Directory.CreateDirectory(root);
         try
         {

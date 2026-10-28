@@ -54,6 +54,10 @@ fn preferences(app: tauri::AppHandle) -> Result<Value, String> {
     }
 }
 #[tauri::command]
+fn desktop_capabilities() -> Value {
+    serde_json::json!({"os": std::env::consts::OS, "persistentSessions": cfg!(windows)})
+}
+#[tauri::command]
 fn save_preferences(address: String, theme: String, app: tauri::AppHandle) -> Result<(), String> {
     if !address.is_empty() {
         media_client_core::validate_server(&address).map_err(|e| e.message.to_owned())?;
@@ -100,7 +104,8 @@ fn main() {
             api_request,
             stream_url,
             preferences,
-            save_preferences
+            save_preferences,
+            desktop_capabilities
         ])
         .run(tauri::generate_context!())
         .expect("Desktop application failed to start");

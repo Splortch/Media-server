@@ -3,10 +3,13 @@ const START = '<!-- platform-downloads:start -->';
 const END = '<!-- platform-downloads:end -->';
 const definitions = [
   ['server-windows', 'Windows server', 'Host your library on Windows x64', /-win-x64(?:-setup\.exe|\.zip)$/],
-  ['server-linux', 'Linux server', 'Host your library on Linux x64', /-linux-x64\.tar\.gz$/],
+  ['server-linux', 'Linux server', 'Host your library on Linux x64', /-linux-x64\.(?:tar\.gz|deb)$/],
   ['docker', 'Docker server', 'Run the Linux amd64 server with Compose', /^MediaServer-Docker-.*\.zip$/],
   ['client-windows', 'Windows desktop client', 'Connect a Windows PC to your server', /-win-x64(?:-setup\.exe|\.msi)$/],
   ['client-android', 'Android phone client', 'Install the debug APK on Android 8.0+', /-debug\.apk$/],
+  ['server-macos', 'macOS server', 'Host media on Apple Silicon or Intel macOS', /-osx-(?:arm64|x64)\.pkg$/],
+  ['client-linux', 'Linux desktop client', 'Connect Ubuntu 24.04 x64 to your server', /-linux-x64\.deb$/],
+  ['client-macos', 'macOS desktop client', 'Connect Apple Silicon or Intel macOS to your server', /-osx-(?:arm64|x64)\.dmg$/],
 ];
 function latestPlatforms(releases) {
   return definitions.map(([id, name, description, asset]) => {

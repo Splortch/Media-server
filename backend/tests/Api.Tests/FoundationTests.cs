@@ -17,7 +17,7 @@ namespace Api.Tests;
 
 public sealed class Server : WebApplicationFactory<Program>
 {
-    public string Root { get; } = Path.Combine(Path.GetTempPath(), "media-tests-" + Guid.NewGuid());
+    public string Root { get; } = Path.Combine(TestPaths.TempRoot, "media-tests-" + Guid.NewGuid());
     public string MediaPath => Path.Combine(Root, "videos");
     public string DataPath => Path.Combine(Root, "data");
 

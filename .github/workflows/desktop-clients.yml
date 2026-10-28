@@ -1,0 +1,139 @@
+name: Desktop clients
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+  workflow_call:
+    inputs:
+      source_sha:
+        type: string
+        required: true
+      client_version:
+        type: string
+        required: true
+      msi_version:
+        type: string
+        required: true
+permissions:
+  contents: read
+concurrency:
+  group: desktop-clients-${{ github.workflow }}-${{ github.ref }}-${{ inputs.client_version || 'ci' }}
+  cancel-in-progress: true
+jobs:
+  desktop:
+    name: Desktop ${{ matrix.rid }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-24.04
+            rid: linux-x64
+            bundles: deb
+          - os: macos-15-intel
+            rid: osx-x64
+            bundles: app,dmg
+          - os: macos-15
+            rid: osx-arm64
+            bundles: app,dmg
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.source_sha || github.sha }}
+          persist-credentials: false
+          fetch-depth: 0
+      - id: changes
+        shell: bash
+        env:
+          RELEASE_BUILD: ${{ inputs.client_version != '' }}
+        run: |
+          if [ "$RELEASE_BUILD" = true ]; then echo 'changed=true' >> "$GITHUB_OUTPUT"; else python3 scripts/component-changes.py desktop; fi
+      - uses: actions/setup-node@v7
+        if: steps.changes.outputs.changed == 'true'
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: |
+            frontend/package-lock.json
+            clients/windows/package-lock.json
+      - uses: actions/setup-dotnet@v6
+        if: steps.changes.outputs.changed == 'true'
+        with:
+          global-json-file: global.json
+      - uses: dtolnay/rust-toolchain@stable
+        if: steps.changes.outputs.changed == 'true'
+        with:
+          components: rustfmt, clippy
+      - uses: Swatinem/rust-cache@v2
+        if: steps.changes.outputs.changed == 'true'
+        with:
+          cache-on-failure: true
+          workspaces: |
+            clients/windows/native -> target
+            clients/windows/src-tauri -> target
+      - name: Install Linux webview, media and package dependencies
+        if: steps.changes.outputs.changed == 'true' && runner.os == 'Linux'
+        run: |
+          sudo apt-get -o Acquire::Retries=2 update
+          sudo apt-get -o Acquire::Retries=2 install -y --no-install-recommends libwebkit2gtk-4.1-dev build-essential libxdo-dev libssl-dev libayatana-appindicator3-dev librsvg2-dev patchelf ffmpeg xvfb dbus-x11 gstreamer1.0-plugins-good gstreamer1.0-libav
+      - name: Install macOS media tools
+        if: steps.changes.outputs.changed == 'true' && runner.os == 'macOS'
+        run: brew list ffmpeg >/dev/null 2>&1 || brew install ffmpeg
+      - if: steps.changes.outputs.changed == 'true'
+        run: npm ci --prefix frontend && npm ci --prefix clients/windows
+      - name: Stamp release version
+        if: steps.changes.outputs.changed == 'true'
+        env:
+          CLIENT_VERSION: ${{ inputs.client_version || format('0.1.0-alpha.{0}', github.run_number) }}
+          MSI_VERSION: ${{ inputs.msi_version || format('0.1.{0}', github.run_number) }}
+        run: node scripts/stamp-windows-version.cjs
+      - if: steps.changes.outputs.changed == 'true'
+        run: npm test --prefix clients/windows && npm run lint --prefix clients/windows && npm run format:check --prefix clients/windows
+      - if: steps.changes.outputs.changed == 'true'
+        run: cargo fmt --manifest-path clients/windows/native/Cargo.toml --check && cargo clippy --locked --manifest-path clients/windows/native/Cargo.toml --all-targets -- -D warnings && cargo test --locked --manifest-path clients/windows/native/Cargo.toml
+      - name: Verify macOS secure media ABI
+        if: steps.changes.outputs.changed == 'true' && runner.os == 'macOS'
+        run: cc -std=c11 tests/security/darwin-media-abi.c -o "$RUNNER_TEMP/media-abi" && "$RUNNER_TEMP/media-abi"
+      - if: steps.changes.outputs.changed == 'true'
+        run: dotnet build MediaServer.sln && python3 scripts/test-native-client.py
+      - name: Generate macOS icon from the existing project icon
+        if: steps.changes.outputs.changed == 'true' && runner.os == 'macOS'
+        working-directory: clients/windows
+        run: npm run tauri -- icon src-tauri/icons/icon.png --output src-tauri/generated-icons
+      - name: Build the native desktop installer
+        if: steps.changes.outputs.changed == 'true'
+        working-directory: clients/windows
+        env:
+          CI: 'true'
+          BUNDLES: ${{ matrix.bundles }}
+        run: |
+          if [ "$RUNNER_OS" = macOS ]; then
+            npm run tauri -- build --bundles "$BUNDLES" --config '{"bundle":{"icon":["generated-icons/icon.icns"]}}' -- --locked
+          else
+            npm run tauri -- build --bundles "$BUNDLES" -- --locked
+          fi
+      - name: Collect and verify installed application
+        if: steps.changes.outputs.changed == 'true'
+        env:
+          CLIENT_VERSION: ${{ inputs.client_version || format('0.1.0-alpha.{0}', github.run_number) }}
+          RID: ${{ matrix.rid }}
+        run: |
+          python3 scripts/collect-desktop-client.py
+          python3 scripts/test-desktop-installer.py
+      - uses: actions/upload-artifact@v7
+        if: success() && steps.changes.outputs.changed == 'true'
+        with:
+          name: release-desktop-${{ matrix.rid }}
+          path: artifacts/desktop/*
+          if-no-files-found: error
+  required:
+    name: Desktop packages
+    needs: desktop
+    if: always()
+    runs-on: ubuntu-24.04
+    steps:
+      - env:
+          RESULT: ${{ needs.desktop.result }}
+        run: test "$RESULT" = success
