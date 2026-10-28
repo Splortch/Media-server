@@ -16,6 +16,21 @@ Choose an absolute media folder, open http://127.0.0.1:5050 and read the setup-t
 printed location. For a preconfigured FFprobe/data/media root, export MediaServer__FfprobePath,
 MediaServer__DataDirectory and MediaServer__AllowedRoots__0 before running.
 
+Linux DEB: install with `sudo apt install ./MediaServer-v<VERSION>-linux-x64.deb`,
+then open Media Server from the application menu. Apt installs FFprobe; the server
+itself runs as your signed-in user, not root.
+
+macOS (14+ server): choose osx-arm64 for Apple Silicon or osx-x64 for Intel. Install
+the PKG, install FFprobe with `brew install ffmpeg`, then open
+`/Applications/MediaServer/Start-MediaServer.command`. For portable use, extract the
+archive and open its Start-MediaServer.command. Choose your media folder, open
+http://127.0.0.1:5050, and read the setup-token file printed in Terminal. Keep Terminal
+open; Control-C stops the server. Data stays in
+`~/Library/Application Support/Splortch/MediaServer`. Alpha PKGs are unsigned and not
+notarized; use Apple's per-application approval only if you trust the verified download.
+
+See the included **DESKTOP-INSTALLERS.md** for setup, uninstall and troubleshooting.
+
 Data lives outside this archive: Windows uses %LOCALAPPDATA%\Splortch\MediaServer, Linux uses
 ${XDG_DATA_HOME:-$HOME/.local/share}/media-server. Replacing the extracted application does not
 replace that data. Back it up before upgrades. Database migrations may prevent safe downgrades.
