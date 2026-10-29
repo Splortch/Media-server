@@ -12,13 +12,14 @@ Install a server on the machine that stores your media. Each server includes the
 
 Windows · x64 — Host your library on Windows x64.
 
-**Latest: v0.2.0-alpha.126**
+**Latest: v0.2.0-alpha.135**
 
-[Download setup.exe](https://github.com/Splortch/Media-server/releases/download/server-windows/v0.2.0-alpha.126/MediaServer-v0.2.0-alpha.126-win-x64-setup.exe) · [Release notes](https://github.com/Splortch/Media-server/releases/tag/server-windows/v0.2.0-alpha.126) · [Portable ZIP](https://github.com/Splortch/Media-server/releases/download/server-windows/v0.2.0-alpha.126/MediaServer-v0.2.0-alpha.126-win-x64.zip)
+[Download setup.exe](https://github.com/Splortch/Media-server/releases/download/server-windows/v0.2.0-alpha.135/MediaServer-v0.2.0-alpha.135-win-x64-setup.exe) · [Release notes](https://github.com/Splortch/Media-server/releases/tag/server-windows/v0.2.0-alpha.135) · [Portable ZIP](https://github.com/Splortch/Media-server/releases/download/server-windows/v0.2.0-alpha.135/MediaServer-v0.2.0-alpha.135-win-x64.zip)
 
 <details>
-<summary>Older Windows server versions (12)</summary>
+<summary>Older Windows server versions (13)</summary>
 
+- [v0.2.0-alpha.126](https://github.com/Splortch/Media-server/releases/tag/server-windows/v0.2.0-alpha.126)
 - [v0.2.0-alpha.113](https://github.com/Splortch/Media-server/releases/tag/server-windows/v0.2.0-alpha.113)
 - [v0.2.0-alpha.109](https://github.com/Splortch/Media-server/releases/tag/server-windows/v0.2.0-alpha.109)
 - [v0.2.0-alpha.104](https://github.com/Splortch/Media-server/releases/tag/server-windows/v0.2.0-alpha.104)
@@ -38,13 +39,14 @@ Windows · x64 — Host your library on Windows x64.
 
 Linux · x64 — Host your library on Linux x64.
 
-**Latest: v0.2.0-alpha.126**
+**Latest: v0.2.0-alpha.135**
 
-[Download DEB installer](https://github.com/Splortch/Media-server/releases/download/server-linux/v0.2.0-alpha.126/MediaServer-v0.2.0-alpha.126-linux-x64.deb) · [Release notes](https://github.com/Splortch/Media-server/releases/tag/server-linux/v0.2.0-alpha.126) · [Portable archive](https://github.com/Splortch/Media-server/releases/download/server-linux/v0.2.0-alpha.126/MediaServer-v0.2.0-alpha.126-linux-x64.tar.gz)
+[Download DEB installer](https://github.com/Splortch/Media-server/releases/download/server-linux/v0.2.0-alpha.135/MediaServer-v0.2.0-alpha.135-linux-x64.deb) · [Release notes](https://github.com/Splortch/Media-server/releases/tag/server-linux/v0.2.0-alpha.135) · [Portable archive](https://github.com/Splortch/Media-server/releases/download/server-linux/v0.2.0-alpha.135/MediaServer-v0.2.0-alpha.135-linux-x64.tar.gz)
 
 <details>
-<summary>Older Linux server versions (12)</summary>
+<summary>Older Linux server versions (13)</summary>
 
+- [v0.2.0-alpha.126](https://github.com/Splortch/Media-server/releases/tag/server-linux/v0.2.0-alpha.126)
 - [v0.2.0-alpha.113](https://github.com/Splortch/Media-server/releases/tag/server-linux/v0.2.0-alpha.113)
 - [v0.2.0-alpha.109](https://github.com/Splortch/Media-server/releases/tag/server-linux/v0.2.0-alpha.109)
 - [v0.2.0-alpha.104](https://github.com/Splortch/Media-server/releases/tag/server-linux/v0.2.0-alpha.104)
@@ -64,13 +66,14 @@ Linux · x64 — Host your library on Linux x64.
 
 Docker · Linux amd64 — Run the Linux amd64 server with Compose.
 
-**Latest: v0.2.0-alpha.126**
+**Latest: v0.2.0-alpha.135**
 
-[Download Compose setup](https://github.com/Splortch/Media-server/releases/download/docker/v0.2.0-alpha.126/MediaServer-Docker-v0.2.0-alpha.126.zip) · [Release notes](https://github.com/Splortch/Media-server/releases/tag/docker/v0.2.0-alpha.126)
+[Download Compose setup](https://github.com/Splortch/Media-server/releases/download/docker/v0.2.0-alpha.135/MediaServer-Docker-v0.2.0-alpha.135.zip) · [Release notes](https://github.com/Splortch/Media-server/releases/tag/docker/v0.2.0-alpha.135)
 
 <details>
-<summary>Older Docker server versions (12)</summary>
+<summary>Older Docker server versions (13)</summary>
 
+- [v0.2.0-alpha.126](https://github.com/Splortch/Media-server/releases/tag/docker/v0.2.0-alpha.126)
 - [v0.2.0-alpha.113](https://github.com/Splortch/Media-server/releases/tag/docker/v0.2.0-alpha.113)
 - [v0.2.0-alpha.109](https://github.com/Splortch/Media-server/releases/tag/docker/v0.2.0-alpha.109)
 - [v0.2.0-alpha.104](https://github.com/Splortch/Media-server/releases/tag/docker/v0.2.0-alpha.104)
@@ -90,9 +93,16 @@ Docker · Linux amd64 — Run the Linux amd64 server with Compose.
 
 macOS · Apple Silicon / Intel — Host media on Apple Silicon or Intel macOS.
 
-**Latest: v0.2.0-alpha.126**
+**Latest: v0.2.0-alpha.135**
 
-[Apple Silicon server PKG](https://github.com/Splortch/Media-server/releases/download/server-macos/v0.2.0-alpha.126/MediaServer-v0.2.0-alpha.126-osx-arm64.pkg) · [Release notes](https://github.com/Splortch/Media-server/releases/tag/server-macos/v0.2.0-alpha.126) · [Intel server PKG](https://github.com/Splortch/Media-server/releases/download/server-macos/v0.2.0-alpha.126/MediaServer-v0.2.0-alpha.126-osx-x64.pkg)
+[Apple Silicon server PKG](https://github.com/Splortch/Media-server/releases/download/server-macos/v0.2.0-alpha.135/MediaServer-v0.2.0-alpha.135-osx-arm64.pkg) · [Release notes](https://github.com/Splortch/Media-server/releases/tag/server-macos/v0.2.0-alpha.135) · [Intel server PKG](https://github.com/Splortch/Media-server/releases/download/server-macos/v0.2.0-alpha.135/MediaServer-v0.2.0-alpha.135-osx-x64.pkg)
+
+<details>
+<summary>Older macOS server versions (1)</summary>
+
+- [v0.2.0-alpha.126](https://github.com/Splortch/Media-server/releases/tag/server-macos/v0.2.0-alpha.126)
+
+</details>
 
 ## Clients
 
@@ -102,13 +112,14 @@ Connect these applications to your existing server.
 
 Windows · x64 — Connect a Windows PC to your server.
 
-**Latest: v0.1.0-alpha.126**
+**Latest: v0.1.0-alpha.135**
 
-[Download desktop installer](https://github.com/Splortch/Media-server/releases/download/client-windows/v0.1.0-alpha.126/MediaServer-Windows-Client-v0.1.0-alpha.126-win-x64-setup.exe) · [Release notes](https://github.com/Splortch/Media-server/releases/tag/client-windows/v0.1.0-alpha.126) · [MSI installer](https://github.com/Splortch/Media-server/releases/download/client-windows/v0.1.0-alpha.126/MediaServer-Windows-Client-v0.1.0-alpha.126-win-x64.msi)
+[Download desktop installer](https://github.com/Splortch/Media-server/releases/download/client-windows/v0.1.0-alpha.135/MediaServer-Windows-Client-v0.1.0-alpha.135-win-x64-setup.exe) · [Release notes](https://github.com/Splortch/Media-server/releases/tag/client-windows/v0.1.0-alpha.135) · [MSI installer](https://github.com/Splortch/Media-server/releases/download/client-windows/v0.1.0-alpha.135/MediaServer-Windows-Client-v0.1.0-alpha.135-win-x64.msi)
 
 <details>
-<summary>Older Windows desktop client versions (12)</summary>
+<summary>Older Windows desktop client versions (13)</summary>
 
+- [v0.1.0-alpha.126](https://github.com/Splortch/Media-server/releases/tag/client-windows/v0.1.0-alpha.126)
 - [v0.1.0-alpha.113](https://github.com/Splortch/Media-server/releases/tag/client-windows/v0.1.0-alpha.113)
 - [v0.1.0-alpha.109](https://github.com/Splortch/Media-server/releases/tag/client-windows/v0.1.0-alpha.109)
 - [v0.1.0-alpha.104](https://github.com/Splortch/Media-server/releases/tag/client-windows/v0.1.0-alpha.104)
@@ -148,17 +159,31 @@ The debug APK is the installable testing build. Unsigned release APK/AAB files n
 
 Ubuntu 24.04 · x64 — Connect Ubuntu 24.04 x64 to your server.
 
-**Latest: v0.1.0-alpha.126**
+**Latest: v0.1.0-alpha.135**
 
-[Download desktop DEB](https://github.com/Splortch/Media-server/releases/download/client-linux/v0.1.0-alpha.126/MediaServer-Desktop-Client-v0.1.0-alpha.126-linux-x64.deb) · [Release notes](https://github.com/Splortch/Media-server/releases/tag/client-linux/v0.1.0-alpha.126)
+[Download desktop DEB](https://github.com/Splortch/Media-server/releases/download/client-linux/v0.1.0-alpha.135/MediaServer-Desktop-Client-v0.1.0-alpha.135-linux-x64.deb) · [Release notes](https://github.com/Splortch/Media-server/releases/tag/client-linux/v0.1.0-alpha.135)
+
+<details>
+<summary>Older Linux desktop client versions (1)</summary>
+
+- [v0.1.0-alpha.126](https://github.com/Splortch/Media-server/releases/tag/client-linux/v0.1.0-alpha.126)
+
+</details>
 
 ### macOS desktop client
 
 macOS · Apple Silicon / Intel — Connect Apple Silicon or Intel macOS to your server.
 
-**Latest: v0.1.0-alpha.126**
+**Latest: v0.1.0-alpha.135**
 
-[Apple Silicon client DMG](https://github.com/Splortch/Media-server/releases/download/client-macos/v0.1.0-alpha.126/MediaServer-Desktop-Client-v0.1.0-alpha.126-osx-arm64.dmg) · [Release notes](https://github.com/Splortch/Media-server/releases/tag/client-macos/v0.1.0-alpha.126) · [Intel client DMG](https://github.com/Splortch/Media-server/releases/download/client-macos/v0.1.0-alpha.126/MediaServer-Desktop-Client-v0.1.0-alpha.126-osx-x64.dmg)
+[Apple Silicon client DMG](https://github.com/Splortch/Media-server/releases/download/client-macos/v0.1.0-alpha.135/MediaServer-Desktop-Client-v0.1.0-alpha.135-osx-arm64.dmg) · [Release notes](https://github.com/Splortch/Media-server/releases/tag/client-macos/v0.1.0-alpha.135) · [Intel client DMG](https://github.com/Splortch/Media-server/releases/download/client-macos/v0.1.0-alpha.135/MediaServer-Desktop-Client-v0.1.0-alpha.135-osx-x64.dmg)
+
+<details>
+<summary>Older macOS desktop client versions (1)</summary>
+
+- [v0.1.0-alpha.126](https://github.com/Splortch/Media-server/releases/tag/client-macos/v0.1.0-alpha.126)
+
+</details>
 
 ## Browser
 
