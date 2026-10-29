@@ -46,7 +46,20 @@ jobs:
           name: playback-software-results
           path: artifacts/*.json
   browsers:
-    runs-on: ubuntu-24.04
+    name: Browsers (${{ matrix.platform }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: linux
+            os: ubuntu-24.04
+            browsers: chromium firefox
+            projects: --project=chromium --project=firefox
+          - platform: macos
+            os: macos-15
+            browsers: webkit
+            projects: --project=webkit
+    runs-on: ${{ matrix.os }}
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v7
@@ -60,21 +73,27 @@ jobs:
           node-version: '24'
           cache: npm
           cache-dependency-path: frontend/package-lock.json
-      - name: Ensure synthetic media tooling
+      - name: Ensure Linux synthetic media tooling
+        if: runner.os == 'Linux'
         run: |
           if ! command -v ffmpeg >/dev/null || ! command -v ffprobe >/dev/null; then
             sudo apt-get -o Acquire::Retries=2 install -y --no-install-recommends ffmpeg
           fi
+      - name: Ensure macOS synthetic media tooling
+        if: runner.os == 'macOS'
+        run: |
+          brew list ffmpeg-full >/dev/null 2>&1 || brew install ffmpeg-full
+          echo "$(brew --prefix ffmpeg-full)/bin" >> "$GITHUB_PATH"
       - run: dotnet restore MediaServer.sln --locked-mode
       - run: dotnet build MediaServer.sln --no-restore -warnaserror
       - run: npm ci --prefix frontend
-      - run: cd frontend && npx playwright install --with-deps chromium firefox webkit
+      - run: cd frontend && npx playwright install --with-deps ${{ matrix.browsers }}
       - name: Measure network adaptation and browser decoder compatibility
-        run: bash scripts/playback-browser.sh
+        run: bash scripts/playback-browser.sh ${{ matrix.projects }}
       - uses: actions/upload-artifact@v7
         if: always()
         with:
-          name: playback-browser-evidence
+          name: playback-browser-evidence-${{ matrix.platform }}
           path: frontend/benchmark-results/
   hardware:
     if: github.event_name == 'workflow_dispatch' && inputs.hardware && github.ref == 'refs/heads/main'

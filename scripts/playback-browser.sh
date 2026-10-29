@@ -2,14 +2,18 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 TASK_TEMP="$(mktemp -d)"
+# macOS /var aliases /private/var; use the physical path for strict media-root validation.
+TASK_TEMP="$(cd "$TASK_TEMP" && pwd -P)"
 API_PID=""
 cleanup() {
   if [[ -n "$API_PID" ]]; then kill "$API_PID" 2>/dev/null || true; wait "$API_PID" 2>/dev/null || true; fi
   rm -rf "$TASK_TEMP"
 }
 trap cleanup EXIT
-mkdir -p "$TASK_TEMP/media"
+mkdir -p "$TASK_TEMP/media" frontend/benchmark-results
 ffmpeg -v error -filter_threads 1 -f lavfi -i testsrc2=size=1280x720:rate=24 -f lavfi -i sine=frequency=440 -t 60 -c:v libx264 -preset ultrafast -threads 2 -c:a aac -movflags +faststart "$TASK_TEMP/media/bandwidth.mp4"
+# Codec probes use equivalent short fixtures; the 60-second source is only for ABR.
+ffmpeg -v error -filter_threads 1 -f lavfi -i testsrc2=size=640x360:rate=24 -f lavfi -i sine=frequency=440 -t 2 -c:v libx264 -preset ultrafast -profile:v baseline -level:v 3.0 -pix_fmt yuv420p -threads 2 -c:a aac -movflags +faststart "$TASK_TEMP/media/h264.mp4"
 for codec in hevc av1; do
   encoder=libx265
   options=(-preset ultrafast -x265-params pools=none:frame-threads=1 -tag:v hvc1)
@@ -28,4 +32,4 @@ for i in $(seq 1 100); do
   sleep .2
 done
 if [[ "$READY" != 1 ]]; then cat "$TASK_TEMP/server.log"; exit 1; fi
-(cd frontend && npx playwright test --config playwright.benchmark.config.ts)
+(cd frontend && npx playwright test --config playwright.benchmark.config.ts "$@")
