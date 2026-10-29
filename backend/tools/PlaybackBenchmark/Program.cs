@@ -195,7 +195,11 @@ static class Benchmark
             {
                 var policy = new PathPolicy([Path.Combine(root, "media")]);
                 var library = new Library { Id = 1, Path = Path.Combine(root, "media") };
-                var selection = new PlaybackSelection(Encoder: encoder);
+                var captionPath = Path.Combine(root, "media", "source.vtt");
+                const string captionInput =
+                    "WEBVTT\n\n00:00:00.000 --> 00:00:01.000\n<b>Synthetic caption</b>\n";
+                await File.WriteAllTextAsync(captionPath, captionInput, deadline.Token);
+                var selection = new PlaybackSelection(SubtitleTrack: -1, Encoder: encoder);
                 var watch = Stopwatch.StartNew();
                 var state =
                     await sessions.StartAsync(
@@ -215,6 +219,23 @@ static class Benchmark
                 watch.Stop();
                 if (state.State != "ready")
                     throw new IOException();
+                var captionOutput =
+                    sessions.FilePath(state.Id, 1, 1, "benchmark-a", "captions.vtt")
+                    ?? throw new IOException("Missing authorized caption output.");
+                var captionText = await File.ReadAllTextAsync(captionOutput, deadline.Token);
+                if (
+                    !captionText.Contains("00:00:00.000 --> 00:00:01.000")
+                    || !captionText.Contains("Synthetic caption")
+                    || captionText.Contains('<')
+                    || await File.ReadAllTextAsync(captionPath, deadline.Token) != captionInput
+                )
+                    throw new IOException("Caption text, timing or original preservation failed.");
+                report["captions"] = new
+                {
+                    timingPreserved = true,
+                    sanitized = true,
+                    originalPreserved = true,
+                };
                 report["actualEncoder"] = state.Encoder;
                 report["elapsedSeconds"] = watch.Elapsed.TotalSeconds;
                 report["preparationMode"] = "complete-vod";

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type RefObject } from 'react';
+import { useEffect, useId, useRef, useState, type RefObject } from 'react';
 import Hls from 'hls.js';
 import { api } from '../services/api';
 
@@ -90,6 +90,7 @@ export default function PlaybackSettings({
   onCaption: (value: string) => void;
   transport?: PlaybackTransport;
 }) {
+  const trackHelp = useId();
   const desktop = !!transport;
   const request = transport?.request ?? api;
   const fileUrl = transport?.fileUrl ?? webFileUrl;
@@ -376,9 +377,14 @@ export default function PlaybackSettings({
           {adaptive.estimatedKbps} kbps
         </p>
       )}
+      <p id={trackHelp}>
+        Choose tracks, then select Prepare HLS playback to apply them. Text
+        subtitles are supported; bitmap subtitles are unavailable.
+      </p>
       <label>
         Audio track
         <select
+          aria-describedby={trackHelp}
           value={audio}
           onChange={(e) => setAudio(e.target.value)}
           disabled={busy || session?.state === 'preparing'}
@@ -398,6 +404,7 @@ export default function PlaybackSettings({
         Subtitles
         <select
           aria-label="Subtitles"
+          aria-describedby={trackHelp}
           value={subtitle}
           onChange={(e) => setSubtitle(e.target.value)}
           disabled={busy || session?.state === 'preparing'}
@@ -426,6 +433,14 @@ export default function PlaybackSettings({
               >
                 {t.language || 'Unknown language'} · {t.title || t.codec} ·
                 track {t.index}
+                {![
+                  'subrip',
+                  'ass',
+                  'ssa',
+                  'webvtt',
+                  'mov_text',
+                  'text',
+                ].includes(t.codec) && ' · Unavailable (bitmap subtitle)'}
               </option>
             ))}
         </select>

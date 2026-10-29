@@ -72,6 +72,53 @@ async function report(name: string, value: unknown) {
   );
 }
 
+test('track controls expose instructions and support keyboard selection', async ({
+  page,
+  browserName,
+}) => {
+  const items = await connect(page);
+  const item = items.find((x) => x.title === 'bandwidth')!;
+  await page.goto(`/#media/${item.id}`);
+  const summary = page.getByText('Quality, audio and subtitles', {
+    exact: true,
+  });
+  await summary.focus();
+  await page.keyboard.press('Enter');
+  const audio = page.getByRole('combobox', {
+    name: 'Audio track',
+    exact: true,
+  });
+  const subtitles = page.getByRole('combobox', {
+    name: 'Subtitles',
+    exact: true,
+  });
+  await expect(subtitles).toContainText('swe');
+  await expect(audio).toHaveAccessibleDescription(/Prepare HLS playback/);
+  await expect(subtitles).toHaveAccessibleDescription(
+    /bitmap subtitles are unavailable/,
+  );
+  await subtitles.focus();
+  await page.keyboard.press('ArrowDown');
+  await page.keyboard.press('Enter');
+  await expect(subtitles).not.toHaveValue('');
+  await page.keyboard.press('Tab');
+  await expect(
+    page.getByRole('combobox', { name: 'Encoder preference' }),
+  ).toBeFocused();
+  const audit = await new AxeBuilder({ page })
+    .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'])
+    .analyze();
+  expect(audit.violations).toEqual([]);
+  await report(`${browserName}-track-accessibility`, {
+    browser: browserName,
+    platform: process.platform,
+    keyboardSelection: true,
+    accessibleInstructions: true,
+    axeViolations: audit.violations.length,
+    manualScreenReaderTested: false,
+  });
+});
+
 test('measure bandwidth adaptation, rebuffering and accessible track selection', async ({
   page,
   browserName,
