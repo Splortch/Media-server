@@ -437,7 +437,14 @@ public sealed class OperationsTests(ITestOutputHelper output)
         Assert.DoesNotContain(server.DataPath, raw);
         Assert.DoesNotContain("MediaServer.Session", raw);
         var parsed = JsonSerializer.Deserialize<JsonElement>(raw);
-        Assert.False(parsed.GetProperty("transcodingSupported").GetBoolean());
+        Assert.True(parsed.GetProperty("transcodingSupported").GetBoolean());
+        Assert.Equal(0, parsed.GetProperty("transcodingQueueCount").GetInt32());
+        Assert.Equal(2, parsed.GetProperty("transcoding").GetProperty("capacity").GetInt32());
+        Assert.Empty(parsed.GetProperty("transcoding").GetProperty("jobs").EnumerateArray());
+        Assert.Equal(
+            "Disabled by operator",
+            parsed.GetProperty("gpu").GetProperty("status").GetString()
+        );
         Assert.Equal(
             JsonValueKind.Null,
             parsed.GetProperty("transcodingFramesPerSecond").ValueKind

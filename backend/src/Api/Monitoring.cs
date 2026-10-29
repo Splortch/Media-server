@@ -64,7 +64,7 @@ public sealed class ResourceMonitor(string dataDirectory)
                 now,
                 available,
                 total,
-                "Unavailable: vendor GPU adapters are not implemented"
+                "See optional GPU sample; AMD/Intel utilization is unavailable"
             );
         }
     }
@@ -76,19 +76,43 @@ public static partial class Operations
     {
         api.MapGet(
                 "/monitoring",
-                async (ResourceMonitor resources, StreamRegistry streams, MediaDb db) =>
-                    Results.Ok(
+                async (
+                    ResourceMonitor resources,
+                    StreamRegistry streams,
+                    PlaybackSessions playback,
+                    GpuMetrics gpu,
+                    MediaDb db,
+                    CancellationToken ct
+                ) =>
+                {
+                    var conversion = playback.Snapshot();
+                    return Results.Ok(
                         new
                         {
                             resources = resources.Read(),
                             activeHttpStreams = streams.Snapshot(),
                             queuedScans = await db.Jobs.CountAsync(x => x.State == "queued"),
                             runningScans = await db.Jobs.CountAsync(x => x.State == "running"),
-                            transcodingSupported = false,
-                            transcodingFramesPerSecond = (double?)null,
-                            transcodingQueueCount = (int?)null,
+                            gpu = await gpu.ReadAsync(ct),
+                            transcodingSupported = true,
+                            transcodingFramesPerSecond = conversion
+                                .Jobs.Where(x =>
+                                    x.State == "preparing"
+                                    && x.Phase == "encoding"
+                                    && x.Progress?.FramesPerSecond is not null
+                                )
+                                .Select(x => x.Progress!.FramesPerSecond)
+                                .DefaultIfEmpty(null)
+                                .Aggregate(
+                                    (double?)null,
+                                    (sum, fps) => fps is null ? sum : (sum ?? 0) + fps
+                                ),
+                            // Admission rejects excess jobs; there is no unbounded waiting queue.
+                            transcodingQueueCount = 0,
+                            transcoding = conversion,
                         }
-                    )
+                    );
+                }
             )
             .RequireAuthorization("admin");
     }

@@ -7,7 +7,8 @@ public sealed class FfmpegRunner(string executable)
     public async Task RunAsync(
         IEnumerable<string> arguments,
         string directory,
-        CancellationToken ct
+        CancellationToken ct,
+        Action<FfmpegProgress>? progress = null
     )
     {
         var start = new ProcessStartInfo(executable)
@@ -24,6 +25,19 @@ public sealed class FfmpegRunner(string executable)
             )
         )
             start.ArgumentList.Add(arg);
+        if (progress is not null)
+        {
+            var argumentsToPrepend = new[]
+            {
+                "-nostats",
+                "-progress",
+                "pipe:1",
+                "-stats_period",
+                "0.5",
+            };
+            for (var i = argumentsToPrepend.Length - 1; i >= 0; i--)
+                start.ArgumentList.Insert(0, argumentsToPrepend[i]);
+        }
         using var process = Process.Start(start) ?? throw new IOException("FFmpeg unavailable.");
         using var kill = ct.Register(() =>
         {
@@ -35,7 +49,9 @@ public sealed class FfmpegRunner(string executable)
         });
         // Drain rather than retain potentially sensitive source paths/output in logs or memory.
         var error = process.StandardError.BaseStream.CopyToAsync(Stream.Null, ct);
-        var output = process.StandardOutput.BaseStream.CopyToAsync(Stream.Null, ct);
+        var output = progress is null
+            ? process.StandardOutput.BaseStream.CopyToAsync(Stream.Null, ct)
+            : FfmpegProgressReader.ReadAsync(process.StandardOutput, progress, ct);
         try
         {
             await process.WaitForExitAsync(ct);

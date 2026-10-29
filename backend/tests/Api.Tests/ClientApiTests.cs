@@ -204,5 +204,25 @@ public sealed class ClientApiTests
             Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(target))!);
             await File.WriteAllTextAsync(target, schema + "\n");
         }
+        else
+        {
+            var root = new DirectoryInfo(AppContext.BaseDirectory);
+            while (
+                root is not null
+                && !File.Exists(Path.Combine(root.FullName, "shared", "api", "openapi-v1.json"))
+            )
+                root = root.Parent;
+            Assert.NotNull(root);
+            var checkedIn = await File.ReadAllTextAsync(
+                Path.Combine(root.FullName, "shared", "api", "openapi-v1.json")
+            );
+            Assert.True(
+                System.Text.Json.Nodes.JsonNode.DeepEquals(
+                    System.Text.Json.Nodes.JsonNode.Parse(checkedIn),
+                    System.Text.Json.Nodes.JsonNode.Parse(schema)
+                ),
+                "Running API v1 differs from the checked-in contract. Export and regenerate clients before committing."
+            );
+        }
     }
 }

@@ -28,7 +28,7 @@ The [client ecosystem](docs/clients/README.md) adds a shared Tauri desktop clien
 | Library watching / reconciliation | Implemented alpha | Opt-in watching, missing-entry tombstones and optional hash-based move/duplicate detection |
 | Indexed browsing / smart collections | Implemented alpha | Prefix search, bounded keyset pages, per-user typed rules |
 | Backups / native updates | Implemented alpha | Offline verified snapshots, empty-directory restore and optional staged update manager on Windows/Linux; manual application replacement on macOS |
-| Server monitoring | Implemented alpha | Admin-only process, storage, scan and HTTP stream metrics; GPU and HLS-session monitoring planned |
+| Server monitoring | Implemented alpha | Admin-only process/storage/stream metrics, live FFmpeg conversion activity and opt-in NVIDIA host metrics; physical GPU validation pending |
 | Desktop clients | Alpha implementation | Shared Tauri client; Windows EXE/MSI, Ubuntu 24.04 x64 DEB, Intel/Apple Silicon macOS DMGs; see native CI for build/install evidence |
 | Android phone client | Alpha implementation | Native Compose/Media3, authenticated playback, encrypted sessions and revision-checked progress; see Android CI for build/device evidence |
 | TV / iOS / plugins / secure remote streaming | Planned | Localhost deployment by default; remote clients require trusted HTTPS |

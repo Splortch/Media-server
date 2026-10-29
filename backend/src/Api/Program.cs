@@ -187,6 +187,12 @@ builder.Services.AddHostedService(sp => sp.GetRequiredService<PlaybackSessions>(
 builder.Services.AddSingleton<ScanQueue>();
 builder.Services.AddSingleton<StreamRegistry>();
 builder.Services.AddSingleton(new ResourceMonitor(data));
+builder.Services.AddSingleton(
+    new GpuMetrics(
+        builder.Configuration.GetValue<bool>("MediaServer:EnableGpuMetrics"),
+        builder.Configuration["MediaServer:NvidiaSmiPath"] ?? "nvidia-smi"
+    )
+);
 builder.Services.AddSingleton<ScanScheduler>();
 builder.Services.AddHostedService<LibraryMonitor>();
 builder.Services.AddHostedService<ScanWorker>();

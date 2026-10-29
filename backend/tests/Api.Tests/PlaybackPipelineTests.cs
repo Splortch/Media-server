@@ -430,6 +430,16 @@ public sealed class PlaybackPipelineTests
                 .Sessions.Select(x => x.Id)
                 .SingleAsync();
         var playback = server.Services.GetRequiredService<PlaybackSessions>();
+        var activity = Assert.Single(playback.Snapshot().Jobs);
+        Assert.Equal("ready", activity.State);
+        Assert.Equal("ready", activity.Phase);
+        Assert.Equal(3, activity.CompletedRenditions);
+        Assert.True(activity.ElapsedSeconds > 0);
+        Assert.Null(activity.Progress); // A cached conversion must not appear to keep encoding.
+        var monitoring = await admin.GetStringAsync("/api/v1/monitoring");
+        Assert.DoesNotContain(ownerSession, monitoring);
+        Assert.DoesNotContain(server.MediaPath, monitoring);
+        Assert.DoesNotContain(server.DataPath, monitoring);
         var rejected = 0;
         Parallel.For(
             0,
