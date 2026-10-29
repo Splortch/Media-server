@@ -98,6 +98,8 @@ test('track controls expose instructions and support keyboard selection', async 
     /bitmap subtitles are unavailable/,
   );
   await subtitles.focus();
+  // macOS popup buttons open on Space; Down alone opens without changing value.
+  if (browserName === 'webkit') await page.keyboard.press('Space');
   await page.keyboard.press('ArrowDown');
   await page.keyboard.press('Enter');
   await expect(subtitles).not.toHaveValue('');
