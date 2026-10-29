@@ -383,8 +383,7 @@ public sealed class PlaybackSessions(
         foreach (var level in TranscodeProfile.Ladder)
         {
             var args = new List<string> { "-filter_threads", hdr ? "1" : "2" };
-            if (encoder == "h264_vaapi")
-                args.AddRange(["-vaapi_device", "/dev/dri/renderD128"]);
+            args.AddRange(TranscodeProfile.DeviceArguments(encoder, settings));
             args.AddRange([
                 "-protocol_whitelist",
                 "file",
@@ -403,7 +402,7 @@ public sealed class PlaybackSessions(
             if (encoder == "h264_vaapi")
                 filter += ",format=nv12,hwupload";
             args.AddRange(["-vf", filter]);
-            args.AddRange(TranscodeProfile.EncoderArguments(encoder));
+            args.AddRange(TranscodeProfile.EncoderArguments(encoder, settings));
             args.AddRange([
                 "-threads",
                 "2",

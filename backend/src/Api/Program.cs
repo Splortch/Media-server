@@ -166,9 +166,15 @@ var permittedEncoders =
     builder.Configuration.GetSection("MediaServer:HardwareEncoders").Get<string[]>() ?? [];
 if (permittedEncoders.Any(x => !EncoderDiscovery.Encoders.Contains(x)))
     throw new InvalidOperationException("Unknown configured hardware encoder.");
-builder.Services.AddSingleton(
-    new TranscodeSettings(new[] { "libx264" }.Concat(permittedEncoders).Distinct().ToArray())
+var transcodeSettings = new TranscodeSettings(
+    new[] { "libx264" }.Concat(permittedEncoders).Distinct().ToArray(),
+    builder.Configuration["MediaServer:VaapiDevice"] ?? "/dev/dri/renderD128",
+    builder.Configuration.GetValue<int?>("MediaServer:NvencGpu") ?? -1,
+    builder.Configuration["MediaServer:QsvDevice"]
 );
+transcodeSettings.Validate();
+builder.Services.AddSingleton(transcodeSettings);
+
 builder.Services.AddSingleton(sp => new PlaybackSessions(
     data,
     sp.GetRequiredService<FfmpegRunner>(),

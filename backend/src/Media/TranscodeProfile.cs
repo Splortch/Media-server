@@ -50,8 +50,21 @@ public static class TranscodeProfile
         + $"scale=w=-2:h='min({rendition.Height},ih)':force_original_aspect_ratio=decrease,format=yuv420p";
 
     // All selections are server-defined, never raw client command-line arguments.
-    public static string[] EncoderArguments(string encoder) =>
+    public static string[] DeviceArguments(string encoder, TranscodeSettings settings) =>
         encoder switch
+        {
+            "h264_vaapi" => ["-vaapi_device", settings.VaapiDevice],
+            "h264_qsv" when settings.QsvDevice is not null =>
+            [
+                "-init_hw_device",
+                $"qsv=mediaqsv:hw,child_device={settings.QsvDevice},child_device_type={(OperatingSystem.IsWindows() ? "d3d11va" : "vaapi")}",
+            ],
+            _ => [],
+        };
+
+    public static string[] EncoderArguments(string encoder, TranscodeSettings? settings = null)
+    {
+        string[] result = encoder switch
         {
             "h264_nvenc" => ["-c:v", encoder, "-preset", "p4"],
             "h264_qsv" => ["-c:v", encoder, "-preset", "medium"],
@@ -60,4 +73,13 @@ public static class TranscodeProfile
             "libx264" => ["-c:v", encoder, "-preset", "veryfast"],
             _ => throw new ArgumentException("Unsupported encoder."),
         };
+        return encoder == "h264_nvenc" && settings is { NvencGpu: >= 0 }
+            ?
+            [
+                .. result,
+                "-gpu",
+                settings.NvencGpu.ToString(System.Globalization.CultureInfo.InvariantCulture),
+            ]
+            : result;
+    }
 }

@@ -129,3 +129,5 @@ See [desktop installers for Windows, Linux and macOS](docs/deployment/DESKTOP-IN
 ### Playback and library management
 
 See [HLS conversion, hardware opt-in, HDR, subtitles and library removal](docs/architecture/PLAYBACK-PIPELINE.md) for setup, API details, alpha limits and the physical-device validation still needed.
+
+Playback pipeline validation and GPU configuration: [development guide](docs/development/PLAYBACK-VALIDATION.md).
