@@ -256,6 +256,19 @@ builder.Services.AddRateLimiter(o =>
                 }
             )
     );
+    o.AddPolicy(
+        "playback",
+        context =>
+            RateLimitPartition.GetFixedWindowLimiter(
+                context.User.FindFirstValue(ClaimTypes.NameIdentifier) ?? "anonymous",
+                _ => new FixedWindowRateLimiterOptions
+                {
+                    PermitLimit = 6,
+                    Window = TimeSpan.FromMinutes(1),
+                    QueueLimit = 0,
+                }
+            )
+    );
 });
 builder.Services.AddOpenApi("v1", o => o.ShouldInclude = _ => true);
 builder.Services.AddOpenApi("client-v1", o => o.ShouldInclude = d => d.GroupName == "client-v1");
@@ -356,8 +369,8 @@ app.Use(
         }
     }
 );
-app.UseRateLimiter();
 app.UseAuthentication();
+app.UseRateLimiter();
 app.UseAuthorization();
 app.Use(
     async (context, next) =>

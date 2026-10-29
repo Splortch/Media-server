@@ -165,6 +165,7 @@ test('measure bandwidth adaptation, rebuffering and accessible track selection',
       )
       .toContain('synthetic caption');
     await page.waitForTimeout(4000); // Deliberate fixed high-bandwidth measurement window.
+    const atDrop = await sample();
     const dropAt = (Date.now() - started) / 1000;
     await shape(140000);
     await page.getByLabel('Playback quality').selectOption('-1');
@@ -197,6 +198,10 @@ test('measure bandwidth adaptation, rebuffering and accessible track selection',
       },
       dropAtSeconds: dropAt,
       adaptationSeconds: adapted - dropAt,
+      afterDrop: {
+        stalls: final.stalls - atDrop.stalls,
+        stallSeconds: Math.max(0, final.stallSeconds - atDrop.stallSeconds),
+      },
       final,
       observations,
       note: 'Synthetic complete-VOD HLS; CDP download throughput shaping. Not physical-network/device or progressive-startup evidence.',

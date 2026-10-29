@@ -465,6 +465,57 @@ public sealed class PlaybackPipelineTests
         Assert.Equal(state.Id, (await joined.Content.ReadFromJsonAsync<ConversionState>())!.Id);
         Assert.Equal(HttpStatusCode.OK, (await other.GetAsync(state.Manifest)).StatusCode);
 
+        var account = await admin.PostAsJsonAsync(
+            "/api/users",
+            new
+            {
+                name = "cache-viewer",
+                password = "cache-viewer-password",
+                allLibraries = true,
+            }
+        );
+        Assert.Equal(HttpStatusCode.Created, account.StatusCode);
+        var viewerId = (await account.Content.ReadFromJsonAsync<JsonElement>())
+            .GetProperty("id")
+            .GetInt32();
+        using var viewer = server.CreateClient();
+        await Server.Csrf(viewer);
+        Assert.Equal(
+            HttpStatusCode.OK,
+            (
+                await viewer.PostAsJsonAsync(
+                    "/api/auth/login",
+                    new { name = "cache-viewer", password = "cache-viewer-password" }
+                )
+            ).StatusCode
+        );
+        Assert.Equal(HttpStatusCode.NotFound, (await viewer.GetAsync(state.Manifest)).StatusCode);
+        await Server.Csrf(viewer);
+        var viewerLease = await viewer.PostAsJsonAsync(
+            "/api/v1/media/1/playback-sessions",
+            new PlaybackSelection(AudioTrack: 2, SubtitleTrack: -1, Encoder: "h264_nvenc")
+        );
+        Assert.Equal(HttpStatusCode.Accepted, viewerLease.StatusCode);
+        Assert.Equal(
+            state.Id,
+            (await viewerLease.Content.ReadFromJsonAsync<ConversionState>())!.Id
+        );
+        Assert.Equal(HttpStatusCode.OK, (await viewer.GetAsync(state.Manifest)).StatusCode);
+        using (var scope = server.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<MediaDb>();
+            var user = (await db.Users.FindAsync(viewerId))!;
+            user.AllLibraries = false;
+            await db.SaveChangesAsync();
+        }
+        // Keep the login alive to prove each asset rechecks ACL independently of revocation.
+        Assert.Equal(HttpStatusCode.OK, (await viewer.GetAsync("/api/auth/me")).StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, (await viewer.GetAsync(state.Manifest)).StatusCode);
+        Assert.Equal(
+            HttpStatusCode.NoContent,
+            (await viewer.DeleteAsync("/api/v1/playback-sessions/" + state.Id)).StatusCode
+        );
+
         Assert.Equal(
             HttpStatusCode.NoContent,
             (await admin.DeleteAsync("/api/v1/playback-sessions/" + state.Id)).StatusCode

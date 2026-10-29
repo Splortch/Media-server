@@ -97,7 +97,7 @@ public static class PlaybackApi
                 }
             )
             .Produces<ConversionState>(202)
-            .RequireRateLimiting("auth");
+            .RequireRateLimiting("playback");
         api.MapGet(
                 "/playback-sessions/{session}",
                 async (

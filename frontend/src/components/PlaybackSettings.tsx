@@ -475,7 +475,7 @@ export default function PlaybackSettings({
             onChange={(e) => {
               const value = Number(e.target.value);
               setQuality(value);
-              if (hls.current) hls.current.currentLevel = value;
+              if (hls.current) hls.current.nextLevel = value;
             }}
           >
             <option value="-1">Auto (network aware)</option>

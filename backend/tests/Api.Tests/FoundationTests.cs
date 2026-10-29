@@ -344,6 +344,53 @@ public sealed class FoundationTests
     }
 
     [Fact]
+    public async Task PlaybackQuotaIsPerUserAndDoesNotSpendSignInBudget()
+    {
+        using var server = new Server();
+        using var admin = await server.Admin();
+        for (var i = 0; i < 6; i++)
+            Assert.Equal(
+                HttpStatusCode.NotFound,
+                (
+                    await admin.PostAsJsonAsync(
+                        "/api/v1/media/999/playback-sessions",
+                        new { encoder = "libx264" }
+                    )
+                ).StatusCode
+            );
+        Assert.Equal(
+            HttpStatusCode.TooManyRequests,
+            (
+                await admin.PostAsJsonAsync(
+                    "/api/v1/media/999/playback-sessions",
+                    new { encoder = "libx264" }
+                )
+            ).StatusCode
+        );
+        using var other = server.CreateClient();
+        await Server.Csrf(other);
+        Assert.Equal(
+            HttpStatusCode.OK,
+            (
+                await other.PostAsJsonAsync(
+                    "/api/auth/login",
+                    new { name = "admin", password = "twelve-character-password" }
+                )
+            ).StatusCode
+        );
+        await Server.Csrf(other);
+        Assert.Equal(
+            HttpStatusCode.TooManyRequests,
+            (
+                await other.PostAsJsonAsync(
+                    "/api/v1/media/999/playback-sessions",
+                    new { encoder = "libx264" }
+                )
+            ).StatusCode
+        );
+    }
+
+    [Fact]
     public async Task SensitiveEndpointsAreRateLimited()
     {
         using var server = new Server();
