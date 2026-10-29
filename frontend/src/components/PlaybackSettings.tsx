@@ -103,6 +103,13 @@ export default function PlaybackSettings({
   const [quality, setQuality] = useState(-1);
   const [levels, setLevels] = useState<string[]>([]);
   const [busy, setBusy] = useState(false);
+  const [adaptive, setAdaptive] = useState({
+    height: 0,
+    switches: 0,
+    stalls: 0,
+    stallSeconds: 0,
+    estimatedKbps: 0,
+  });
   const hls = useRef<Hls | null>(null);
   const current = useRef<string | undefined>(undefined);
   const mounted = useRef(true);
@@ -140,6 +147,9 @@ export default function PlaybackSettings({
     if (Hls.isSupported()) {
       const engine = new Hls({
         enableWorker: false,
+        maxBufferLength: 12,
+        maxMaxBufferLength: 24,
+        maxBufferSize: 8 * 1024 * 1024,
         xhrSetup: (xhr) => {
           xhr.withCredentials = true;
         },
@@ -147,6 +157,60 @@ export default function PlaybackSettings({
       hls.current = engine;
       engine.loadSource(source);
       engine.attachMedia(element);
+      let played = false;
+      let waitingAt: number | undefined;
+      let previousLevel = -1;
+      const metrics = {
+        height: 0,
+        switches: 0,
+        stalls: 0,
+        stallSeconds: 0,
+        estimatedKbps: 0,
+      };
+      const publish = () => {
+        metrics.estimatedKbps = Number.isFinite(engine.bandwidthEstimate)
+          ? Math.round(engine.bandwidthEstimate / 1000)
+          : 0;
+        setAdaptive({ ...metrics });
+      };
+      const finishWait = () => {
+        if (waitingAt !== undefined)
+          metrics.stallSeconds += (performance.now() - waitingAt) / 1000;
+        waitingAt = undefined;
+        publish();
+      };
+      const onPlaying = () => {
+        played = true;
+        finishWait();
+      };
+      const onWaiting = () => {
+        if (
+          played &&
+          !element.paused &&
+          !element.seeking &&
+          !element.ended &&
+          waitingAt === undefined
+        ) {
+          waitingAt = performance.now();
+          metrics.stalls++;
+          publish();
+        }
+      };
+      const onSeeking = () => {
+        waitingAt = undefined;
+      };
+      element.addEventListener('playing', onPlaying);
+      element.addEventListener('waiting', onWaiting);
+      element.addEventListener('pause', finishWait);
+      element.addEventListener('seeking', onSeeking);
+      engine.on(Hls.Events.LEVEL_SWITCHED, (_, data) => {
+        if (previousLevel >= 0 && previousLevel !== data.level)
+          metrics.switches++;
+        previousLevel = data.level;
+        metrics.height = engine.levels[data.level]?.height ?? 0;
+        publish();
+      });
+      engine.on(Hls.Events.FRAG_LOADED, publish);
       engine.on(Hls.Events.MANIFEST_PARSED, () => {
         setLevels(
           engine.levels.map(
@@ -169,6 +233,10 @@ export default function PlaybackSettings({
         }
       });
       return () => {
+        element.removeEventListener('playing', onPlaying);
+        element.removeEventListener('waiting', onWaiting);
+        element.removeEventListener('pause', finishWait);
+        element.removeEventListener('seeking', onSeeking);
         engine.destroy();
         hls.current = null;
       };
@@ -293,6 +361,21 @@ export default function PlaybackSettings({
           requires a compatible HDR display and decoder.
         </p>
       )}
+      {levels.length > 0 && (
+        <p
+          aria-label="Adaptive playback diagnostics"
+          data-height={adaptive.height}
+          data-switches={adaptive.switches}
+          data-stalls={adaptive.stalls}
+          data-stall-seconds={adaptive.stallSeconds.toFixed(3)}
+          data-estimated-kbps={adaptive.estimatedKbps}
+        >
+          Playing {adaptive.height || 'unknown'}p · {adaptive.switches} quality
+          switches · {adaptive.stalls} rebuffer events (
+          {adaptive.stallSeconds.toFixed(1)} seconds) · estimated bandwidth{' '}
+          {adaptive.estimatedKbps} kbps
+        </p>
+      )}
       <label>
         Audio track
         <select
@@ -319,9 +402,10 @@ export default function PlaybackSettings({
           disabled={busy || session?.state === 'preparing'}
         >
           <option value="">Off</option>
-          {options?.externalWebVtt && (
-            <option value="-1">External WebVTT</option>
-          )}
+          {options?.externalWebVtt &&
+            !options.tracks.some((t) => t.index === -1) && (
+              <option value="-1">External WebVTT</option>
+            )}
           {options?.tracks
             ?.filter((t) => t.type === 'subtitle')
             .map((t) => (

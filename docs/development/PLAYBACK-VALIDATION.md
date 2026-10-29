@@ -46,8 +46,23 @@ The Playback validation workflow runs software checks on hosted Linux runners. H
 | Native HLS authorization, ranges, logout and malicious manifests | Rust real-backend integration tests |
 | Android HLS rendering and quality changes | Emulator instrumentation against the real backend; not physical-device evidence |
 | Physical NVENC, QSV, VAAPI and AMF devices | Not tested in this development environment; run the explicit hardware workflow |
-| Throttled-network ABR/rebuffer measurements | Still pending |
+| Throttled-network ABR/rebuffer measurements | Chromium CDP throughput test records switches, adaptation delay and rebuffer counts/time; inspect the current workflow artifact for measured results |
 | HDR visual fidelity and physical display behavior | Still pending |
-| Bitmap subtitle burn-in and multiple external text files | Still pending |
+| External language captions | Bounded VTT/SRT/ASS/SSA discovery, safe conversion and content-hash cache invalidation; bitmap burn-in remains unsupported |
 
 Do not interpret a successful software workflow as proof of GPU support, device codec compatibility, HDR display output or a successful visual-quality review.
+
+## Browser network and codec evidence
+
+```sh
+npm ci --prefix frontend
+(cd frontend && npx playwright install --with-deps chromium firefox webkit)
+dotnet build MediaServer.sln
+bash scripts/playback-browser.sh
+```
+
+This starts a fresh server with synthetic media and fresh test-only credentials, runs browser tests, then removes only its own temporary files. Do not point it at a personal server. Outputs in `frontend/benchmark-results/` include browser version/platform, advertised versus actual AV1/HEVC decoding, and Chromium network observations. Linux Playwright WebKit is not a physical Safari/iPhone test.
+
+Chromium's CDP shapes download throughput at 800,000 then 140,000 bytes/second with 40 ms latency. The test confirms 720p manual playback, enables Auto, observes a switch to 360p and confirms playback advances. It records adaptation delay, quality switches, buffering events and accumulated stall seconds. The player bounds its media buffer to 24 seconds; startup and intentional seeking are excluded from rebuffer counts. Results depend on the synthetic scene and runner; do not treat them as universal quality/performance promises. This benchmark measures adaptation after complete-VOD preparation, not progressive transcoding startup.
+
+Codec tests require actual H.264 playback as a baseline and record actual rendered playback or decoder/unsupported errors for synthetic 10-bit HEVC/AV1. Network failures, timeouts and autoplay rejection fail the test instead of being labelled unsupported. High-dynamic-range display advertising is recorded separately; no color-fidelity claim follows from headless decoding.

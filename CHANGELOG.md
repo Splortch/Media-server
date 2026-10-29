@@ -51,3 +51,5 @@ No official stable release has been published. Transcoding, hardware acceleratio
 - Add native desktop HLS/track controls through the credential-owning loopback bridge and Android Media3 HLS, quality and caption selection.
 - Reuse compatible conversions through independent per-session leases, with current ACL checks, isolated progress, bounded fan-out and last-lease cleanup.
 - Validate untrusted playback responses and resources, reject external playlist references, and exercise native HLS ranges and logout against the real backend.
+
+- Added multiple external text subtitle languages with content-aware cache invalidation, adaptive playback diagnostics, and synthetic throttled-network/browser codec validation.

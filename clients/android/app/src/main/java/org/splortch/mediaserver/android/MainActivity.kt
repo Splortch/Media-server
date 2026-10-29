@@ -254,7 +254,10 @@ class MainActivity : ComponentActivity() {
                                             "Subtitles",
                                             screen.subtitleTrack,
                                             listOf(null to "Off") +
-                                                (if (options.externalWebVtt)
+                                                (if (
+                                                    options.externalWebVtt &&
+                                                        options.tracks.none { it.index == -1 }
+                                                )
                                                     listOf(-1 to "External WebVTT")
                                                 else emptyList()) +
                                                 options.tracks

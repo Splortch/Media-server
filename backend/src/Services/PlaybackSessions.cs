@@ -95,12 +95,24 @@ public sealed class PlaybackSessions(
             throw new ArgumentException("Unknown audio track.");
         if (
             selection.SubtitleTrack is int subtitle
-            && subtitle != -1
+            && subtitle >= 0
             && !tracks.Any(x =>
                 x.Index == subtitle && x.Type == "subtitle" && TextSubtitle(x.Codec)
             )
         )
             throw new ArgumentException("Only text subtitles can be converted to WebVTT.");
+        byte[]? captionBytes = null;
+        string? captionCodec = null;
+        if (selection.SubtitleTrack is < 0)
+        {
+            var caption =
+                ExternalCaptions
+                    .Discover(policy, library, item)
+                    .FirstOrDefault(x => x.Index == selection.SubtitleTrack)
+                ?? throw new ArgumentException("Unknown external subtitle.");
+            captionBytes = await ExternalCaptions.ReadAsync(policy, library, caption, ct);
+            captionCodec = caption.Codec;
+        }
         if (item.Size > MaxSourceBytes || item.Duration > 21600)
             throw new ArgumentException(
                 "Alpha conversion limit: 8 GiB source and six hours. Use Direct Play for larger files."
@@ -109,7 +121,7 @@ public sealed class PlaybackSessions(
         try
         {
             var key =
-                $"{item.Id}:{item.ModifiedTicks}:{item.Size}:{JsonSerializer.Serialize(selection)}";
+                $"{item.Id}:{item.ModifiedTicks}:{item.Size}:{JsonSerializer.Serialize(selection)}:{(captionBytes is null ? "" : Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(captionBytes)))}";
             var existing = jobs.Values.FirstOrDefault(x =>
                 x.Key == key && x.State is "preparing" or "ready"
             );
@@ -123,16 +135,10 @@ public sealed class PlaybackSessions(
             if (jobs.Count >= 2)
                 return null;
             var source = policy.OpenRead(library.Path, item.RelativePath);
-            Stream? captions = null;
             try
             {
                 if (source.Length > MaxSourceBytes)
                     throw new ArgumentException("Source exceeds conversion limit.");
-                if (selection.SubtitleTrack == -1)
-                    captions = policy.OpenRead(
-                        library.Path,
-                        Path.ChangeExtension(item.RelativePath, ".vtt")
-                    );
                 var id = Guid.NewGuid().ToString("N");
                 var path = Path.Combine(root, id);
                 Directory.CreateDirectory(path);
@@ -145,13 +151,12 @@ public sealed class PlaybackSessions(
                 job.Leases[session] = new Lease(user, DateTime.UtcNow);
                 jobs[id] = job;
                 // Own already pinned handles; never reopen a client/source path in FFmpeg.
-                job.Work = ConvertAsync(job, source, captions, item);
+                job.Work = ConvertAsync(job, source, captionBytes, captionCodec, item);
                 return job.Info();
             }
             catch
             {
                 source.Dispose();
-                captions?.Dispose();
                 throw;
             }
         }
@@ -252,7 +257,13 @@ public sealed class PlaybackSessions(
         jobs.TryRemove(job.Id, out _);
     }
 
-    private async Task ConvertAsync(Job job, Stream source, Stream? captions, MediaItem item)
+    private async Task ConvertAsync(
+        Job job,
+        Stream source,
+        byte[]? captions,
+        string? captionCodec,
+        MediaItem item
+    )
     {
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(
             job.Stop.Token,
@@ -285,16 +296,43 @@ public sealed class PlaybackSessions(
             item.ColorJson = metadata.ColorJson;
             if (captions is not null)
             {
-                using var reader = new StreamReader(captions);
-                var buffer = new char[1024 * 1024 + 1];
-                var count = await reader.ReadBlockAsync(buffer.AsMemory(), ct);
-                if (count > 1024 * 1024)
-                    throw new IOException("Caption quota exceeded.");
-                await File.WriteAllTextAsync(
-                    Path.Combine(job.Directory, "captions.vtt"),
-                    SanitizeVtt(new string(buffer, 0, count)),
-                    ct
-                );
+                var captionPath = Path.Combine(job.Directory, "captions.vtt");
+                if (captionCodec == "webvtt")
+                    await File.WriteAllTextAsync(
+                        captionPath,
+                        SanitizeVtt(Encoding.UTF8.GetString(captions)),
+                        ct
+                    );
+                else
+                {
+                    var input = "captions-source." + (captionCodec == "subrip" ? "srt" : "ass");
+                    await File.WriteAllBytesAsync(Path.Combine(job.Directory, input), captions, ct);
+                    await runner.RunAsync(
+                        [
+                            "-protocol_whitelist",
+                            "file",
+                            "-format_whitelist",
+                            "srt,ass,webvtt",
+                            "-i",
+                            input,
+                            "-map",
+                            "0:s:0",
+                            "-c:s",
+                            "webvtt",
+                            "captions.vtt",
+                        ],
+                        job.Directory,
+                        ct
+                    );
+                    if (new FileInfo(captionPath).Length > ExternalCaptions.MaxBytes)
+                        throw new IOException("Caption quota exceeded.");
+                    await File.WriteAllTextAsync(
+                        captionPath,
+                        SanitizeVtt(await File.ReadAllTextAsync(captionPath, ct)),
+                        ct
+                    );
+                    File.Delete(Path.Combine(job.Directory, input));
+                }
             }
             else if (job.Selection.SubtitleTrack is int subtitle)
             {
@@ -369,7 +407,6 @@ public sealed class PlaybackSessions(
         finally
         {
             source.Dispose();
-            captions?.Dispose();
             monitorStop.Cancel();
             await quota;
         }

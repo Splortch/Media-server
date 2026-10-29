@@ -31,3 +31,6 @@ artifacts/
 **/local.properties
 *.jks
 *.keystore
+
+# Reproducible browser benchmark output
+frontend/benchmark-results/

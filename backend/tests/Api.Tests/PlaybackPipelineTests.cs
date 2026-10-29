@@ -369,6 +369,11 @@ public sealed class PlaybackPipelineTests
             Path.ChangeExtension(path, ".vtt"),
             "WEBVTT\n\n00:00:00.000 --> 00:00:01.000\n<b>Accessible caption</b>\n"
         );
+        var externalSrt = Path.Combine(server.MediaPath, "synthetic.swe.srt");
+        await File.WriteAllTextAsync(
+            externalSrt,
+            "1\n00:00:00,000 --> 00:00:01,000\n<b>Swedish caption</b>\n"
+        );
         var observed = await new Ffprobe("ffprobe").ProbeAsync(path, CancellationToken.None);
         using (var scope = server.Services.CreateScope())
         {
@@ -470,6 +475,61 @@ public sealed class PlaybackPipelineTests
             (await other.DeleteAsync("/api/v1/playback-sessions/" + state.Id)).StatusCode
         );
         Assert.Equal(HttpStatusCode.NotFound, (await other.GetAsync(state.Manifest)).StatusCode);
+        var externalTrack = options
+            .GetProperty("tracks")
+            .EnumerateArray()
+            .Single(x =>
+                x.GetProperty("codec").GetString() == "subrip"
+                && x.GetProperty("language").GetString() == "swe"
+            );
+        var selected = new PlaybackSelection(
+            SubtitleTrack: externalTrack.GetProperty("index").GetInt32()
+        );
+        Assert.True(selected.SubtitleTrack < -1);
+        async Task<ConversionState> PrepareCaption()
+        {
+            var response = await admin.PostAsJsonAsync(
+                "/api/v1/media/1/playback-sessions",
+                selected
+            );
+            Assert.Equal(HttpStatusCode.Accepted, response.StatusCode);
+            var value = (await response.Content.ReadFromJsonAsync<ConversionState>())!;
+            for (var i = 0; i < 200 && value.State == "preparing"; i++)
+            {
+                await Task.Delay(100);
+                value = (
+                    await admin.GetFromJsonAsync<ConversionState>(
+                        "/api/v1/playback-sessions/" + value.Id
+                    )
+                )!;
+            }
+            Assert.True(value.State == "ready", value.Error);
+            return value;
+        }
+        var firstCaption = await PrepareCaption();
+        var firstCaptionUrl = firstCaption.Manifest.Replace("master.m3u8", "captions.vtt");
+        var rendered = await admin.GetStringAsync(firstCaptionUrl);
+        Assert.Contains("Swedish caption", rendered);
+        Assert.DoesNotContain("<b>", rendered);
+        await File.WriteAllTextAsync(
+            externalSrt,
+            "1\n00:00:00,000 --> 00:00:01,000\nUpdated caption\n"
+        );
+        var updatedCaption = await PrepareCaption();
+        Assert.NotEqual(firstCaption.Id, updatedCaption.Id);
+        Assert.Contains(
+            "Updated caption",
+            await admin.GetStringAsync(
+                updatedCaption.Manifest.Replace("master.m3u8", "captions.vtt")
+            )
+        );
+        Assert.Contains("Swedish caption", await admin.GetStringAsync(firstCaptionUrl));
+        Assert.Equal(
+            HttpStatusCode.Unauthorized,
+            (await anonymous.GetAsync(firstCaptionUrl)).StatusCode
+        );
+        await admin.DeleteAsync("/api/v1/playback-sessions/" + firstCaption.Id);
+        await admin.DeleteAsync("/api/v1/playback-sessions/" + updatedCaption.Id);
         Assert.True(File.Exists(path));
     }
 }

@@ -6,11 +6,11 @@ This alpha adds an operational, bounded HLS conversion path alongside unchanged 
 
 | Area | Implemented | Still requires validation or follow-up |
 | --- | --- | --- |
-| #5 adaptive playback | 360p/480p/720p ceiling ladder, hls.js automatic bandwidth selection, manual override, reuse through separately authorized session leases | Real throttled-network switching/rebuffering benchmarks; source-resolution-specific ladders |
+| #5 adaptive playback | 360p/480p/720p ceiling ladder, hls.js automatic bandwidth selection, manual override, reuse through separately authorized session leases | Representative real-world network/device testing; source-resolution-specific ladders (automated CDP measurements are provided) |
 | #6 NVIDIA | Runtime synthetic encode probe, opt-in NVENC encoder, retry the complete conversion in software if hardware fails | Real NVIDIA device/driver tests and throughput benchmarks |
 | #7 Intel/AMD | Runtime QSV, VAAPI and AMF adapters through FFmpeg; configured VAAPI/QSV render nodes and NVENC adapter selection; explicit fallback | Physical Linux/Windows GPU matrix and AMF adapter selection |
 | #8 formats/HDR | FFprobe dimensions, pixel format, bit depth, primaries, transfer, matrix and side metadata; explicit HDR warning; Hable HDR-to-BT.709 SDR conversion with stale HDR frame side data removed | Physical HDR display checks, visual/reference color fidelity, Dolby Vision, cross-browser decoder matrix and representative tone-map benchmarks |
-| #9 tracks | Indexed audio selection through conversion, authorized embedded text-to-WebVTT and same-basename external `.vtt`, escaped React labels, caption markup stripping | Bitmap subtitle burn-in, multiple external language files, bitmap captions, external-language sets and screen-reader/device checks |
+| #9 tracks | Indexed audio selection through conversion, authorized embedded text-to-WebVTT and multiple external `.vtt`/`.srt`/`.ass`/`.ssa` language files, escaped React labels, caption markup stripping | Bitmap subtitle burn-in and physical screen-reader/device checks |
 | Remove libraries | Administrator-only API and confirmation UI, transactional catalog cleanup, scan conflict protection, original files preserved | Existing already-open Direct Play handles can finish; subsequent media/segment requests fail |
 
 Web and desktop clients share the HLS/quality/audio/subtitle controls. Desktop requests flow through the native credential-owning transport and a nonce-scoped loopback bridge; captions and MSE use restricted CORS. Native Android uses Media3 HLS and its protected same-origin cookie client, with Auto/manual variants and text subtitles. Actual device codec support is still not assumed. The server API is client-independent and additive to API v1.
@@ -73,3 +73,9 @@ Automated tests cover transactional removal/source preservation, active scan rej
 A passing build is not a physical GPU, HDR color-fidelity, screen-reader or native-device test. Keep #5–#9 open for those remaining criteria. Tone-map timing reported by conversion is wall-clock end-to-end time, not a representative hardware benchmark. Dolby Vision and automatic HDR-display passthrough negotiation are not implemented. Remote use still requires HTTPS and the existing deployment guidance.
 
 See [playback validation](../development/PLAYBACK-VALIDATION.md) for synthetic benchmark commands, JSON evidence, GPU binding configuration and the optional physical-hardware workflow.
+
+## External language captions
+
+Place `Movie.eng.vtt`, `Movie.swe.srt` or `Movie.swe.forced.ass` beside `Movie.mkv` (same basename). Exact `Movie.vtt` remains compatible with existing clients. The language suffix is displayed alongside the format and labels; ASS styling/positioning is lost during safe WebVTT conversion. No subtitle path is accepted from a client. Files are opened through the no-symlink library policy and pinned into bounded memory before encoding. Their content hashes participate in cache keys, so editing a caption cannot silently reuse stale caption output.
+
+At most 32 external subtitle files, 1 MiB per file, and 4096 directory entries are considered. Larger directories omit external-caption discovery instead of performing an unbounded scan. Embedded tracks remain available. Originals are never edited. Unsupported bitmap subtitles remain explicitly disabled in the client UI.
