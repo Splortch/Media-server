@@ -1,10 +1,10 @@
 name: Playback validation
 on:
   pull_request:
-    paths: ['backend/**', 'frontend/**', 'scripts/playback-browser.sh', '.github/workflows/playback-validation.yml', 'Directory.Build.props', 'global.json']
+    paths: ['backend/**', 'frontend/**', 'scripts/playback-browser.sh', 'scripts/playback-evidence.py', 'scripts/tests/test_playback_evidence.py', '.github/workflows/playback-validation.yml', 'Directory.Build.props', 'global.json']
   push:
     branches: [main]
-    paths: ['backend/**', 'frontend/**', 'scripts/playback-browser.sh', '.github/workflows/playback-validation.yml', 'Directory.Build.props', 'global.json']
+    paths: ['backend/**', 'frontend/**', 'scripts/playback-browser.sh', 'scripts/playback-evidence.py', 'scripts/tests/test_playback_evidence.py', '.github/workflows/playback-validation.yml', 'Directory.Build.props', 'global.json']
   workflow_dispatch:
     inputs:
       hardware:
@@ -40,11 +40,16 @@ jobs:
           for scenario in sdr hevc-hdr av1-hdr; do
             dotnet run --no-build --project backend/tools/PlaybackBenchmark -- --scenario "$scenario" --output "artifacts/$scenario.json"
           done
+      - name: Validate evidence reporting
+        run: python3 -m unittest discover -s scripts/tests -p test_playback_evidence.py
+      - name: Publish software evidence matrix
+        if: always()
+        run: python3 scripts/playback-evidence.py artifacts/*.json --output artifacts/matrix.md >> "$GITHUB_STEP_SUMMARY"
       - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: playback-software-results
-          path: artifacts/*.json
+          path: artifacts/
   browsers:
     name: Browsers (${{ matrix.platform }})
     strategy:
@@ -88,6 +93,9 @@ jobs:
       - run: dotnet build MediaServer.sln --no-restore -warnaserror
       - run: npm ci --prefix frontend
       - run: cd frontend && npx playwright install --with-deps ${{ matrix.browsers }}
+      - name: Enable macOS keyboard navigation
+        if: runner.os == 'macOS'
+        run: defaults write org.webkit.Playwright AppleKeyboardUIMode -int 2
       - name: Measure network adaptation and browser decoder compatibility
         run: bash scripts/playback-browser.sh ${{ matrix.projects }}
       - uses: actions/upload-artifact@v7
@@ -114,8 +122,12 @@ jobs:
           for scenario in sdr hevc-hdr av1-hdr; do
             dotnet run --no-build --project backend/tools/PlaybackBenchmark -- --encoder "$REQUESTED_ENCODER" --require-hardware --scenario "$scenario" --output "artifacts/hardware-$scenario.json"
           done
+      - name: Publish hardware evidence without accepting fallback
+        if: always()
+        shell: bash
+        run: python3 scripts/playback-evidence.py artifacts/hardware-*.json --require-hardware --output artifacts/hardware-matrix.md >> "$GITHUB_STEP_SUMMARY"
       - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: playback-hardware-results
-          path: artifacts/hardware-*.json
+          path: artifacts/hardware-*
