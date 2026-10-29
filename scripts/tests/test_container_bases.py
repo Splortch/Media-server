@@ -32,6 +32,10 @@ class ContainerBaseTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             policy.verify(self.text.replace("node:26-bookworm-slim", "node:latest"))
 
+    def test_long_invalid_repository_is_rejected_without_ambiguous_matching(self):
+        with self.assertRaises(ValueError):
+            policy.verify(self.text.replace("node:26-bookworm-slim", ("x/" * 10000) + "node:bad!"))
+
     def test_malformed_digest_fails(self):
         with self.assertRaises(ValueError):
             policy.verify(self.text.replace("sha256:", "sha512:", 1))

@@ -16,7 +16,7 @@ def verify(text):
             raise ValueError("Review FROM options explicitly before adding them.")
         base = tokens[1]
         if base.lower() not in stages and base.lower() != "scratch":
-            match = re.fullmatch(r"([^:@]+(?:/[^:@]+)*):([^@]+)@sha256:[0-9a-f]{64}", base)
+            match = re.fullmatch(r"([a-z0-9./_-]+):([A-Za-z0-9_.-]+)@sha256:[0-9a-f]{64}", base)
             if not match or match[1] not in EXPECTED or match[2].lower() == "latest":
                 raise ValueError("Every external base must use a reviewed tag and SHA-256 digest.")
             bases.append(base)
