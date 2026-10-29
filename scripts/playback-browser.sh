@@ -2,6 +2,8 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 TASK_TEMP="$(mktemp -d)"
+# macOS /var aliases /private/var; use the physical path for strict media-root validation.
+TASK_TEMP="$(cd "$TASK_TEMP" && pwd -P)"
 API_PID=""
 cleanup() {
   if [[ -n "$API_PID" ]]; then kill "$API_PID" 2>/dev/null || true; wait "$API_PID" 2>/dev/null || true; fi

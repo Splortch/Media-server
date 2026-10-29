@@ -44,7 +44,7 @@ async function connect(page: Page) {
       headers: { 'X-CSRF-TOKEN': await csrf() },
       data: { name: 'Synthetic validation', path: process.env.BENCHMARK_MEDIA },
     });
-    expect(created.ok()).toBeTruthy();
+    expect(created.ok(), await created.text()).toBeTruthy();
     libraries = [await created.json()];
     const scan = await page.request.post(
       `/api/libraries/${libraries[0].id}/scan`,
