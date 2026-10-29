@@ -219,93 +219,154 @@ test('measure bandwidth adaptation, rebuffering and accessible track selection',
   }
 });
 
-test('record actual AV1 and HEVC decoding separately from advertised support', async ({
-  page,
-  browserName,
-  browser,
-}) => {
-  const items = await connect(page);
-  const matrix = [];
-  for (const [title, type] of [
-    ['bandwidth', 'video/mp4; codecs="avc1.42E01E"'],
-    ['hevc', 'video/mp4; codecs="hvc1.2.4.L60.B0"'],
-    ['av1', 'video/mp4; codecs="av01.0.00M.10"'],
-  ]) {
-    const item = items.find((x) => x.title === title)!;
-    expect(item).toBeTruthy();
-    const result = await page.evaluate(
-      async ({ id, type }) => {
-        const video = document.createElement('video');
-        video.muted = true;
-        video.playsInline = true;
-        video.style.cssText =
-          'position:fixed;top:0;left:0;width:320px;height:180px;z-index:9999';
-        video.preload = 'auto';
-        video.src = `/api/v1/media/${id}/stream`;
-        document.body.append(video);
-        const advertised = video.canPlayType(type);
-        const highDynamicRange = matchMedia('(dynamic-range: high)').matches;
-        let outcome = 'timeout';
-        let code = 0;
-        try {
-          await Promise.race([
-            new Promise<void>((resolve) => {
-              video.addEventListener('timeupdate', () => {
+// Separate contexts exercise decoder startup twice without retrying or hiding failures.
+for (const attempt of [1, 2]) {
+  test(`record actual AV1 and HEVC decoding (probe ${attempt})`, async ({
+    page,
+    browserName,
+    browser,
+  }) => {
+    const items = await connect(page);
+    const matrix: Record<string, unknown>[] = [];
+    const save = () =>
+      report(`${browserName}-codecs-${attempt}`, {
+        browser: browserName,
+        version: browser.version(),
+        platform: process.platform,
+        attempt,
+        matrix,
+        note: 'Headless Linux decoder evidence only. Advertised support is not actual decode proof. No physical HDR display or color-fidelity claim.',
+      });
+    for (const [title, type] of [
+      ['h264', 'video/mp4; codecs="avc1.42C01E"'],
+      ['hevc', 'video/mp4; codecs="hvc1.2.4.L60.B0"'],
+      ['av1', 'video/mp4; codecs="av01.0.00M.10"'],
+    ]) {
+      const item = items.find((x) => x.title === title)!;
+      expect(item).toBeTruthy();
+      const result = await page.evaluate(
+        async ({ id, type }) => {
+          const video = document.createElement('video');
+          video.muted = true;
+          video.playsInline = true;
+          video.style.cssText =
+            'position:fixed;top:0;left:0;width:320px;height:180px;z-index:9999';
+          video.preload = 'auto';
+          document.body.append(video);
+          const advertised = video.canPlayType(type);
+          const highDynamicRange = matchMedia('(dynamic-range: high)').matches;
+          const events: {
+            event: string;
+            position: number;
+            readyState: number;
+          }[] = [];
+          let outcome = 'timeout';
+          let code = 0;
+          let presentedFrames = 0;
+          let frameCallback: number | undefined;
+          let deadline: number | undefined;
+          let done = false;
+          const decodedFrames = () =>
+            video.getVideoPlaybackQuality?.().totalVideoFrames ?? 0;
+          try {
+            await new Promise<void>((resolve) => {
+              const finish = (value: string) => {
+                if (!done) {
+                  done = true;
+                  outcome = value;
+                  resolve();
+                }
+              };
+              const check = () => {
                 if (
                   video.currentTime > 0.1 &&
                   video.videoWidth > 0 &&
-                  video.getVideoPlaybackQuality().totalVideoFrames > 0
-                ) {
-                  outcome = 'rendered';
-                  resolve();
-                }
-              });
+                  (decodedFrames() > 0 || presentedFrames > 0)
+                )
+                  finish('rendered');
+              };
+              for (const event of [
+                'loadedmetadata',
+                'loadeddata',
+                'playing',
+                'waiting',
+                'stalled',
+                'timeupdate',
+                'ended',
+              ]) {
+                video.addEventListener(event, () => {
+                  if (events.length < 24)
+                    events.push({
+                      event,
+                      position: video.currentTime,
+                      readyState: video.readyState,
+                    });
+                  check();
+                });
+              }
               video.addEventListener(
                 'error',
                 () => {
                   code = video.error?.code ?? 0;
-                  outcome = 'unsupported';
-                  resolve();
+                  finish(
+                    code === 3 || code === 4 ? 'unsupported' : 'media-error',
+                  );
                 },
                 { once: true },
               );
+              if (typeof video.requestVideoFrameCallback === 'function') {
+                const frame = () => {
+                  presentedFrames++;
+                  check();
+                  if (!done)
+                    frameCallback = video.requestVideoFrameCallback(frame);
+                };
+                frameCallback = video.requestVideoFrameCallback(frame);
+              }
+              deadline = window.setTimeout(() => finish('timeout'), 30000);
+              video.src = `/api/v1/media/${id}/stream`;
+              video.load();
               void video.play().catch(() => {
                 code = video.error?.code ?? 0;
-                outcome =
-                  code === 3 || code === 4 ? 'unsupported' : 'play-rejected';
-                resolve();
+                finish(
+                  code === 3 || code === 4 ? 'unsupported' : 'play-rejected',
+                );
               });
-            }),
-            new Promise<void>((resolve) => setTimeout(resolve, 15000)),
-          ]);
-          return {
-            advertised,
-            outcome,
-            errorCode: code,
-            highDynamicRange,
-            frames: video.getVideoPlaybackQuality().totalVideoFrames,
-          };
-        } finally {
-          video.pause();
-          video.removeAttribute('src');
-          video.load();
-          video.remove();
-        }
-      },
-      { id: item.id, type },
-    );
-    matrix.push({ codec: title === 'bandwidth' ? 'h264' : title, ...result });
-    // Unsupported codecs are a matrix result, never a false playback pass.
-    if (title === 'bandwidth') expect(result.outcome).toBe('rendered');
-    else expect(['rendered', 'unsupported']).toContain(result.outcome);
-    if (result.outcome === 'unsupported')
-      expect([3, 4]).toContain(result.errorCode);
-  }
-  await report(`${browserName}-codecs`, {
-    browser: browserName,
-    version: browser.version(),
-    platform: process.platform,
-    matrix,
-    note: 'Headless Linux decoder evidence only. Advertised support is not actual decode proof. No physical HDR display or color-fidelity claim.',
+            });
+            return {
+              advertised,
+              outcome,
+              errorCode: code,
+              highDynamicRange,
+              frames: decodedFrames(),
+              presentedFrames,
+              position: video.currentTime,
+              width: video.videoWidth,
+              height: video.videoHeight,
+              paused: video.paused,
+              readyState: video.readyState,
+              networkState: video.networkState,
+              events,
+            };
+          } finally {
+            if (deadline !== undefined) clearTimeout(deadline);
+            if (frameCallback !== undefined)
+              video.cancelVideoFrameCallback(frameCallback);
+            video.pause();
+            video.removeAttribute('src');
+            video.load();
+            video.remove();
+          }
+        },
+        { id: item.id, type },
+      );
+      matrix.push({ codec: title, ...result });
+      // Preserve diagnostics before asserting, including baseline timeouts/network errors.
+      await save();
+      if (title === 'h264') expect(result.outcome).toBe('rendered');
+      else expect(['rendered', 'unsupported']).toContain(result.outcome);
+      if (result.outcome === 'unsupported')
+        expect([3, 4]).toContain(result.errorCode);
+    }
   });
-});
+}
