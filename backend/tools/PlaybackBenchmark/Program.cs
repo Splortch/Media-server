@@ -232,6 +232,8 @@ static class Benchmark
                     if (
                         decoded.VideoCodec != "h264"
                         || decoded.AudioCodec != "aac"
+                        || color?.Width % 2 != 0
+                        || color?.Height % 2 != 0
                         || color?.Hdr == true
                         || (scenario != "sdr" && color?.Primaries != "bt709")
                     )

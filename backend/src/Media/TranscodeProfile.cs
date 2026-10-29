@@ -47,7 +47,7 @@ public static class TranscodeProfile
                 ? "zscale=t=linear:npl=100,format=gbrpf32le,zscale=p=bt709,tonemap=tonemap=hable:desat=0,zscale=t=bt709:m=bt709:r=tv,sidedata=mode=delete,"
                 : ""
         )
-        + $"scale=w=-2:h='min({rendition.Height},ih)':force_original_aspect_ratio=decrease,format=yuv420p";
+        + $"scale=w=-2:h='min({rendition.Height},ih)':force_original_aspect_ratio=decrease:force_divisible_by=2,format=yuv420p";
 
     // All selections are server-defined, never raw client command-line arguments.
     public static string[] DeviceArguments(string encoder, TranscodeSettings settings) =>

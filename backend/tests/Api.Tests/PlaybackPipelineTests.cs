@@ -138,6 +138,56 @@ public sealed class PlaybackPipelineTests
         Assert.Contains("hello", caption);
     }
 
+    [Fact]
+    public async Task WidescreenRenditionsHaveEvenDimensions()
+    {
+        var root = Path.Combine(TestPaths.TempRoot, "scaling-test-" + Guid.NewGuid());
+        Directory.CreateDirectory(root);
+        try
+        {
+            var runner = new FfmpegRunner("ffmpeg");
+            var probe = new Ffprobe("ffprobe");
+            using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(60));
+            foreach (var level in TranscodeProfile.Ladder)
+            {
+                var output = level.Name + ".mp4";
+                await runner.RunAsync(
+                    [
+                        "-filter_threads",
+                        "1",
+                        "-f",
+                        "lavfi",
+                        "-i",
+                        "testsrc2=size=1280x720:rate=24",
+                        "-frames:v",
+                        "1",
+                        "-vf",
+                        TranscodeProfile.Filter(level, false),
+                        "-c:v",
+                        "libx264",
+                        "-preset",
+                        "ultrafast",
+                        "-threads",
+                        "1",
+                        output,
+                    ],
+                    root,
+                    timeout.Token
+                );
+                var result = await probe.ProbeAsync(Path.Combine(root, output), timeout.Token);
+                var color = JsonSerializer.Deserialize<VideoColor>(result.ColorJson)!;
+                Assert.Equal(level.Height, color.Height);
+                Assert.Equal(0, color.Width % 2);
+                Assert.Equal(0, color.Height % 2);
+                Assert.Equal("h264", result.VideoCodec);
+            }
+        }
+        finally
+        {
+            Directory.Delete(root, true);
+        }
+    }
+
     [Theory]
     [InlineData("libx265", "hevc")]
     [InlineData("libaom-av1", "av1")]
