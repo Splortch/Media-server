@@ -493,26 +493,47 @@ public sealed class PlaybackSessions(
 
     public static string SanitizeVtt(string value)
     {
+        value = value.TrimStart('\uFEFF');
         if (!value.StartsWith("WEBVTT", StringComparison.Ordinal))
             throw new IOException("Invalid WebVTT captions.");
-        // Captions are text, never HTML. Strip markup/control characters and metadata blocks.
-        var blocks = value.Replace("\r", "").Split("\n\n").Skip(1);
-        return "WEBVTT\n\n"
-            + string.Join(
-                "\n\n",
-                blocks
-                    .Where(x => x.Contains(" --> ", StringComparison.Ordinal))
-                    .Select(x =>
-                        Regex.Replace(
-                            x,
-                            "<[^>]*>",
-                            "",
-                            RegexOptions.CultureInvariant,
-                            TimeSpan.FromSeconds(1)
-                        )
-                    )
+        var result = new StringBuilder("WEBVTT\n\n");
+        const string stamp = @"(?:[0-9]{2,}:)?[0-5][0-9]:[0-5][0-9]\.[0-9]{3}";
+        foreach (var block in value.Replace("\r", "").Split("\n\n").Skip(1))
+        {
+            var lines = block.Split('\n');
+            if (
+                lines.Length < 2
+                || lines[0].StartsWith("STYLE", StringComparison.Ordinal)
+                || lines[0].StartsWith("REGION", StringComparison.Ordinal)
+                || lines[0].StartsWith("NOTE", StringComparison.Ordinal)
             )
-            + "\n";
+                continue;
+            var timingIndex = lines[0].Contains(" --> ", StringComparison.Ordinal) ? 0 : 1;
+            var timing = Regex.Match(
+                lines[timingIndex],
+                $@"\A(?<start>{stamp})[ \t]+-->[ \t]+(?<end>{stamp})(?:[ \t].*)?\z",
+                RegexOptions.CultureInvariant,
+                TimeSpan.FromSeconds(1)
+            );
+            if (!timing.Success)
+                continue;
+            var body = Regex.Replace(
+                string.Join('\n', lines.Skip(timingIndex + 1)),
+                "<[^>]*>",
+                "",
+                RegexOptions.CultureInvariant,
+                TimeSpan.FromSeconds(1)
+            );
+            body = new string(body.Where(c => !char.IsControl(c) || c is '\n' or '\t').ToArray());
+            result
+                .Append(timing.Groups["start"].Value)
+                .Append(" --> ")
+                .Append(timing.Groups["end"].Value)
+                .Append('\n')
+                .Append(body)
+                .Append("\n\n");
+        }
+        return result.ToString();
     }
 
     private static async Task MonitorQuota(

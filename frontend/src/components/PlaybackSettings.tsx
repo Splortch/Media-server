@@ -397,6 +397,7 @@ export default function PlaybackSettings({
       <label>
         Subtitles
         <select
+          aria-label="Subtitles"
           value={subtitle}
           onChange={(e) => setSubtitle(e.target.value)}
           disabled={busy || session?.state === 'preparing'}

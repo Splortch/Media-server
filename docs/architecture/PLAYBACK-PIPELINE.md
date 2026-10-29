@@ -56,7 +56,7 @@ Consult [FFmpeg's hardware documentation](https://ffmpeg.org/ffmpeg-codecs.html)
 The generated contract lives in `shared/api/openapi-v1.json` and `shared/api/src/generated.ts`.
 
 - `GET /api/v1/media/{id}/playback-options`: color metadata, tracks, external-caption presence, allowed encoders and conversion limits.
-- `POST /api/v1/media/{id}/playback-sessions`: `{ audioTrack: number|null, subtitleTrack: number|null, encoder: string }`. Subtitle `-1` selects the same-basename external WebVTT file. Returns 202 with conversion state; 409 when capacity is occupied.
+- `POST /api/v1/media/{id}/playback-sessions`: `{ audioTrack: number|null, subtitleTrack: number|null, encoder: string }`. Subtitle `-1` selects the same-basename external WebVTT file; other advertised negative track IDs select external language files. Never derive a filename from the submitted index. Returns 202 with conversion state; 409 when capacity is occupied.
 - `GET /api/v1/playback-sessions/{session}`: preparing/ready/failed state, actual encoder, encode seconds, manifest URL.
 - `GET|HEAD /api/v1/playback-sessions/{session}/files/{file}`: private, no-store manifest/variant/segment/caption bytes. Supports byte ranges. Every request revalidates the login, user, session ownership and current media ACL. A guessed session ID is insufficient; another login must explicitly acquire its own authorized lease before using it.
 - `DELETE /api/v1/playback-sessions/{session}`: cancel, wait for process termination, remove generated cache. CSRF protection applies to mutations, just as to existing endpoints.
@@ -78,4 +78,4 @@ See [playback validation](../development/PLAYBACK-VALIDATION.md) for synthetic b
 
 Place `Movie.eng.vtt`, `Movie.swe.srt` or `Movie.swe.forced.ass` beside `Movie.mkv` (same basename). Exact `Movie.vtt` remains compatible with existing clients. The language suffix is displayed alongside the format and labels; ASS styling/positioning is lost during safe WebVTT conversion. No subtitle path is accepted from a client. Files are opened through the no-symlink library policy and pinned into bounded memory before encoding. Their content hashes participate in cache keys, so editing a caption cannot silently reuse stale caption output.
 
-At most 32 external subtitle files, 1 MiB per file, and 4096 directory entries are considered. Larger directories omit external-caption discovery instead of performing an unbounded scan. Embedded tracks remain available. Originals are never edited. Unsupported bitmap subtitles remain explicitly disabled in the client UI.
+At most 32 external subtitle files, 1 MiB per file, and 4096 directory files are considered. Larger directories omit external-caption discovery instead of performing an unbounded scan. Embedded tracks remain available. Originals are never edited. Unsupported bitmap subtitles remain explicitly disabled in the client UI.

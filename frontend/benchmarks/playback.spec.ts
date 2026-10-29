@@ -219,6 +219,9 @@ test('record actual AV1 and HEVC decoding separately from advertised support', a
       async ({ id, type }) => {
         const video = document.createElement('video');
         video.muted = true;
+        video.playsInline = true;
+        video.style.cssText =
+          'position:fixed;top:0;left:0;width:320px;height:180px;z-index:9999';
         video.preload = 'auto';
         video.src = `/api/v1/media/${id}/stream`;
         document.body.append(video);
@@ -230,7 +233,11 @@ test('record actual AV1 and HEVC decoding separately from advertised support', a
           await Promise.race([
             new Promise<void>((resolve) => {
               video.addEventListener('timeupdate', () => {
-                if (video.currentTime > 0.1) {
+                if (
+                  video.currentTime > 0.1 &&
+                  video.videoWidth > 0 &&
+                  video.getVideoPlaybackQuality().totalVideoFrames > 0
+                ) {
                   outcome = 'rendered';
                   resolve();
                 }

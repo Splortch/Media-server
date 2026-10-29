@@ -1,11 +1,27 @@
 using MediaServer.Core;
 using MediaServer.Media;
+using MediaServer.Services;
 using Xunit;
 
 namespace Api.Tests;
 
 public sealed class ExternalCaptionTests
 {
+    [Fact]
+    public void SanitizerRejectsMetadataMasqueradingAsCuesAndAcceptsUtf8Bom()
+    {
+        var safe = PlaybackSessions.SanitizeVtt(
+            "\uFEFFWEBVTT\n\nSTYLE\n::cue { content: \" --> \"; }\n\nNOTE private --> metadata\nignored\n\ncue-id\n00:00:00.000 --> 00:00:01.000 position:0%\n<b>Caption</b>\u0001\n"
+        );
+        Assert.StartsWith("WEBVTT\n\n", safe);
+        Assert.Contains("Caption", safe);
+        Assert.DoesNotContain("STYLE", safe);
+        Assert.DoesNotContain("NOTE", safe);
+        Assert.DoesNotContain("position:", safe);
+        Assert.DoesNotContain("<", safe);
+        Assert.False(safe.Contains('\u0001'));
+    }
+
     [Fact]
     public async Task DiscoveryIsScopedStableBoundedAndRejectsLinks()
     {
