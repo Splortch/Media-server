@@ -1,4 +1,4 @@
 [[permission]]
 identifier = "allow-client-commands"
 description = "Allow the bundled main renderer to use the scoped client transport and preferences."
-commands.allow = ["connect", "login", "logout", "api_request", "stream_url", "preferences", "save_preferences", "desktop_capabilities"]
+commands.allow = ["connect", "login", "logout", "api_request", "stream_url", "playback_url", "preferences", "save_preferences", "desktop_capabilities"]

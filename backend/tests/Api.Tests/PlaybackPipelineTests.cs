@@ -400,11 +400,26 @@ public sealed class PlaybackPipelineTests
             new { name = "admin", password = "twelve-character-password" }
         );
         Assert.Equal(HttpStatusCode.NotFound, (await other.GetAsync(state.Manifest)).StatusCode);
+        await Server.Csrf(other);
+        var joined = await other.PostAsJsonAsync(
+            "/api/v1/media/1/playback-sessions",
+            new PlaybackSelection(AudioTrack: 2, SubtitleTrack: -1, Encoder: "h264_nvenc")
+        );
+        Assert.Equal(HttpStatusCode.Accepted, joined.StatusCode);
+        Assert.Equal(state.Id, (await joined.Content.ReadFromJsonAsync<ConversionState>())!.Id);
+        Assert.Equal(HttpStatusCode.OK, (await other.GetAsync(state.Manifest)).StatusCode);
+
         Assert.Equal(
             HttpStatusCode.NoContent,
             (await admin.DeleteAsync("/api/v1/playback-sessions/" + state.Id)).StatusCode
         );
         Assert.Equal(HttpStatusCode.NotFound, (await admin.GetAsync(state.Manifest)).StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await other.GetAsync(state.Manifest)).StatusCode);
+        Assert.Equal(
+            HttpStatusCode.NoContent,
+            (await other.DeleteAsync("/api/v1/playback-sessions/" + state.Id)).StatusCode
+        );
+        Assert.Equal(HttpStatusCode.NotFound, (await other.GetAsync(state.Manifest)).StatusCode);
         Assert.True(File.Exists(path));
     }
 }

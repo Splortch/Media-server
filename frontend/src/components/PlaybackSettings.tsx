@@ -24,19 +24,75 @@ type Session = {
   manifest: string;
   encodeSeconds: number;
 };
+function validSession(value: Session, expected?: string): Session {
+  if (
+    !value ||
+    (expected !== undefined && value.id !== expected) ||
+    !/^[a-f0-9]{32}$/i.test(value.id) ||
+    !['preparing', 'ready', 'failed', 'cancelled'].includes(value.state) ||
+    !Number.isFinite(value.encodeSeconds) ||
+    value.encodeSeconds < 0 ||
+    value.manifest !== `/api/v1/playback-sessions/${value.id}/files/master.m3u8`
+  )
+    throw new Error('Invalid playback response.');
+  return value;
+}
+function validOptions(value: Options): Options {
+  if (
+    !value ||
+    !Array.isArray(value.tracks) ||
+    value.tracks.length > 256 ||
+    value.tracks.some(
+      (t) =>
+        !Number.isSafeInteger(t.index) ||
+        typeof t.type !== 'string' ||
+        typeof t.codec !== 'string' ||
+        (t.title != null &&
+          (typeof t.title !== 'string' || t.title.length > 512)) ||
+        (t.language != null &&
+          (typeof t.language !== 'string' || t.language.length > 64)),
+    ) ||
+    !Array.isArray(value.encoders) ||
+    value.encoders.length > 5 ||
+    value.encoders.some(
+      (e) =>
+        ![
+          'libx264',
+          'h264_nvenc',
+          'h264_qsv',
+          'h264_vaapi',
+          'h264_amf',
+        ].includes(e),
+    )
+  )
+    throw new Error('Invalid playback options.');
+  return value;
+}
+export type PlaybackTransport = {
+  request: typeof api;
+  fileUrl: (session: string, file: string) => Promise<string>;
+  directUrl: string;
+};
+const webFileUrl = async (session: string, file: string) =>
+  `/api/v1/playback-sessions/${session}/files/${file}`;
 export default function PlaybackSettings({
   id,
   video,
   source,
   onSource,
   onCaption,
+  transport,
 }: {
   id: number;
   video: RefObject<HTMLVideoElement | null>;
   source: string;
   onSource: (value: string) => void;
   onCaption: (value: string) => void;
+  transport?: PlaybackTransport;
 }) {
+  const desktop = !!transport;
+  const request = transport?.request ?? api;
+  const fileUrl = transport?.fileUrl ?? webFileUrl;
   const [opened, setOpened] = useState(false);
   const [options, setOptions] = useState<Options>();
   const [audio, setAudio] = useState('');
@@ -53,25 +109,28 @@ export default function PlaybackSettings({
   useEffect(() => {
     if (!opened) return;
     let active = true;
-    api<Options>(`/v1/media/${id}/playback-options`)
+    request<Options>(`/v1/media/${id}/playback-options`)
       .then((value) => {
-        if (active) setOptions(value);
+        if (active) setOptions(validOptions(value));
       })
-      .catch(() => {});
+      .catch((e) => {
+        if (active) setError((e as Error).message);
+      });
     return () => {
       active = false;
     };
-  }, [id, opened]);
+  }, [id, opened, request]);
   useEffect(() => {
     mounted.current = true;
     return () => {
       mounted.current = false;
       if (current.current)
-        void api(`/v1/playback-sessions/${current.current}`, 'DELETE').catch(
-          () => {},
-        );
+        void request(
+          `/v1/playback-sessions/${current.current}`,
+          'DELETE',
+        ).catch(() => {});
     };
-  }, [id]);
+  }, [id, request]);
   const resume = useRef(0);
   useEffect(() => {
     const element = video.current;
@@ -98,10 +157,16 @@ export default function PlaybackSettings({
         if (playing) void element.play().catch(() => {});
       });
       engine.on(Hls.Events.ERROR, (_, data) => {
-        if (data.fatal)
+        if (data.fatal) {
           setError(
             'HLS playback failed. Check the server connection and sign in again if your session expired.',
           );
+          void request('/v1/auth/me').catch(() => {});
+          void request(`/v1/media/${id}/playback-errors`, 'POST', {
+            code: 'decode',
+            client: desktop ? 'desktop-hls' : 'web-hls',
+          }).catch(() => {});
+        }
       });
       return () => {
         engine.destroy();
@@ -117,7 +182,7 @@ export default function PlaybackSettings({
       element.addEventListener('loadedmetadata', restore, { once: true });
       return () => element.removeEventListener('loadedmetadata', restore);
     }
-  }, [source, video]);
+  }, [source, video, request, id, desktop]);
   async function convert() {
     if (
       !Hls.isSupported() &&
@@ -128,12 +193,15 @@ export default function PlaybackSettings({
       );
       return;
     }
+    video.current?.pause();
     setBusy(true);
     setError('');
+    activated.current = undefined;
+    selectedCaption.current = subtitle !== '';
     try {
       if (current.current)
-        await api(`/v1/playback-sessions/${current.current}`, 'DELETE');
-      const created = await api<Session>(
+        await request(`/v1/playback-sessions/${current.current}`, 'DELETE');
+      const created = await request<Session>(
         `/v1/media/${id}/playback-sessions`,
         'POST',
         {
@@ -142,12 +210,13 @@ export default function PlaybackSettings({
           encoder,
         },
       );
+      validSession(created);
       current.current = created.id;
       if (!mounted.current) {
-        await api(`/v1/playback-sessions/${created.id}`, 'DELETE');
+        await request(`/v1/playback-sessions/${created.id}`, 'DELETE');
         return;
       }
-      setSession(created);
+      setSession(validSession(created));
     } catch (e) {
       setError((e as Error).message);
     } finally {
@@ -157,18 +226,9 @@ export default function PlaybackSettings({
   useEffect(() => {
     if (session?.state !== 'preparing') return;
     const timer = setTimeout(() => {
-      api<Session>(`/v1/playback-sessions/${session.id}`)
-        .then((next) => {
-          setSession(next);
-          if (next.state === 'ready') {
-            resume.current = video.current?.currentTime ?? 0;
-            onSource(next.manifest);
-            onCaption(
-              subtitle === ''
-                ? ''
-                : `/api/v1/playback-sessions/${next.id}/files/captions.vtt`,
-            );
-          }
+      request<Session>(`/v1/playback-sessions/${session.id}`)
+        .then(async (next) => {
+          setSession(validSession(next, session.id));
           if (next.state === 'failed')
             setError(next.error || 'Conversion failed.');
         })
@@ -178,19 +238,42 @@ export default function PlaybackSettings({
         });
     }, 1500);
     return () => clearTimeout(timer);
-  }, [session, onSource, onCaption, subtitle, video]);
+  }, [session, request]);
+  const activated = useRef<string | undefined>(undefined);
+  const selectedCaption = useRef(false);
+  useEffect(() => {
+    if (session?.state !== 'ready' || activated.current === session.id) return;
+    let active = true;
+    activated.current = session.id;
+    void Promise.all([
+      fileUrl(session.id, 'master.m3u8'),
+      selectedCaption.current
+        ? fileUrl(session.id, 'captions.vtt')
+        : Promise.resolve(''),
+    ])
+      .then(([manifest, caption]) => {
+        if (!active) return;
+        resume.current = video.current?.currentTime ?? 0;
+        onSource(manifest);
+        onCaption(caption);
+      })
+      .catch((e) => setError((e as Error).message));
+    return () => {
+      active = false;
+    };
+  }, [session, fileUrl, onSource, onCaption, video]);
   async function direct() {
     setSession(undefined);
     const previous = current.current;
     current.current = undefined;
     hls.current?.destroy();
     hls.current = null;
-    onSource(`/api/media/${id}/stream`);
+    onSource(transport?.directUrl ?? `/api/media/${id}/stream`);
     onCaption('');
     setLevels([]);
     setQuality(-1);
     if (previous)
-      await api(`/v1/playback-sessions/${previous}`, 'DELETE').catch((e) =>
+      await request(`/v1/playback-sessions/${previous}`, 'DELETE').catch((e) =>
         setError((e as Error).message),
       );
   }

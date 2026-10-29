@@ -132,3 +132,51 @@ data class PlaybackError(
     val client: String
 )
 
+@Serializable
+data class VideoColor(
+    val width: Int,
+    val height: Int,
+    val bitDepth: Int?,
+    val pixelFormat: String?,
+    val primaries: String?,
+    val transfer: String?,
+    val matrix: String?,
+    val hasMasteringMetadata: Boolean,
+    val sideDataJson: String? = null,
+    val hdr: Boolean = false
+)
+
+@Serializable
+data class Rendition(
+    val name: String,
+    val height: Int,
+    val kilobits: Int
+)
+
+@Serializable
+data class PlaybackOptions(
+    val color: VideoColor?,
+    val tracks: List<MediaTrack>,
+    val externalWebVtt: Boolean,
+    val qualities: List<Rendition>,
+    val encoders: List<String>,
+    val conversionNotice: String
+)
+
+@Serializable
+data class PlaybackSelection(
+    val audioTrack: Int? = null,
+    val subtitleTrack: Int? = null,
+    val encoder: String = "libx264"
+)
+
+@Serializable
+data class ConversionState(
+    val id: String,
+    val state: String,
+    val encoder: String,
+    val error: String?,
+    val encodeSeconds: Double,
+    val manifest: String
+)
+

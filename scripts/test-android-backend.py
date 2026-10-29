@@ -56,7 +56,7 @@ with tempfile.TemporaryDirectory(prefix='android-real-server-') as temp:
             outputs = root / 'clients/android/app/build/outputs'
             for apk in ['apk/debug/app-debug.apk', 'apk/androidTest/debug/app-debug-androidTest.apk']:
                 subprocess.run(['adb', 'install', '-r', str(outputs / apk)], check=True)
-            result = subprocess.run(['adb', 'shell', 'am', 'instrument', '-w', 'org.splortch.mediaserver.android.debug.test/androidx.test.runner.AndroidJUnitRunner'], capture_output=True, text=True, timeout=240)
+            result = subprocess.run(['adb', 'shell', 'am', 'instrument', '-w', 'org.splortch.mediaserver.android.debug.test/androidx.test.runner.AndroidJUnitRunner'], capture_output=True, text=True, timeout=360)
             print(result.stdout); print(result.stderr)
             if result.returncode or 'OK (1 test)' not in result.stdout or 'FAILURES' in result.stdout: raise RuntimeError('Android real-server instrumentation failed')
             assert request('/media/1/progress')['seconds'] >= 15

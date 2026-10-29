@@ -67,6 +67,21 @@ interface MediaApi {
         @Body error: PlaybackError,
     )
 
+    @GET("media/{id}/playback-options")
+    suspend fun playbackOptions(@Path("id") id: Int): PlaybackOptions
+
+    @POST("media/{id}/playback-sessions")
+    suspend fun prepare(
+        @Path("id") id: Int,
+        @Header("X-CSRF-TOKEN") csrf: String,
+        @Body input: PlaybackSelection,
+    ): ConversionState
+
+    @GET("playback-sessions/{id}") suspend fun conversion(@Path("id") id: String): ConversionState
+
+    @DELETE("playback-sessions/{id}")
+    suspend fun release(@Path("id") id: String, @Header("X-CSRF-TOKEN") csrf: String)
+
     @GET("sessions") suspend fun sessions(): List<SessionInfo>
 
     @DELETE("sessions/{handle}")
@@ -108,13 +123,7 @@ class ServerConnection(
         base
             .newBuilder()
             .addInterceptor { chain ->
-                if (
-                    !chain
-                        .request()
-                        .url
-                        .encodedPath
-                        .matches(Regex("/api/v1/media/[1-9][0-9]*/stream"))
-                )
+                if (!chain.request().url.encodedPath.let { PlaybackResources.allowedPath(it) })
                     throw IOException("Invalid media path.")
                 chain.proceed(chain.request())
             }
@@ -199,6 +208,13 @@ class ServerConnection(
     fun streamUrl(id: Int): String {
         require(id > 0)
         return origin.resolve("/api/v1/media/$id/stream")!!.toString()
+    }
+
+    fun playbackUrl(session: String, file: String): String {
+        require(PlaybackResources.validSession(session) && PlaybackResources.validFile(file)) {
+            "Invalid playback resource."
+        }
+        return origin.resolve("/api/v1/playback-sessions/$session/files/$file")!!.toString()
     }
 
     fun close(clearSaved: Boolean = true) {

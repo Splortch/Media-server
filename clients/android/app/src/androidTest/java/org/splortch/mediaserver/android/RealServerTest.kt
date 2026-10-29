@@ -38,6 +38,36 @@ class RealServerTest {
         compose.runOnUiThread {
             assertTrue(compose.activity.model.player.value!!.currentPosition >= 2900)
         }
+        compose.onNodeWithText("Prepare HLS playback").performScrollTo().performClick()
+        compose.waitUntil(180000) {
+            compose.activity.model.screen.value.conversionStatus?.startsWith("HLS ready") == true &&
+                compose.activity.model.screen.value.videoReady
+        }
+        compose.runOnUiThread { compose.activity.model.chooseQuality("360p") }
+        compose.waitUntil(30000) { compose.activity.model.screen.value.videoReady }
+        compose.runOnUiThread {
+            assertTrue(
+                compose.activity.model.player.value!!
+                    .currentMediaItem!!
+                    .localConfiguration!!
+                    .uri
+                    .toString()
+                    .endsWith("/360p.m3u8")
+            )
+            assertTrue(compose.activity.model.player.value!!.currentPosition >= 2900)
+        }
+        compose.runOnUiThread { compose.activity.model.chooseQuality("Auto") }
+        compose.waitUntil(30000) { compose.activity.model.screen.value.videoReady }
+        compose.runOnUiThread {
+            assertTrue(
+                compose.activity.model.player.value!!
+                    .currentMediaItem!!
+                    .localConfiguration!!
+                    .uri
+                    .toString()
+                    .endsWith("/master.m3u8")
+            )
+        }
         compose.activityRule.scenario.recreate()
         compose.waitUntil(10000) { compose.activity.model.screen.value.videoReady }
         val context = compose.activity.applicationContext

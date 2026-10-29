@@ -49,3 +49,18 @@ export function desktopCapabilities() {
     'desktop_capabilities',
   );
 }
+
+export async function playbackRequest<T>(
+  path: string,
+  method = 'GET',
+  body?: unknown,
+): Promise<T> {
+  try {
+    return await transport.request<T>(method, '/api' + path, body);
+  } catch (e) {
+    if (expired(e)) window.dispatchEvent(new Event('desktop-session-expired'));
+    throw e;
+  }
+}
+export const playbackFileUrl = (session: string, file: string) =>
+  invoke<string>('playback_url', { session, file });

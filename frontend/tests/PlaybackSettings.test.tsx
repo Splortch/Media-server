@@ -98,3 +98,50 @@ it('removes a library only after explicit confirmation and reports server refusa
   fireEvent.click(screen.getByRole('button', { name: 'Confirm removal' }));
   await waitFor(() => expect(screen.queryByText('/media/movies')).toBeNull());
 });
+
+it('starts an already-ready cached conversion through the native transport', async () => {
+  const Hls = (await import('hls.js')).default;
+  vi.spyOn(Hls, 'isSupported').mockReturnValue(true);
+  const id = 'a'.repeat(32);
+  const request = vi.fn().mockResolvedValue({
+    id,
+    state: 'ready',
+    encoder: 'libx264',
+    error: null,
+    encodeSeconds: 1,
+    manifest: `/api/v1/playback-sessions/${id}/files/master.m3u8`,
+  });
+  const fileUrl = vi
+    .fn()
+    .mockResolvedValue(
+      `http://127.0.0.1:5058/secret/playback/${id}/files/master.m3u8`,
+    );
+  const onSource = vi.fn();
+  render(
+    <PlaybackSettings
+      id={1}
+      video={createRef()}
+      source="http://127.0.0.1:5058/secret/media/1"
+      onSource={onSource}
+      onCaption={() => {}}
+      transport={{
+        request,
+        fileUrl,
+        directUrl: 'http://127.0.0.1:5058/secret/media/1',
+      }}
+    />,
+  );
+  fireEvent.click(screen.getByRole('button', { name: 'Prepare HLS playback' }));
+  await waitFor(() =>
+    expect(onSource).toHaveBeenCalledWith(
+      `http://127.0.0.1:5058/secret/playback/${id}/files/master.m3u8`,
+    ),
+  );
+  expect(fileUrl).toHaveBeenCalledWith(id, 'master.m3u8');
+  expect(request).toHaveBeenCalledWith(
+    '/v1/media/1/playback-sessions',
+    'POST',
+    { audioTrack: null, subtitleTrack: null, encoder: 'libx264' },
+  );
+  vi.mocked(Hls.isSupported).mockRestore();
+});

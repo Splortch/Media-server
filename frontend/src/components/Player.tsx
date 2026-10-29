@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import PlaybackSettings from './PlaybackSettings';
+import PlaybackSettings, { type PlaybackTransport } from './PlaybackSettings';
 import { api, type Media } from '../services/api';
 export default function Player({
   item,
@@ -8,6 +8,7 @@ export default function Player({
   streamUrl,
   onSaveProgress,
   onPlaybackError,
+  playbackTransport,
 }: {
   item: Media;
   resume: number;
@@ -15,6 +16,7 @@ export default function Player({
   streamUrl?: string;
   onSaveProgress?: (seconds: number, completed: boolean) => Promise<void>;
   onPlaybackError?: () => Promise<void>;
+  playbackTransport?: PlaybackTransport;
 }) {
   const [source, setSource] = useState(
     streamUrl ?? `/api/media/${item.id}/stream`,
@@ -202,8 +204,9 @@ export default function Player({
 
   return (
     <section aria-label="Video player" className="player-wrap">
-      {!streamUrl && (
+      {(!streamUrl || playbackTransport) && (
         <PlaybackSettings
+          transport={playbackTransport}
           id={item.id}
           video={videoRef}
           source={source}
@@ -244,6 +247,7 @@ export default function Player({
       >
         <video
           ref={videoRef}
+          crossOrigin={playbackTransport ? 'anonymous' : undefined}
           playsInline
           preload="metadata"
           aria-label={item.title}

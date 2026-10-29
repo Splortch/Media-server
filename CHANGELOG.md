@@ -45,3 +45,9 @@ No official stable release has been published. Transcoding, hardware acceleratio
 - Add web audio/text-subtitle selection and sanitized WebVTT captions.
 - Add administrator library removal with explicit confirmation, transactional catalog cleanup, scan protection and source-file preservation.
 - Physical GPU/HDR-display validation, network benchmarks and native-client HLS controls remain unfinished; see the playback architecture guide.
+
+### Native HLS and authorized cache leases (unreleased)
+
+- Add native desktop HLS/track controls through the credential-owning loopback bridge and Android Media3 HLS, quality and caption selection.
+- Reuse compatible conversions through independent per-session leases, with current ACL checks, isolated progress, bounded fan-out and last-lease cleanup.
+- Validate untrusted playback responses and resources, reject external playlist references, and exercise native HLS ranges and logout against the real backend.

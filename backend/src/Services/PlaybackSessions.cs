@@ -23,7 +23,8 @@ public record ConversionState(
     string Manifest
 );
 
-// Conversion cache is private, ephemeral and bound to the authenticated login session.
+// Conversion cache is private and ephemeral; access is bound to authenticated session leases.
+// Encodes may be reused, but every authenticated session needs its own lease and media ACL.
 // No shared public files or bearer tokens in URLs. At most two staged/encoded sources.
 public sealed class PlaybackSessions(
     string dataDirectory,
@@ -40,28 +41,26 @@ public sealed class PlaybackSessions(
     private readonly ConcurrentDictionary<string, Job> jobs = new();
     private readonly SemaphoreSlim admission = new(1, 1);
 
+    private sealed record Lease(int User, DateTime Touched);
+
     private sealed class Job(
         string id,
         int media,
-        int user,
-        string session,
         string key,
         string path,
         PlaybackSelection selection
     )
     {
         public string Id = id,
-            Session = session,
             Key = key,
             Directory = path;
-        public int Media = media,
-            User = user;
+        public int Media = media;
+        public ConcurrentDictionary<string, Lease> Leases { get; } = new();
         public PlaybackSelection Selection = selection;
         public volatile string State = "preparing";
         public string Encoder = "libx264";
         public string? Error;
         public double Seconds;
-        public DateTime Touched = DateTime.UtcNow;
         public CancellationTokenSource Stop = new();
         public Task Work = Task.CompletedTask;
 
@@ -112,14 +111,13 @@ public sealed class PlaybackSessions(
             var key =
                 $"{item.Id}:{item.ModifiedTicks}:{item.Size}:{JsonSerializer.Serialize(selection)}";
             var existing = jobs.Values.FirstOrDefault(x =>
-                x.User == user
-                && x.Session == session
-                && x.Key == key
-                && x.State is "preparing" or "ready"
+                x.Key == key && x.State is "preparing" or "ready"
             );
             if (existing is not null)
             {
-                existing.Touched = DateTime.UtcNow;
+                if (existing.Leases.Count >= 32 && !existing.Leases.ContainsKey(session))
+                    return null;
+                existing.Leases[session] = new Lease(user, DateTime.UtcNow);
                 return existing.Info();
             }
             if (jobs.Count >= 2)
@@ -143,7 +141,8 @@ public sealed class PlaybackSessions(
                         path,
                         UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute
                     );
-                var job = new Job(id, item.Id, user, session, key, path, selection);
+                var job = new Job(id, item.Id, key, path, selection);
+                job.Leases[session] = new Lease(user, DateTime.UtcNow);
                 jobs[id] = job;
                 // Own already pinned handles; never reopen a client/source path in FFmpeg.
                 job.Work = ConvertAsync(job, source, captions, item);
@@ -173,16 +172,19 @@ public sealed class PlaybackSessions(
         if (
             !jobs.TryGetValue(id, out var job)
             || job.Media != media
-            || job.User != user
-            || job.Session != session
+            || !job.Leases.TryGetValue(session, out var lease)
+            || lease.User != user
         )
             return null;
-        job.Touched = DateTime.UtcNow;
+        if (!job.Leases.TryUpdate(session, new Lease(user, DateTime.UtcNow), lease))
+            return null;
         return job;
     }
 
     public int? MediaId(string id, int user, string session) =>
-        jobs.TryGetValue(id, out var job) && job.User == user && job.Session == session
+        jobs.TryGetValue(id, out var job)
+        && job.Leases.TryGetValue(session, out var lease)
+        && lease.User == user
             ? job.Media
             : null;
 
@@ -204,10 +206,24 @@ public sealed class PlaybackSessions(
 
     public async Task<bool> RemoveAsync(string id, int user, string session)
     {
-        if (!jobs.TryGetValue(id, out var job) || job.User != user || job.Session != session)
-            return false;
-        await StopAsync(job);
-        return true;
+        await admission.WaitAsync();
+        try
+        {
+            if (
+                !jobs.TryGetValue(id, out var job)
+                || !job.Leases.TryGetValue(session, out var lease)
+                || lease.User != user
+            )
+                return false;
+            job.Leases.TryRemove(session, out _);
+            if (job.Leases.IsEmpty)
+                await StopAsync(job);
+            return true;
+        }
+        finally
+        {
+            admission.Release();
+        }
     }
 
     private async Task StopAsync(Job job)
@@ -227,12 +243,10 @@ public sealed class PlaybackSessions(
         catch (DirectoryNotFoundException) { }
         catch (IOException)
         {
-            job.Touched = DateTime.UtcNow.AddMinutes(-31);
             return;
         }
         catch (UnauthorizedAccessException)
         {
-            job.Touched = DateTime.UtcNow.AddMinutes(-31);
             return;
         }
         jobs.TryRemove(job.Id, out _);
@@ -511,12 +525,27 @@ public sealed class PlaybackSessions(
             while (!stoppingToken.IsCancellationRequested)
             {
                 await Task.Delay(TimeSpan.FromSeconds(30), stoppingToken);
-                foreach (
-                    var job in jobs.Values.Where(x =>
-                        DateTime.UtcNow - x.Touched > TimeSpan.FromMinutes(30)
-                    )
-                )
-                    await StopAsync(job);
+                await admission.WaitAsync(stoppingToken);
+                try
+                {
+                    foreach (var job in jobs.Values)
+                    {
+                        foreach (
+                            var lease in job
+                                .Leases.Where(x =>
+                                    DateTime.UtcNow - x.Value.Touched > TimeSpan.FromMinutes(30)
+                                )
+                                .ToArray()
+                        )
+                            ((ICollection<KeyValuePair<string, Lease>>)job.Leases).Remove(lease);
+                        if (job.Leases.IsEmpty)
+                            await StopAsync(job);
+                    }
+                }
+                finally
+                {
+                    admission.Release();
+                }
             }
         }
         catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested) { }

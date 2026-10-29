@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import {
   api,
+  playbackRequest,
+  playbackFileUrl,
   connect,
   login,
   logout,
@@ -117,6 +119,21 @@ export default function App() {
   useEffect(() => {
     document.documentElement.dataset.theme = theme;
   }, [theme]);
+  useEffect(() => {
+    const onExpired = () => {
+      setUser(undefined);
+      setSelection(undefined);
+      setItems([]);
+      setWatching([]);
+      setContinueItems([]);
+      setSessions([]);
+      setError('Your session expired. Sign in again.');
+    };
+    window.addEventListener('desktop-session-expired', onExpired);
+    return () =>
+      window.removeEventListener('desktop-session-expired', onExpired);
+  }, []);
+
   function failure(e: unknown) {
     setError(errorMessage(e));
     if (expired(e)) {
@@ -506,6 +523,11 @@ export default function App() {
                 }
                 progressRevision={selection.progress.revision}
                 streamUrl={selection.url}
+                playbackTransport={{
+                  request: playbackRequest,
+                  fileUrl: playbackFileUrl,
+                  directUrl: selection.url,
+                }}
                 onSaveProgress={(seconds, completed) =>
                   selection.writer.save(seconds, completed)
                 }

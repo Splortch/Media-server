@@ -6,14 +6,14 @@ This alpha adds an operational, bounded HLS conversion path alongside unchanged 
 
 | Area | Implemented | Still requires validation or follow-up |
 | --- | --- | --- |
-| #5 adaptive playback | 360p/480p/720p ceiling ladder, hls.js automatic bandwidth selection, manual override, reuse within the same authenticated session | Real throttled-network switching/rebuffering benchmarks; progressive startup; source-resolution-specific ladders |
+| #5 adaptive playback | 360p/480p/720p ceiling ladder, hls.js automatic bandwidth selection, manual override, reuse through separately authorized session leases | Real throttled-network switching/rebuffering benchmarks; source-resolution-specific ladders |
 | #6 NVIDIA | Runtime synthetic encode probe, opt-in NVENC encoder, retry the complete conversion in software if hardware fails | Real NVIDIA device/driver tests and throughput benchmarks |
 | #7 Intel/AMD | Runtime QSV, VAAPI and AMF adapters through FFmpeg; explicit fallback | Physical Linux/Windows GPU matrix, device selection beyond the default Linux render node |
 | #8 formats/HDR | FFprobe dimensions, pixel format, bit depth, primaries, transfer, matrix and side metadata; explicit HDR warning; Hable HDR-to-BT.709 SDR conversion with stale HDR frame side data removed | Physical HDR display checks, visual/reference color fidelity, Dolby Vision, cross-browser decoder matrix and representative tone-map benchmarks |
-| #9 tracks | Indexed audio selection through conversion, authorized embedded text-to-WebVTT and same-basename external `.vtt`, escaped React labels, caption markup stripping | Bitmap subtitle burn-in, multiple external language files, native client selection UI and screen-reader/device checks |
+| #9 tracks | Indexed audio selection through conversion, authorized embedded text-to-WebVTT and same-basename external `.vtt`, escaped React labels, caption markup stripping | Bitmap subtitle burn-in, multiple external language files, bitmap captions, external-language sets and screen-reader/device checks |
 | Remove libraries | Administrator-only API and confirmation UI, transactional catalog cleanup, scan conflict protection, original files preserved | Existing already-open Direct Play handles can finish; subsequent media/segment requests fail |
 
-The web player has the new controls. Desktop and Android retain their existing Direct Play behavior; their native authenticated transport must be extended before enabling HLS controls there. The server API is client-independent and additive to API v1.
+Web and desktop clients share the HLS/quality/audio/subtitle controls. Desktop requests flow through the native credential-owning transport and a nonce-scoped loopback bridge; captions and MSE use restricted CORS. Native Android uses Media3 HLS and its protected same-origin cookie client, with Auto/manual variants and text subtitles. Actual device codec support is still not assumed. The server API is client-independent and additive to API v1.
 
 ## Try it
 
@@ -58,13 +58,13 @@ The generated contract lives in `shared/api/openapi-v1.json` and `shared/api/src
 - `GET /api/v1/media/{id}/playback-options`: color metadata, tracks, external-caption presence, allowed encoders and conversion limits.
 - `POST /api/v1/media/{id}/playback-sessions`: `{ audioTrack: number|null, subtitleTrack: number|null, encoder: string }`. Subtitle `-1` selects the same-basename external WebVTT file. Returns 202 with conversion state; 409 when capacity is occupied.
 - `GET /api/v1/playback-sessions/{session}`: preparing/ready/failed state, actual encoder, encode seconds, manifest URL.
-- `GET|HEAD /api/v1/playback-sessions/{session}/files/{file}`: private, no-store manifest/variant/segment/caption bytes. Supports byte ranges. Every request revalidates the login, user, session ownership and current media ACL. A guessed session ID is insufficient; another login of the same account cannot reuse it.
+- `GET|HEAD /api/v1/playback-sessions/{session}/files/{file}`: private, no-store manifest/variant/segment/caption bytes. Supports byte ranges. Every request revalidates the login, user, session ownership and current media ACL. A guessed session ID is insufficient; another login must explicitly acquire its own authorized lease before using it.
 - `DELETE /api/v1/playback-sessions/{session}`: cancel, wait for process termination, remove generated cache. CSRF protection applies to mutations, just as to existing endpoints.
 - `DELETE /api/libraries/{id}` and `/api/v1/libraries/{id}`: admin only. 204 removed, 404 absent, 409 scan active. Same scheduling lock prevents a scan from being inserted during deletion. Database transaction removes library, media, jobs/issues, permissions, history, progress, reports and library-bound smart collections. No filesystem delete receives a library path. Watcher reconciliation disposes removed-library watchers.
 
 FFmpeg receives server-created paths and fixed argument lists, never client-supplied filters or executable names. Sources/captions are opened through the existing no-symlink path policy and staged from pinned handles; FFmpeg input protocols and container demuxers are restricted. Output filenames use a closed allowlist. Process output is drained, never returned to clients or logged with private paths. Cache URLs contain no tokens. Browser HLS uses authenticated same-origin requests and MSE blob URLs; CSP permits media blobs without relaxing scripts or external origins. Captions render through native WebVTT, not HTML; tags/style/region blocks are stripped. ASS positioning/styling is intentionally lost in text conversion.
 
-Sessions are intentionally reused only within the same login and matching source fingerprint/selection. Cross-user reuse would need a separate content-addressed cache with independently checked leases, and is not part of this alpha.
+Matching media fingerprint/selection jobs can be reused across logins and users, but each session must first POST through the media ACL to acquire its own lease. A session that merely guesses a job ID still receives 404. Every file request rechecks the current session and media ACL. DELETE revokes only the caller’s lease; the last lease cancels and removes the cache. Up to 32 leases share one encode, with 30-minute per-lease inactivity expiry. Progress and history remain separate per user.
 
 ## Validation and remaining work
 

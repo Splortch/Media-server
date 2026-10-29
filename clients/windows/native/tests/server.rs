@@ -123,6 +123,109 @@ async fn real_server_cookie_login_ranges_resume_conflicts_revocation_and_disconn
     let mut bad = url::Url::parse(&source).unwrap();
     bad.set_path(&format!("/wrong/media/{id}"));
     assert_eq!(http.get(bad).send().await.unwrap().status(), 404);
+    let options = first
+        .request("GET", &format!("/api/v1/media/{id}/playback-options"), None)
+        .await
+        .unwrap();
+    assert!(options["encoders"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|e| e == "libx264"));
+    let mut conversion = first
+        .request(
+            "POST",
+            &format!("/api/v1/media/{id}/playback-sessions"),
+            Some(json!({"encoder":"libx264"})),
+        )
+        .await
+        .unwrap();
+    let conversion_id = conversion["id"].as_str().unwrap().to_owned();
+    for _ in 0..200 {
+        if conversion["state"] != "preparing" {
+            break;
+        }
+        tokio::time::sleep(Duration::from_millis(200)).await;
+        conversion = first
+            .request(
+                "GET",
+                &format!("/api/v1/playback-sessions/{conversion_id}"),
+                None,
+            )
+            .await
+            .unwrap();
+    }
+    assert_eq!(conversion["state"], "ready");
+    let manifest_url = first
+        .playback_url(&conversion_id, "master.m3u8")
+        .await
+        .unwrap();
+    let public_http = reqwest::Client::new();
+    let manifest = public_http
+        .get(&manifest_url)
+        .header("Origin", "http://tauri.localhost")
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(manifest.status(), 200);
+    assert_eq!(
+        manifest.headers()["access-control-allow-origin"],
+        "http://tauri.localhost"
+    );
+    assert!(!manifest.headers().contains_key("set-cookie"));
+    assert!(manifest.text().await.unwrap().contains("720p.m3u8"));
+    assert_eq!(
+        public_http
+            .get(&manifest_url)
+            .header("Origin", "https://evil.invalid")
+            .send()
+            .await
+            .unwrap()
+            .status(),
+        404
+    );
+    let head = public_http
+        .head(&manifest_url)
+        .header("Origin", "http://tauri.localhost")
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(head.status(), 200);
+    assert!(
+        head.headers()["content-length"]
+            .to_str()
+            .unwrap()
+            .parse::<u64>()
+            .unwrap()
+            > 0
+    );
+    let playlist = public_http
+        .get(
+            first
+                .playback_url(&conversion_id, "360p.m3u8")
+                .await
+                .unwrap(),
+        )
+        .send()
+        .await
+        .unwrap()
+        .text()
+        .await
+        .unwrap();
+    let segment = playlist.lines().find(|s| s.ends_with(".ts")).unwrap();
+    let bytes = public_http
+        .get(first.playback_url(&conversion_id, segment).await.unwrap())
+        .header("Range", "bytes=0-187")
+        .header("Origin", "http://tauri.localhost")
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(bytes.status(), 206);
+    assert_eq!(bytes.bytes().await.unwrap()[0], 0x47);
+    assert!(first
+        .playback_url(&conversion_id, "../source.bin")
+        .await
+        .is_err());
     let second = DesktopClient::start(vault).await.unwrap();
     second.connect(&base, true).await.unwrap();
     assert_eq!(
@@ -191,6 +294,15 @@ async fn real_server_cookie_login_ranges_resume_conflicts_revocation_and_disconn
     );
     first.logout().await.unwrap();
     assert_eq!(http.get(&source).send().await.unwrap().status(), 404);
+    assert_eq!(
+        public_http
+            .get(&manifest_url)
+            .send()
+            .await
+            .unwrap()
+            .status(),
+        404
+    );
     assert_eq!(
         first
             .request("GET", "/api/v1/media", None)

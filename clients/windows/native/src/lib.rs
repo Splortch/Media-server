@@ -299,6 +299,10 @@ impl DesktopClient {
         };
         let router = Router::new()
             .route("/{secret}/media/{id}", get(stream_media))
+            .route(
+                "/{secret}/playback/{session}/files/{file}",
+                get(stream_playback),
+            )
             .with_state(client.clone());
         tokio::spawn(async move {
             let _ = axum::serve(listener, router).await;
@@ -442,6 +446,16 @@ impl DesktopClient {
         let c = self.current().await?;
         Ok(format!("{}/{}/media/{id}", self.proxy, c.proxy_secret))
     }
+    pub async fn playback_url(&self, session: &str, file: &str) -> Result<String> {
+        if !valid_session(session) || !playback_file(file) {
+            return Err(ClientError::new("PATH", "Invalid playback resource."));
+        }
+        let c = self.current().await?;
+        Ok(format!(
+            "{}/{}/playback/{session}/files/{file}",
+            self.proxy, c.proxy_secret
+        ))
+    }
 }
 fn allowed_request(method: &str, path: &str) -> bool {
     if path.len() > 1024 || path.contains('#') || path.contains('\\') {
@@ -472,16 +486,151 @@ fn allowed_request(method: &str, path: &str) -> bool {
     if method == "DELETE" && parts.len() == 2 && parts[0] == "sessions" {
         return parts[1].len() == 32 && parts[1].chars().all(|c| c.is_ascii_hexdigit());
     }
+    if parts.len() == 2 && parts[0] == "playback-sessions" && valid_session(parts[1]) {
+        return matches!(method, "GET" | "DELETE");
+    }
     if parts.len() >= 2 && parts[0] == "media" && parts[1].parse::<u64>().is_ok_and(|n| n > 0) {
         return matches!(
             (method, parts.len(), parts.get(2).copied()),
             ("GET", 2, _)
-                | ("GET", 3, Some("progress" | "tracks"))
+                | ("GET", 3, Some("progress" | "tracks" | "playback-options"))
                 | ("PUT", 3, Some("progress-sync"))
-                | ("POST", 3, Some("playback-errors"))
+                | ("POST", 3, Some("playback-errors" | "playback-sessions"))
         );
     }
     false
+}
+fn valid_session(value: &str) -> bool {
+    value.len() == 32 && value.bytes().all(|c| c.is_ascii_hexdigit())
+}
+fn playback_file(value: &str) -> bool {
+    if matches!(
+        value,
+        "master.m3u8" | "captions.vtt" | "360p.m3u8" | "480p.m3u8" | "720p.m3u8"
+    ) {
+        return true;
+    }
+    ["360p_", "480p_", "720p_"].iter().any(|prefix| {
+        value
+            .strip_prefix(prefix)
+            .and_then(|v| v.strip_suffix(".ts"))
+            .is_some_and(|v| (5..=10).contains(&v.len()) && v.bytes().all(|c| c.is_ascii_digit()))
+    })
+}
+fn bridge_origin(headers: &HeaderMap) -> Option<&str> {
+    headers
+        .get("origin")
+        .and_then(|v| v.to_str().ok())
+        .filter(|origin| {
+            matches!(
+                *origin,
+                "http://tauri.localhost" | "tauri://localhost" | "http://127.0.0.1:1420"
+            )
+        })
+}
+fn valid_playlist(text: &str) -> bool {
+    text.starts_with("#EXTM3U")
+        && text.lines().all(|line| {
+            let line = line.trim();
+            line.is_empty()
+                || (line.starts_with('#') && !line.contains("URI="))
+                || playback_file(line)
+        })
+}
+async fn stream_playback(
+    State(client): State<DesktopClient>,
+    Path((secret, session, file)): Path<(String, String, String)>,
+    method: Method,
+    headers: HeaderMap,
+) -> Response {
+    let empty = |status| {
+        Response::builder()
+            .status(status)
+            .body(Body::empty())
+            .unwrap()
+    };
+    if !valid_session(&session)
+        || !playback_file(&file)
+        || (headers.contains_key("origin") && bridge_origin(&headers).is_none())
+    {
+        return empty(StatusCode::NOT_FOUND);
+    }
+    let Ok(c) = client.current().await else {
+        return empty(StatusCode::NOT_FOUND);
+    };
+    if secret != c.proxy_secret.as_ref() {
+        return empty(StatusCode::NOT_FOUND);
+    }
+    let path = format!("/api/v1/playback-sessions/{session}/files/{file}");
+    let mut request = c.http.request(method.clone(), c.base.join(&path).unwrap());
+    if let Some(range) = headers.get("range") {
+        request = request.header("range", range);
+    }
+    let Ok(response) = request.send().await else {
+        return empty(StatusCode::BAD_GATEWAY);
+    };
+    let status = response.status();
+    let mut builder = Response::builder()
+        .status(status)
+        .header("Cache-Control", "no-store")
+        .header("X-Content-Type-Options", "nosniff");
+    if let Some(origin) = bridge_origin(&headers) {
+        builder = builder
+            .header("Access-Control-Allow-Origin", origin)
+            .header("Access-Control-Allow-Credentials", "true")
+            .header("Vary", "Origin");
+    }
+    if !status.is_success() {
+        return builder.body(Body::empty()).unwrap();
+    }
+    let kind = response
+        .headers()
+        .get("content-type")
+        .and_then(|v| v.to_str().ok())
+        .unwrap_or("");
+    let valid_type = if file.ends_with(".m3u8") {
+        matches!(
+            kind.split(';').next().unwrap_or(""),
+            "application/vnd.apple.mpegurl" | "application/x-mpegURL"
+        )
+    } else if file.ends_with(".vtt") {
+        kind.starts_with("text/vtt")
+    } else {
+        kind == "video/mp2t"
+    };
+    if !valid_type {
+        return empty(StatusCode::BAD_GATEWAY);
+    }
+    for name in ["content-type", "content-range", "accept-ranges"] {
+        if let Some(value) = response.headers().get(name) {
+            builder = builder.header(name, value);
+        }
+    }
+    if file.ends_with(".m3u8") && method != Method::HEAD {
+        let mut data = Vec::new();
+        let mut stream = response.bytes_stream();
+        while let Some(chunk) = stream.next().await {
+            let Ok(chunk) = chunk else {
+                return empty(StatusCode::BAD_GATEWAY);
+            };
+            if data.len() + chunk.len() > 1024 * 1024 {
+                return empty(StatusCode::BAD_GATEWAY);
+            }
+            data.extend_from_slice(&chunk);
+        }
+        if !std::str::from_utf8(&data).is_ok_and(valid_playlist) {
+            return empty(StatusCode::BAD_GATEWAY);
+        }
+        return builder.body(Body::from(data)).unwrap();
+    }
+    if let Some(length) = response.headers().get("content-length") {
+        builder = builder.header("content-length", length);
+    }
+    let body = response
+        .bytes_stream()
+        .take_until(c.cancel.cancelled_owned())
+        .map_err(std::io::Error::other);
+    builder.body(Body::from_stream(body)).unwrap()
 }
 async fn stream_media(
     State(client): State<DesktopClient>,
@@ -528,6 +677,12 @@ async fn stream_media(
         .status(response.status())
         .header("Cache-Control", "no-store")
         .header("X-Content-Type-Options", "nosniff");
+    if let Some(origin) = bridge_origin(&headers) {
+        builder = builder
+            .header("Access-Control-Allow-Origin", origin)
+            .header("Access-Control-Allow-Credentials", "true")
+            .header("Vary", "Origin");
+    }
     if let Some(kind) = response
         .headers()
         .get("content-type")
@@ -563,6 +718,40 @@ async fn stream_media(
 }
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn scoped_hls_paths_and_manifests() {
+        assert!(super::allowed_request(
+            "GET",
+            "/api/v1/media/1/playback-options"
+        ));
+        assert!(super::allowed_request(
+            "POST",
+            "/api/v1/media/1/playback-sessions"
+        ));
+        assert!(super::allowed_request(
+            "GET",
+            "/api/v1/playback-sessions/abcdef0123456789abcdef0123456789"
+        ));
+        assert!(!super::allowed_request(
+            "GET",
+            "/api/v1/playback-sessions/../../media/1"
+        ));
+        assert!(super::valid_playlist(
+            "#EXTM3U\n#EXT-X-STREAM-INF:BANDWIDTH=960000\n360p.m3u8\n"
+        ));
+        for value in [
+            "#EXTM3U\nhttps://evil.invalid/video.ts",
+            "#EXTM3U\n../source.bin",
+            "#EXTM3U\n#EXT-X-KEY:URI=\"https://evil.invalid\"",
+            "#EXTM3U\n//evil.invalid/360p.m3u8",
+        ] {
+            assert!(!super::valid_playlist(value));
+        }
+        assert!(!super::playback_file("source.bin"));
+        assert!(super::playback_file("720p_00001.ts"));
+        assert!(!super::playback_file("720p_../../secret.ts"));
+    }
+
     use super::*;
     #[test]
     fn credential_keys_preserve_saved_session_addresses() {
