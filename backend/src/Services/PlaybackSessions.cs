@@ -174,16 +174,16 @@ public sealed class PlaybackSessions(
 
     private Job? Find(string id, int media, int user, string session)
     {
-        if (
-            !jobs.TryGetValue(id, out var job)
-            || job.Media != media
-            || !job.Leases.TryGetValue(session, out var lease)
-            || lease.User != user
-        )
+        if (!jobs.TryGetValue(id, out var job) || job.Media != media)
             return null;
-        if (!job.Leases.TryUpdate(session, new Lease(user, DateTime.UtcNow), lease))
-            return null;
-        return job;
+        // Parallel manifest, segment and caption reads may all refresh the same lease.
+        // Retry a timestamp collision, but never recreate a lease removed by logout/expiry.
+        while (job.Leases.TryGetValue(session, out var lease) && lease.User == user)
+        {
+            if (job.Leases.TryUpdate(session, new Lease(user, DateTime.UtcNow), lease))
+                return job;
+        }
+        return null;
     }
 
     public int? MediaId(string id, int user, string session) =>

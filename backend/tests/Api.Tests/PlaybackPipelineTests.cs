@@ -423,6 +423,40 @@ public sealed class PlaybackPipelineTests
             )!;
         }
         Assert.True(state.State == "ready", state.Error);
+        string ownerSession;
+        using (var scope = server.Services.CreateScope())
+            ownerSession = await scope
+                .ServiceProvider.GetRequiredService<MediaDb>()
+                .Sessions.Select(x => x.Id)
+                .SingleAsync();
+        var playback = server.Services.GetRequiredService<PlaybackSessions>();
+        var rejected = 0;
+        Parallel.For(
+            0,
+            10000,
+            _ =>
+            {
+                if (playback.Get(state.Id, 1, 1, ownerSession) is null)
+                    Interlocked.Increment(ref rejected);
+            }
+        );
+        Assert.Equal(0, rejected);
+        var resources = await Task.WhenAll(
+            Enumerable
+                .Range(0, 32)
+                .Select(i =>
+                    admin.GetAsync(
+                        i % 2 == 0
+                            ? state.Manifest
+                            : state.Manifest.Replace("master.m3u8", "captions.vtt")
+                    )
+                )
+        );
+        foreach (var resource in resources)
+        {
+            Assert.Equal(HttpStatusCode.OK, resource.StatusCode);
+            resource.Dispose();
+        }
         var manifest = await admin.GetStringAsync(state.Manifest);
         Assert.Contains("360p.m3u8", manifest);
         Assert.Contains("720p.m3u8", manifest);
