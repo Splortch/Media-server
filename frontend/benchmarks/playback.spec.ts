@@ -235,7 +235,7 @@ for (const attempt of [1, 2]) {
         platform: process.platform,
         attempt,
         matrix,
-        note: 'Headless Linux decoder evidence only. Advertised support is not actual decode proof. No physical HDR display or color-fidelity claim.',
+        note: 'Headless decoder evidence on the recorded platform only. Advertised support is not actual decode proof. No physical HDR display or color-fidelity claim.',
       });
     for (const [title, type] of [
       ['h264', 'video/mp4; codecs="avc1.42C01E"'],

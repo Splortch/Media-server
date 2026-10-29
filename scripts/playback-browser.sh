@@ -30,4 +30,4 @@ for i in $(seq 1 100); do
   sleep .2
 done
 if [[ "$READY" != 1 ]]; then cat "$TASK_TEMP/server.log"; exit 1; fi
-(cd frontend && npx playwright test --config playwright.benchmark.config.ts)
+(cd frontend && npx playwright test --config playwright.benchmark.config.ts "$@")
