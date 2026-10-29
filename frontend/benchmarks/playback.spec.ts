@@ -98,12 +98,17 @@ test('track controls expose instructions and support keyboard selection', async 
     /bitmap subtitles are unavailable/,
   );
   await subtitles.focus();
-  // macOS popup buttons open on Space; Down alone opens without changing value.
-  if (browserName === 'webkit') await page.keyboard.press('Space');
-  await page.keyboard.press('ArrowDown');
-  await page.keyboard.press('Enter');
+  if (browserName === 'webkit') {
+    // Playwright's macOS native popup does not commit virtual-keyboard choices.
+    // Verify real selection semantics here; do not report keyboard selection as tested.
+    await subtitles.selectOption({ index: 1 });
+  } else {
+    await page.keyboard.press('ArrowDown');
+    await page.keyboard.press('Enter');
+  }
   await expect(subtitles).not.toHaveValue('');
-  await page.keyboard.press('Tab');
+  await page.keyboard.press('Escape');
+  await subtitles.press('Tab');
   await expect(
     page.getByRole('combobox', { name: 'Encoder preference' }),
   ).toBeFocused();
@@ -114,7 +119,8 @@ test('track controls expose instructions and support keyboard selection', async 
   await report(`${browserName}-track-accessibility`, {
     browser: browserName,
     platform: process.platform,
-    keyboardSelection: true,
+    keyboardSelection: browserName !== 'webkit',
+    nativePopupKeyboardManualCheckRequired: browserName === 'webkit',
     accessibleInstructions: true,
     axeViolations: audit.violations.length,
     manualScreenReaderTested: false,

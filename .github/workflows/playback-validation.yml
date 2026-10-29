@@ -93,6 +93,9 @@ jobs:
       - run: dotnet build MediaServer.sln --no-restore -warnaserror
       - run: npm ci --prefix frontend
       - run: cd frontend && npx playwright install --with-deps ${{ matrix.browsers }}
+      - name: Enable macOS keyboard navigation
+        if: runner.os == 'macOS'
+        run: defaults write org.webkit.Playwright AppleKeyboardUIMode -int 2
       - name: Measure network adaptation and browser decoder compatibility
         run: bash scripts/playback-browser.sh ${{ matrix.projects }}
       - uses: actions/upload-artifact@v7

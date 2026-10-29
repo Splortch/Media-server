@@ -10,7 +10,7 @@ Implementation: [PR #83](https://github.com/Splortch/Media-server/pull/83). Repe
 | NVENC (#6) | Runtime synthetic encode, selected GPU binding, unavailable-device fallback tests; hardware workflow rejects fallback | Physical NVIDIA GPU throughput/driver compatibility |
 | Intel/AMD (#7) | Shared runtime probes; QSV/VAAPI device binding; AMF default-device path; strict configuration tests | Physical Intel/AMD driver/device compatibility |
 | HDR conversion (#8) | PQ/HLG neutral-ramp numerical regression; SDR/HEVC-HDR/AV1-HDR production benchmarks; output metadata checks | Reference-color fidelity, gamut accuracy or HDR display output |
-| Captions/audio (#9) | Authorized delivery, language labels, real cue loading, cache edits, sanitization; keyboard and axe checks on each browser; conversion benchmark checks timing and source preservation | Spoken output and interaction with a physical screen reader |
+| Captions/audio (#9) | Authorized delivery, language labels, real cue loading, cache edits, sanitization; keyboard selection on Chromium/Firefox; selection semantics, focus and axe checks on each browser; conversion benchmark checks timing and source preservation | Spoken output and interaction with a physical screen reader |
 
 The neutral-ramp test checks black preservation, neutral channels and monotonic luminance. Its thresholds deliberately tolerate rounding between FFmpeg builds. It is not a perceptual color reference and must not be described as display certification. Conversions explicitly produce SDR; Dolby Vision and bitmap subtitle burn-in remain unsupported. ASS styling is not preserved when converted to text WebVTT.
 
@@ -62,3 +62,5 @@ Use synthetic fixtures and a test account; no personal media is required. Record
 5. For HDR, compare a legally distributable reference clip on a calibrated HDR display against explicit SDR conversion. Check dark detail, highlights, skin/neutral colors, gamut clipping, caption timing and audio alignment. Record display mode and calibration/reference source. A synthetic neutral ramp or an HDR metadata flag alone is insufficient.
 
 Attach results and remaining failures to #8/#9. Leave physical acceptance unchecked until these observations exist. Automated keyboard/axe tests cover semantics and operation; they do not run NVDA, VoiceOver or TalkBack.
+
+macOS native popup selection does not commit virtual keyboard choices through this Playwright build. Its automated test uses `selectOption` and records `keyboardSelection: false`; manual VoiceOver/native keyboard acceptance remains required. CI enables macOS keyboard navigation for focus traversal.
