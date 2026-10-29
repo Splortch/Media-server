@@ -23,6 +23,26 @@ public record ConversionState(
     string Manifest
 );
 
+public record ConversionActivity(
+    int MediaId,
+    string State,
+    string Phase,
+    string Encoder,
+    string? Rendition,
+    int CompletedRenditions,
+    double ElapsedSeconds,
+    FfmpegProgress? Progress
+);
+
+public record ConversionSnapshot(
+    int Capacity,
+    int Preparing,
+    int Encoding,
+    int Ready,
+    int Failed,
+    ConversionActivity[] Jobs
+);
+
 // Conversion cache is private and ephemeral; access is bound to authenticated session leases.
 // Encodes may be reused, but every authenticated session needs its own lease and media ACL.
 // No shared public files or bearer tokens in URLs. At most two staged/encoded sources.
@@ -61,6 +81,12 @@ public sealed class PlaybackSessions(
         public string Encoder = "libx264";
         public string? Error;
         public double Seconds;
+        public volatile string Phase = "staging";
+        public string? Rendition;
+        public int CompletedRenditions;
+        public FfmpegProgress? Progress;
+        public readonly System.Diagnostics.Stopwatch Elapsed =
+            System.Diagnostics.Stopwatch.StartNew();
         public CancellationTokenSource Stop = new();
         public Task Work = Task.CompletedTask;
 
@@ -73,6 +99,33 @@ public sealed class PlaybackSessions(
                 Seconds,
                 $"/api/v1/playback-sessions/{Id}/files/master.m3u8"
             );
+    }
+
+    // Caller must enforce admin authorization. No filesystem paths, lease/session tokens or errors.
+    public ConversionSnapshot Snapshot()
+    {
+        var entries = jobs
+            .Values.Select(job => new ConversionActivity(
+                job.Media,
+                job.State,
+                job.Phase,
+                job.Encoder,
+                Volatile.Read(ref job.Rendition),
+                Volatile.Read(ref job.CompletedRenditions),
+                job.State == "preparing" ? job.Elapsed.Elapsed.TotalSeconds : job.Seconds,
+                job.State == "preparing" && job.Phase == "encoding"
+                    ? Volatile.Read(ref job.Progress)
+                    : null
+            ))
+            .ToArray();
+        return new(
+            2,
+            entries.Count(x => x.State == "preparing"),
+            entries.Count(x => x.State == "preparing" && x.Phase == "encoding"),
+            entries.Count(x => x.State == "ready"),
+            entries.Count(x => x.State == "failed"),
+            entries
+        );
     }
 
     public async Task<ConversionState?> StartAsync(
@@ -292,8 +345,10 @@ public sealed class PlaybackSessions(
                 }
             }
             // Reprobe the pinned staged bytes, so old catalogs cannot silently misclassify HDR.
+            job.Phase = "probing";
             var metadata = await probe.ProbeAsync(Path.Combine(job.Directory, "source.bin"), ct);
             item.ColorJson = metadata.ColorJson;
+            job.Phase = "captions";
             if (captions is not null)
             {
                 var captionPath = Path.Combine(job.Directory, "captions.vtt");
@@ -362,6 +417,7 @@ public sealed class PlaybackSessions(
                     ct
                 );
             }
+            job.Phase = "capability-probe";
             var available = await discovery.GetAsync(ct);
             var encoder = available.Any(x => x.Encoder == job.Selection.Encoder && x.Available)
                 ? job.Selection.Encoder
@@ -386,6 +442,7 @@ public sealed class PlaybackSessions(
             }
             File.Delete(Path.Combine(job.Directory, "source.bin"));
             job.Seconds = watch.Elapsed.TotalSeconds;
+            job.Phase = "ready";
             job.State = "ready";
         }
         catch (Exception ex)
@@ -402,6 +459,8 @@ public sealed class PlaybackSessions(
             job.Error = ct.IsCancellationRequested
                 ? "conversion_cancelled_or_quota_exceeded"
                 : "conversion_failed_check_ffmpeg_and_filters";
+            job.Seconds = watch.Elapsed.TotalSeconds;
+            job.Phase = "failed";
             job.State = "failed";
         }
         finally
@@ -415,6 +474,7 @@ public sealed class PlaybackSessions(
     private async Task Encode(Job job, MediaItem item, string encoder, CancellationToken ct)
     {
         job.Encoder = encoder;
+        Volatile.Write(ref job.CompletedRenditions, 0);
         var master = new StringBuilder("#EXTM3U\n#EXT-X-VERSION:3\n");
         var hdr = TranscodeProfile.Color(item)?.Hdr == true;
         foreach (var level in TranscodeProfile.Ladder)
@@ -479,7 +539,16 @@ public sealed class PlaybackSessions(
                     args.Count - 1,
                     ["-color_primaries", "bt709", "-color_trc", "bt709", "-colorspace", "bt709"]
                 );
-            await runner.RunAsync(args, job.Directory, ct);
+            Volatile.Write(ref job.Progress, null);
+            Volatile.Write(ref job.Rendition, level.Name);
+            job.Phase = "encoding";
+            await runner.RunAsync(
+                args,
+                job.Directory,
+                ct,
+                progress => Volatile.Write(ref job.Progress, progress)
+            );
+            job.Phase = "verifying";
             var encoded = await probe.ProbeAsync(
                 Path.Combine(job.Directory, level.Name + ".m3u8"),
                 ct
@@ -487,6 +556,7 @@ public sealed class PlaybackSessions(
             var dimensions = JsonSerializer.Deserialize<VideoColor>(encoded.ColorJson);
             if (encoded.VideoCodec != "h264" || dimensions is not { Width: > 0, Height: > 0 })
                 throw new IOException("Invalid encoded rendition.");
+            Interlocked.Increment(ref job.CompletedRenditions);
             master.Append(
                 $"#EXT-X-STREAM-INF:BANDWIDTH={(level.Kilobits + 160) * 1000},RESOLUTION={dimensions.Width}x{dimensions.Height},NAME=\"{level.Name}\"\n{level.Name}.m3u8\n"
             );

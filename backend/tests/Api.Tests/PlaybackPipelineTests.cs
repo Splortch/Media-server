@@ -430,6 +430,16 @@ public sealed class PlaybackPipelineTests
                 .Sessions.Select(x => x.Id)
                 .SingleAsync();
         var playback = server.Services.GetRequiredService<PlaybackSessions>();
+        var activity = Assert.Single(playback.Snapshot().Jobs);
+        Assert.Equal("ready", activity.State);
+        Assert.Equal("ready", activity.Phase);
+        Assert.Equal(3, activity.CompletedRenditions);
+        Assert.True(activity.ElapsedSeconds > 0);
+        Assert.Null(activity.Progress); // A cached conversion must not appear to keep encoding.
+        var monitoring = await admin.GetStringAsync("/api/v1/monitoring");
+        Assert.DoesNotContain(ownerSession, monitoring);
+        Assert.DoesNotContain(server.MediaPath, monitoring);
+        Assert.DoesNotContain(server.DataPath, monitoring);
         var rejected = 0;
         Parallel.For(
             0,
@@ -457,6 +467,13 @@ public sealed class PlaybackPipelineTests
             Assert.Equal(HttpStatusCode.OK, resource.StatusCode);
             resource.Dispose();
         }
+        Assert.True(
+            SpinWait.SpinUntil(
+                () => server.Services.GetRequiredService<StreamRegistry>().Snapshot().Length == 0,
+                TimeSpan.FromSeconds(2)
+            ),
+            "Completed HLS transfers must release monitoring counters."
+        );
         var manifest = await admin.GetStringAsync(state.Manifest);
         Assert.Contains("360p.m3u8", manifest);
         Assert.Contains("720p.m3u8", manifest);

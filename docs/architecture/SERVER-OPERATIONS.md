@@ -61,7 +61,26 @@ actual storage and server before setting a tighter service target.
 
 Admin Settings displays server-process CPU (normalized across available logical processors), process/managed
 memory, data-volume free/total capacity, uptime, queued/running scans and active authenticated HTTP transfer
-requests with bytes read. Finished transfers disappear even if a buffered video keeps playing. CPU is null on
+requests with bytes read, including Direct Play and authorized HLS manifests/segments/captions. Finished transfers disappear even if a buffered video keeps playing. CPU is null on
 its first sample; unavailable disk values remain null. Paths and bearer session identifiers are never returned.
-GPU adapters, transcoding rates and transcoding queues are explicitly unavailable until their respective
-engines exist. The web client polls every five seconds; no external telemetry service is involved.
+The web client polls every five seconds and clears stale samples if access is revoked or the request fails. No external telemetry service is involved.
+
+Conversion activity shows preparing/encoding/ready/failed counts, the two-slot capacity, current rendition,
+completed verified renditions, elapsed preparation time and numeric FFmpeg progress (frames, FPS, output
+seconds and speed). Progress is per current rendition and resets on a hardware-to-software retry. Cached
+ready jobs do not contribute to live encoding rates. There is no waiting conversion queue: requests beyond
+the two admitted jobs are rejected. Preparing includes staging, probing and verification; it is not a count
+of active encoders. HTTP streams, admitted conversions, cached outputs and active viewers are distinct.
+These fields are available only to administrators on both `/api/monitoring` and `/api/v1/monitoring`.
+
+Set `MediaServer__EnableGpuMetrics=true` to enable an optional NVIDIA adapter. `MediaServer__NvidiaSmiPath`
+is an operator-controlled executable path (default `nvidia-smi`); clients cannot select commands. The adapter
+requests only adapter index, utilization and VRAM counters with fixed arguments, bounds stdout to 8 KiB,
+kills the process tree after two seconds, discards stderr and caches each result for five seconds. No process
+runs when disabled. NVIDIA `N/A` fields remain null, and malformed/missing/unsupported tools return a generic
+unavailable status, never raw vendor output or paths. Samples are host-wide, not attributed to streams.
+AMD/Intel utilization adapters are unavailable; their encoding support is separate. Parser and failure-path
+tests do not establish physical NVIDIA driver/device compatibility. Use actual hardware to verify a deployment.
+
+Implementation references: [FFmpeg progress protocol](https://ffmpeg.org/ffmpeg.html#toc-Advanced-options)
+and [NVIDIA query documentation](https://docs.nvidia.com/deploy/nvidia-smi/).

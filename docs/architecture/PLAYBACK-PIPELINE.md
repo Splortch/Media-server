@@ -70,7 +70,7 @@ Matching media fingerprint/selection jobs can be reused across logins and users,
 
 Automated tests cover transactional removal/source preservation, active scan rejection, unauthorized access, unknown encoder/filter rejection, real synthetic FFmpeg conversion, all three complete HLS variants and transport segments, session-isolated cache reuse/removal, external subtitle sanitation, HDR profile policy, synthetic AV1/HEVC probing and SDR conversion. Frontend tests cover track labels, unavailable bitmap subtitle choices, encoder authorization and removal confirmation/error handling. The browser suite includes actual HLS frame rendering and quality selection against the real backend.
 
-A passing build is not a physical GPU, HDR color-fidelity, screen-reader or native-device test. Keep #5–#9 open for those remaining criteria. Tone-map timing reported by conversion is wall-clock end-to-end time, not a representative hardware benchmark. Dolby Vision and automatic HDR-display passthrough negotiation are not implemented. Remote use still requires HTTPS and the existing deployment guidance.
+A passing build is not a physical GPU, HDR color-fidelity, screen-reader or native-device test. Issue #5 is complete; keep #6–#9 open for their remaining physical acceptance criteria. Tone-map timing reported by conversion is wall-clock end-to-end time, not a representative hardware benchmark. Dolby Vision and automatic HDR-display passthrough negotiation are not implemented. Remote use still requires HTTPS and the existing deployment guidance.
 
 See [playback validation](../development/PLAYBACK-VALIDATION.md) for synthetic benchmark commands, JSON evidence, GPU binding configuration and the optional physical-hardware workflow.
 
