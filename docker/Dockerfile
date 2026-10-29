@@ -1,17 +1,17 @@
-FROM node:26-bookworm-slim AS web
+FROM node:26-bookworm-slim@sha256:bc0a2afd3b74ce12222fc8bab99271e66257f021078f5f4a5d687a77d280c1d9 AS web
 WORKDIR /web
 COPY frontend/package*.json ./
 RUN npm ci
 COPY frontend/ ./
 RUN npm run build
-FROM mcr.microsoft.com/dotnet/sdk:10.0.403-noble AS build
+FROM mcr.microsoft.com/dotnet/sdk:10.0.403-noble@sha256:de4fe90a98845d75910b9769662465c84de1a934665c431279d1382b2bddc02b AS build
 WORKDIR /source
 ARG VERSION=0.2.0-alpha.1
 COPY Directory.Build.props global.json ./
 COPY backend/ backend/
 RUN dotnet publish backend/src/Api/Api.csproj -c Release -r linux-x64 --no-self-contained -o /app /p:UseAppHost=false /p:Version=$VERSION /p:RestoreLockedMode=true
 COPY --from=web /web/dist /app/wwwroot
-FROM mcr.microsoft.com/dotnet/aspnet:10.0.14-noble AS runtime-base
+FROM mcr.microsoft.com/dotnet/aspnet:10.0.14-noble@sha256:de0ee358cdd672f7017a003bed21e9ac9ed48a27c922a59b18175b6e82fa7fee AS runtime-base
 USER root
 RUN apt-get update && apt-get install -y --no-install-recommends ffmpeg curl && rm -rf /var/lib/apt/lists/* && mkdir -p /data && chown app:app /data
 WORKDIR /app
