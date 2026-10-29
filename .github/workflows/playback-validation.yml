@@ -69,6 +69,13 @@ jobs:
       - run: dotnet build MediaServer.sln --no-restore -warnaserror
       - run: npm ci --prefix frontend
       - run: cd frontend && npx playwright install --with-deps chromium firefox webkit
+      - name: Start virtual audio output for WebKit
+        run: |
+          sudo apt-get -o Acquire::Retries=2 install -y --no-install-recommends pulseaudio
+          pulseaudio --start --exit-idle-time=-1
+          pactl load-module module-null-sink sink_name=playback_validation
+          pactl set-default-sink playback_validation
+          pactl info
       - name: Measure network adaptation and browser decoder compatibility
         env:
           GST_DEBUG: '2'
