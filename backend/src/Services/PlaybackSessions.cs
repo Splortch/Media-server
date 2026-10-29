@@ -480,8 +480,15 @@ public sealed class PlaybackSessions(
                     ["-color_primaries", "bt709", "-color_trc", "bt709", "-colorspace", "bt709"]
                 );
             await runner.RunAsync(args, job.Directory, ct);
+            var encoded = await probe.ProbeAsync(
+                Path.Combine(job.Directory, level.Name + ".m3u8"),
+                ct
+            );
+            var dimensions = JsonSerializer.Deserialize<VideoColor>(encoded.ColorJson);
+            if (encoded.VideoCodec != "h264" || dimensions is not { Width: > 0, Height: > 0 })
+                throw new IOException("Invalid encoded rendition.");
             master.Append(
-                $"#EXT-X-STREAM-INF:BANDWIDTH={(level.Kilobits + 160) * 1000},NAME=\"{level.Name}\"\n{level.Name}.m3u8\n"
+                $"#EXT-X-STREAM-INF:BANDWIDTH={(level.Kilobits + 160) * 1000},RESOLUTION={dimensions.Width}x{dimensions.Height},NAME=\"{level.Name}\"\n{level.Name}.m3u8\n"
             );
         }
         await File.WriteAllTextAsync(

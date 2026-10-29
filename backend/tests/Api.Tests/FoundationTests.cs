@@ -22,10 +22,12 @@ public sealed class Server : WebApplicationFactory<Program>
     public string DataPath => Path.Combine(Root, "data");
 
     private readonly string[]? hardware;
+    private readonly bool realProbe;
 
-    public Server(string[]? hardware = null)
+    public Server(string[]? hardware = null, bool realProbe = false)
     {
         this.hardware = hardware;
+        this.realProbe = realProbe;
         Directory.CreateDirectory(MediaPath);
         Environment.SetEnvironmentVariable("MediaServer__DataDirectory", DataPath);
         Environment.SetEnvironmentVariable("MediaServer__AllowedRoots__0", MediaPath);
@@ -37,7 +39,10 @@ public sealed class Server : WebApplicationFactory<Program>
         builder.ConfigureServices(services =>
         {
             services.RemoveAll<IMediaProbe>();
-            services.AddSingleton<IMediaProbe, TestProbe>();
+            if (realProbe)
+                services.AddSingleton<IMediaProbe>(new Ffprobe("ffprobe"));
+            else
+                services.AddSingleton<IMediaProbe, TestProbe>();
             if (hardware is not null)
                 services.Replace(
                     ServiceDescriptor.Singleton(

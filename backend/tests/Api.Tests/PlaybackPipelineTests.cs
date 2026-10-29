@@ -311,7 +311,7 @@ public sealed class PlaybackPipelineTests
     [Fact]
     public async Task HlsConversionAndEveryAssetRequireOwningSession()
     {
-        using var server = new Server(["h264_nvenc"]);
+        using var server = new Server(["h264_nvenc"], realProbe: true);
         using var admin = await server.Admin();
         var path = Path.Combine(server.MediaPath, "synthetic.mkv");
         var start = new ProcessStartInfo("ffmpeg")
@@ -426,6 +426,7 @@ public sealed class PlaybackPipelineTests
         var manifest = await admin.GetStringAsync(state.Manifest);
         Assert.Contains("360p.m3u8", manifest);
         Assert.Contains("720p.m3u8", manifest);
+        Assert.Contains("RESOLUTION=160x90", manifest);
         var baseUrl = state.Manifest[..state.Manifest.LastIndexOf('/')];
         foreach (var level in TranscodeProfile.Ladder)
         {

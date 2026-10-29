@@ -21,7 +21,7 @@
 - React web client with setup, login, dashboard, library, player, Continue Watching and settings.
 - Automated tests, dependency audits, development container configuration and alpha release workflows.
 
-No official stable release has been published. Transcoding, hardware acceleration and native clients remain planned.
+No official stable release has been published. Current HLS, hardware-encoder and native-client status is documented in the later unreleased entries and the playback architecture guide.
 
 
 ## Unreleased — security, diagnostics and accessibility
@@ -44,12 +44,11 @@ No official stable release has been published. Transcoding, hardware acceleratio
 - Add bounded authenticated HLS conversion, automatic/manual quality controls, operator-authorized hardware encoder probes with software fallback, HDR metadata and explicit SDR tone mapping.
 - Add web audio/text-subtitle selection and sanitized WebVTT captions.
 - Add administrator library removal with explicit confirmation, transactional catalog cleanup, scan protection and source-file preservation.
-- Physical GPU/HDR-display validation, network benchmarks and native-client HLS controls remain unfinished; see the playback architecture guide.
+- Physical GPU/HDR-display validation remains outstanding. Later unreleased entries add native HLS controls and automated network/codec benchmarks; see the playback architecture guide.
 
 ### Native HLS and authorized cache leases (unreleased)
 
 - Add native desktop HLS/track controls through the credential-owning loopback bridge and Android Media3 HLS, quality and caption selection.
 - Reuse compatible conversions through independent per-session leases, with current ACL checks, isolated progress, bounded fan-out and last-lease cleanup.
 - Validate untrusted playback responses and resources, reject external playlist references, and exercise native HLS ranges and logout against the real backend.
-
 - Added multiple external text subtitle languages with content-aware cache invalidation, adaptive playback diagnostics, and synthetic throttled-network/browser codec validation.

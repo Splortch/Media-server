@@ -151,6 +151,19 @@ test('measure bandwidth adaptation, rebuffering and accessible track selection',
     await expect
       .poll(async () => (await sample()).height, { timeout: 20000 })
       .toBe(720);
+    await expect
+      .poll(
+        () =>
+          video.evaluate((el: HTMLVideoElement) =>
+            Array.from(el.textTracks)
+              .flatMap((track) =>
+                Array.from(track.cues ?? []).map((cue) => (cue as VTTCue).text),
+              )
+              .join(' '),
+          ),
+        { timeout: 15000 },
+      )
+      .toContain('synthetic caption');
     await page.waitForTimeout(4000); // Deliberate fixed high-bandwidth measurement window.
     const dropAt = (Date.now() - started) / 1000;
     await shape(140000);
