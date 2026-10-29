@@ -70,6 +70,10 @@ jobs:
       - run: npm ci --prefix frontend
       - run: cd frontend && npx playwright install --with-deps chromium firefox webkit
       - name: Measure network adaptation and browser decoder compatibility
+        env:
+          GST_DEBUG: '2'
+          GST_DEBUG_NO_COLOR: '1'
+          GST_DEBUG_FILE: ${{ github.workspace }}/frontend/benchmark-results/gstreamer.log
         run: bash scripts/playback-browser.sh
       - uses: actions/upload-artifact@v7
         if: always()

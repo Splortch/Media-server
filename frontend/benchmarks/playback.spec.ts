@@ -244,7 +244,7 @@ for (const attempt of [1, 2]) {
     ]) {
       const item = items.find((x) => x.title === title)!;
       expect(item).toBeTruthy();
-      const result = await page.evaluate(
+      const probe = page.evaluate(
         async ({ id, type }) => {
           const video = document.createElement('video');
           video.muted = true;
@@ -253,6 +253,10 @@ for (const attempt of [1, 2]) {
             'position:fixed;top:0;left:0;width:320px;height:180px;z-index:9999';
           video.preload = 'auto';
           document.body.append(video);
+          // Let WebKit observe an actually painted, visible renderer before creating its media pipeline.
+          await new Promise<void>((resolve) =>
+            requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
+          );
           const advertised = video.canPlayType(type);
           const highDynamicRange = matchMedia('(dynamic-range: high)').matches;
           const events: {
@@ -324,14 +328,24 @@ for (const attempt of [1, 2]) {
                 frameCallback = video.requestVideoFrameCallback(frame);
               }
               deadline = window.setTimeout(() => finish('timeout'), 30000);
+              video.addEventListener(
+                'click',
+                () => {
+                  void video.play().catch(() => {
+                    code = video.error?.code ?? 0;
+                    finish(
+                      code === 3 || code === 4
+                        ? 'unsupported'
+                        : 'play-rejected',
+                    );
+                  });
+                },
+                { once: true },
+              );
               video.src = `/api/v1/media/${id}/stream`;
               video.load();
-              void video.play().catch(() => {
-                code = video.error?.code ?? 0;
-                finish(
-                  code === 3 || code === 4 ? 'unsupported' : 'play-rejected',
-                );
-              });
+              // Expose the click target only after its handler and diagnostics are ready.
+              video.dataset.testid = 'codec-probe';
             });
             return {
               advertised,
@@ -360,6 +374,10 @@ for (const attempt of [1, 2]) {
         },
         { id: item.id, type },
       );
+      const [result] = await Promise.all([
+        probe,
+        page.getByTestId('codec-probe').click(),
+      ]);
       matrix.push({ codec: title, ...result });
       // Preserve diagnostics before asserting, including baseline timeouts/network errors.
       await save();

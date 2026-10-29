@@ -8,7 +8,7 @@ cleanup() {
   rm -rf "$TASK_TEMP"
 }
 trap cleanup EXIT
-mkdir -p "$TASK_TEMP/media"
+mkdir -p "$TASK_TEMP/media" frontend/benchmark-results
 ffmpeg -v error -filter_threads 1 -f lavfi -i testsrc2=size=1280x720:rate=24 -f lavfi -i sine=frequency=440 -t 60 -c:v libx264 -preset ultrafast -threads 2 -c:a aac -movflags +faststart "$TASK_TEMP/media/bandwidth.mp4"
 # Codec probes use equivalent short fixtures; the 60-second source is only for ABR.
 ffmpeg -v error -filter_threads 1 -f lavfi -i testsrc2=size=640x360:rate=24 -f lavfi -i sine=frequency=440 -t 2 -c:v libx264 -preset ultrafast -profile:v baseline -level:v 3.0 -pix_fmt yuv420p -threads 2 -c:a aac -movflags +faststart "$TASK_TEMP/media/h264.mp4"
