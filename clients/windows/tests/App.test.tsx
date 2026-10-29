@@ -4,6 +4,8 @@ import App from '../src/App';
 import * as bridge from '../src/bridge';
 vi.mock('../src/bridge', () => ({
   preferences: vi.fn().mockResolvedValue({}),
+  playbackRequest: vi.fn(),
+  playbackFileUrl: vi.fn(),
   desktopCapabilities: vi
     .fn()
     .mockResolvedValue({ os: 'windows', persistentSessions: true }),

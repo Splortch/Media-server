@@ -45,6 +45,7 @@ dependencies {
     implementation("androidx.compose.ui:ui")
     implementation("androidx.core:core-ktx:1.17.0")
     implementation("androidx.media3:media3-exoplayer:1.9.4")
+    implementation("androidx.media3:media3-exoplayer-hls:1.9.4")
     implementation("androidx.media3:media3-ui:1.9.4")
     implementation("androidx.media3:media3-datasource-okhttp:1.9.4")
     implementation("androidx.media3:media3-session:1.9.4")

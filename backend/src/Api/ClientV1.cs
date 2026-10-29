@@ -4,6 +4,7 @@ using System.Text;
 using System.Text.Json;
 using MediaServer.Core;
 using MediaServer.Infrastructure;
+using MediaServer.Media;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.EntityFrameworkCore;
 
@@ -192,12 +193,31 @@ public static class ClientV1
             .WithName("ContinueWatching");
         api.MapGet(
                 "/media/{id:int}/tracks",
-                async Task<Results<Ok<TrackCatalog>, NotFound>> (int id, MediaDb db) =>
+                async Task<Results<Ok<TrackCatalog>, NotFound>> (
+                    int id,
+                    MediaDb db,
+                    PathPolicy policy
+                ) =>
                 {
                     var item = await db.Items.FindAsync(id);
                     if (item is null)
                         return TypedResults.NotFound();
                     var tracks = JsonSerializer.Deserialize<MediaTrack[]>(item.TracksJson) ?? [];
+                    var library = await db.Libraries.FindAsync(item.LibraryId);
+                    try
+                    {
+                        if (library is not null)
+                            tracks =
+                            [
+                                .. tracks,
+                                .. ExternalCaptions
+                                    .Discover(policy, library, item)
+                                    .Select(x => x.Track),
+                            ];
+                    }
+                    catch (Exception e)
+                        when (e is IOException or ArgumentException or UnauthorizedAccessException)
+                    { }
                     return TypedResults.Ok(
                         new TrackCatalog(
                             tracks,

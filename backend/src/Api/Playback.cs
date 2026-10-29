@@ -34,17 +34,11 @@ public static class PlaybackApi
                     if (item is null)
                         return Results.NotFound();
                     var library = await db.Libraries.FindAsync(item.LibraryId);
-                    var external = false;
+                    IReadOnlyList<ExternalCaption> captions = [];
                     try
                     {
                         if (library is not null)
-                        {
-                            using var stream = policy.OpenRead(
-                                library.Path,
-                                Path.ChangeExtension(item.RelativePath, ".vtt")
-                            );
-                            external = true;
-                        }
+                            captions = ExternalCaptions.Discover(policy, library, item);
                     }
                     catch (Exception ex)
                         when (ex is IOException or ArgumentException or UnauthorizedAccessException)
@@ -52,8 +46,11 @@ public static class PlaybackApi
                     return Results.Ok(
                         new PlaybackOptions(
                             TranscodeProfile.Color(item),
-                            JsonSerializer.Deserialize<MediaTrack[]>(item.TracksJson) ?? [],
-                            external,
+                            [
+                                .. JsonSerializer.Deserialize<MediaTrack[]>(item.TracksJson) ?? [],
+                                .. captions.Select(x => x.Track),
+                            ],
+                            captions.Any(x => x.Index == -1),
                             TranscodeProfile.Ladder,
                             settings.AllowedEncoders,
                             "Alpha HLS prepares the whole video before playback. Up to 8 GiB source, six hours, two jobs and 30 minutes conversion. HDR is explicitly tone-mapped to SDR. Direct Play remains available."
@@ -100,7 +97,7 @@ public static class PlaybackApi
                 }
             )
             .Produces<ConversionState>(202)
-            .RequireRateLimiting("auth");
+            .RequireRateLimiting("playback");
         api.MapGet(
                 "/playback-sessions/{session}",
                 async (

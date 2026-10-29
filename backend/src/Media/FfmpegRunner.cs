@@ -59,7 +59,35 @@ public sealed class FfmpegRunner(string executable)
     }
 }
 
-public record TranscodeSettings(string[] AllowedEncoders);
+public record TranscodeSettings(
+    string[] AllowedEncoders,
+    string VaapiDevice = "/dev/dri/renderD128",
+    int NvencGpu = -1,
+    string? QsvDevice = null
+)
+{
+    public void Validate()
+    {
+        static bool RenderNode(string value) =>
+            System.Text.RegularExpressions.Regex.IsMatch(value, @"\A/dev/dri/renderD[0-9]{1,5}\z");
+        if (
+            AllowedEncoders is null
+            || AllowedEncoders.Length > 5
+            || AllowedEncoders.Any(x => !EncoderDiscovery.Encoders.Contains(x))
+            || !RenderNode(VaapiDevice)
+            || NvencGpu is < -1 or > 31
+            || (
+                QsvDevice is not null
+                && !(
+                    OperatingSystem.IsWindows()
+                        ? int.TryParse(QsvDevice, out var adapter) && adapter is >= 0 and <= 31
+                        : OperatingSystem.IsLinux() && RenderNode(QsvDevice)
+                )
+            )
+        )
+            throw new ArgumentException("Invalid hardware encoder/device configuration.");
+    }
+}
 
 public record EncoderCapability(string Encoder, bool Available, string Diagnostic);
 
@@ -93,9 +121,7 @@ public sealed class EncoderDiscovery(FfmpegRunner runner, TranscodeSettings sett
                 }
                 using var timeout = CancellationTokenSource.CreateLinkedTokenSource(ct);
                 timeout.CancelAfter(TimeSpan.FromSeconds(8));
-                var args = new List<string>();
-                if (encoder == "h264_vaapi")
-                    args.AddRange(["-vaapi_device", "/dev/dri/renderD128"]);
+                var args = new List<string>(TranscodeProfile.DeviceArguments(encoder, settings));
                 args.AddRange([
                     "-f",
                     "lavfi",
@@ -108,7 +134,7 @@ public sealed class EncoderDiscovery(FfmpegRunner runner, TranscodeSettings sett
                 ]);
                 if (encoder == "h264_vaapi")
                     args.AddRange(["-vf", "format=nv12,hwupload"]);
-                args.AddRange(TranscodeProfile.EncoderArguments(encoder));
+                args.AddRange(TranscodeProfile.EncoderArguments(encoder, settings));
                 args.AddRange(["-f", "null", "-"]);
                 try
                 {

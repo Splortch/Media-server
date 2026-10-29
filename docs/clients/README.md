@@ -8,7 +8,7 @@ All applications live in this monorepo. The ASP.NET server remains independently
 | Shared API | OpenAPI exported from the running API; generated TypeScript schemas and a transport-neutral client |
 | Windows | Tauri/Rust host with a locally bundled React UI, authenticated networking and local streaming bridge; Windows CI builds EXE/MSI |
 | Linux/macOS desktops | Shared Tauri implementation; Ubuntu 24.04 x64 DEB and Intel/Apple Silicon macOS DMGs. Memory-only sessions; hosted build/install checks differ from physical playback testing |
-| Android phone | Native Kotlin/Compose phone alpha, Media3 Direct Play, encrypted sessions, real-backend emulator test and independent APK/AAB workflow |
+| Android phone | Native Kotlin/Compose phone alpha, Media3 Direct Play/HLS with quality and track controls, encrypted sessions, real-backend emulator test and independent APK/AAB workflow |
 | Android TV | Architecture and focused backlog; no placeholder application |
 | iOS | Architecture and focused backlog; no placeholder application |
 

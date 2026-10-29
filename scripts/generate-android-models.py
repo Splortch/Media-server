@@ -4,8 +4,13 @@ import json
 from pathlib import Path
 root = Path(__file__).resolve().parents[1]
 schemas = json.loads((root / 'shared/api/openapi-v1.json').read_text())['components']['schemas']
-names = ['ServerInfo', 'LoginRequest', 'UserIdentity', 'MediaSummary', 'MediaDetails', 'MediaPage', 'LibraryBrowse', 'ProgressState', 'ProgressUpdate', 'TrackCatalog', 'MediaTrack', 'PlaybackPlan', 'SessionInfo', 'ClientCapabilities', 'PlaybackError']
+names = ['ServerInfo', 'LoginRequest', 'UserIdentity', 'MediaSummary', 'MediaDetails', 'MediaPage', 'LibraryBrowse', 'ProgressState', 'ProgressUpdate', 'TrackCatalog', 'MediaTrack', 'PlaybackPlan', 'SessionInfo', 'ClientCapabilities', 'PlaybackError', 'VideoColor', 'Rendition', 'PlaybackOptions', 'PlaybackSelection', 'ConversionState']
 def typ(prop):
+    if 'oneOf' in prop:
+        choices = prop['oneOf']
+        nonnull = [x for x in choices if x.get('type') != 'null']
+        if len(choices) != 2 or len(nonnull) != 1: raise ValueError(prop)
+        return typ(nonnull[0]) + '?'
     if '$ref' in prop:
         return prop['$ref'].split('/')[-1]
     kind = prop['type']; nullable = isinstance(kind, list) and 'null' in kind
@@ -22,6 +27,7 @@ for name in names:
         if field not in schema.get('required', []):
             if 'default' in prop: default = ' = ' + json.dumps(prop['default'])
             elif t.endswith('?'): default = ' = null'
+            elif name == 'VideoColor' and field == 'hdr': default = ' = false'
             else: raise ValueError((name, field))
         fields.append(f'    val {field}: {t}{default}')
     out += '@Serializable\ndata class ' + name + '(\n' + ',\n'.join(fields) + '\n)'

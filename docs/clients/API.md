@@ -17,13 +17,13 @@ Only the compatibility/CSRF/setup-check routes are public. Media, ranges, progre
 
 - GET `/api/v1/media?search=title&libraryId=1&offset=0&limit=200`: bounded, deterministic title/ID ordering. Basic server-side case-folded search; advanced Unicode/full-text filtering remains roadmap work.
 - GET `/api/v1/media/{id}`: filename-derived technical details and a playback plan. Movie/series metadata identification is still issue #10; the client does not invent that information.
-- GET `/api/v1/media/{id}/tracks`: FFprobe track index/type/codec/language/title after scanning. `canSelectAudio` and `canSelectSubtitles` are **false** until the server can honor track choices. Rescan pre-existing media to populate track data.
+- GET `/api/v1/media/{id}/tracks`: FFprobe track index/type/codec/language/title after scanning. Selection flags reflect supported audio and embedded text subtitle choices through the conversion API. Bitmap subtitle burn-in is not supported. Rescan pre-existing media to populate track data.
 - GET/HEAD `/api/v1/media/{id}/stream`: authenticated Direct Play, including ranges. No token-bearing public playback URL is issued. Native transports must attach cookies to every request and preserve authorization on redirects (the Windows alpha disallows redirects entirely).
 - GET `/api/v1/media/{id}/progress`, PUT `/api/v1/media/{id}/progress-sync` and GET `/api/v1/continue-watching`: see [synchronization](SYNC.md).
 - PUT `/api/v1/capabilities`: bounded platform/player/container/codec report stored with the current session. These are client observations, not proof of hardware codec support or a transcoding negotiation promise.
 - POST `/api/v1/media/{id}/playback-errors`: bounded enum `network|decode|unsupported|unknown` plus a bounded client name. Maximum 100 diagnostic reports retained per user; no raw paths, URLs, cookies, stack traces or free-form user text is logged.
 
-No HLS/transcoding/download authorization exists yet. Clients must not synthesize unsupported media URLs or start offline downloads. No LAN port scanning or automatic service trust is performed; manual connection plus remembered server discovery works now. Future mDNS/Bonjour hints require TLS identity confirmation and local-network permissions.
+GET `/api/v1/media/{id}/playback-options` advertises supported selections. POST `/api/v1/media/{id}/playback-sessions` creates or joins a compatible conversion with a private session lease; poll GET `/api/v1/playback-sessions/{session}` until ready. GET/HEAD `/api/v1/playback-sessions/{session}/files/{file}` requires current authentication, the caller’s lease and library authorization on every request. DELETE `/api/v1/playback-sessions/{session}` releases only the current lease. Use the canonical scoped filenames; never follow arbitrary manifest URLs from an untrusted server. See [playback pipeline](../architecture/PLAYBACK-PIPELINE.md) for quotas and supported tracks. Offline downloads remain unsupported. No LAN port scanning or automatic service trust is performed; manual connection plus remembered server discovery works now. Future mDNS/Bonjour hints require TLS identity confirmation and local-network permissions.
 
 ## Generated contract workflow
 
@@ -34,6 +34,6 @@ npm ci --prefix shared/api
 npm run generate --prefix shared/api
 ```
 
-Commit both the OpenAPI snapshot and generated TypeScript when schemas change. CI re-exports from the actual authenticated server and checks for drift. TypeScript consumers use generated schemas; Rust deliberately uses a scoped transport over bounded JSON and exposes only allowlisted operations, with typed response checks in the shared client. A future Android PR can generate Kotlin DTOs from the same contract without copying backend entities.
+Commit both the OpenAPI snapshot and generated TypeScript when schemas change. CI re-exports from the actual authenticated server and checks for drift. TypeScript consumers use generated schemas; Rust deliberately uses a scoped transport over bounded JSON and exposes only allowlisted operations, with typed response checks in the shared client. Android DTOs are generated from the same contract by `python scripts/generate-android-models.py`; use `--check` to detect drift.
 
 API major versions are independent of server/client product versions. Additive fields may be ignored; breaking semantics require a new version while retaining the supported old version. Wire numbers are strict JSON numbers; malformed numeric strings receive 400.

@@ -1,0 +1,102 @@
+name: Playback validation
+on:
+  pull_request:
+    paths: ['backend/**', 'frontend/**', 'scripts/playback-browser.sh', '.github/workflows/playback-validation.yml', 'Directory.Build.props', 'global.json']
+  push:
+    branches: [main]
+    paths: ['backend/**', 'frontend/**', 'scripts/playback-browser.sh', '.github/workflows/playback-validation.yml', 'Directory.Build.props', 'global.json']
+  workflow_dispatch:
+    inputs:
+      hardware:
+        description: Run on an operator-provisioned GPU runner (main only)
+        type: boolean
+        default: false
+      encoder:
+        description: Hardware encoder to validate
+        type: choice
+        options: [h264_nvenc, h264_qsv, h264_vaapi, h264_amf]
+permissions:
+  contents: read
+concurrency:
+  group: playback-validation-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  software:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-dotnet@v6
+        with:
+          global-json-file: global.json
+          cache: true
+          cache-dependency-path: backend/**/packages.lock.json
+      - run: sudo apt-get -o Acquire::Retries=2 install -y --no-install-recommends ffmpeg
+      - run: dotnet restore backend/tools/PlaybackBenchmark --locked-mode
+      - run: dotnet build backend/tools/PlaybackBenchmark --no-restore -warnaserror
+      - name: Validate synthetic SDR, HEVC HDR and AV1 HDR conversions
+        shell: bash
+        run: |
+          for scenario in sdr hevc-hdr av1-hdr; do
+            dotnet run --no-build --project backend/tools/PlaybackBenchmark -- --scenario "$scenario" --output "artifacts/$scenario.json"
+          done
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: playback-software-results
+          path: artifacts/*.json
+  browsers:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-dotnet@v6
+        with:
+          global-json-file: global.json
+          cache: true
+          cache-dependency-path: backend/**/packages.lock.json
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Ensure synthetic media tooling
+        run: |
+          if ! command -v ffmpeg >/dev/null || ! command -v ffprobe >/dev/null; then
+            sudo apt-get -o Acquire::Retries=2 install -y --no-install-recommends ffmpeg
+          fi
+      - run: dotnet restore MediaServer.sln --locked-mode
+      - run: dotnet build MediaServer.sln --no-restore -warnaserror
+      - run: npm ci --prefix frontend
+      - run: cd frontend && npx playwright install --with-deps chromium firefox webkit
+      - name: Measure network adaptation and browser decoder compatibility
+        run: bash scripts/playback-browser.sh
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: playback-browser-evidence
+          path: frontend/benchmark-results/
+  hardware:
+    if: github.event_name == 'workflow_dispatch' && inputs.hardware && github.ref == 'refs/heads/main'
+    runs-on: [self-hosted, media-validation]
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - name: Validate provisioned hardware without accepting software fallback
+        shell: bash
+        env:
+          REQUESTED_ENCODER: ${{ inputs.encoder }}
+        run: |
+          dotnet restore backend/tools/PlaybackBenchmark --locked-mode
+          dotnet build backend/tools/PlaybackBenchmark --no-restore -warnaserror
+          for scenario in sdr hevc-hdr av1-hdr; do
+            dotnet run --no-build --project backend/tools/PlaybackBenchmark -- --encoder "$REQUESTED_ENCODER" --require-hardware --scenario "$scenario" --output "artifacts/hardware-$scenario.json"
+          done
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: playback-hardware-results
+          path: artifacts/hardware-*.json

@@ -2,12 +2,14 @@ package org.splortch.mediaserver.android
 
 import android.app.Application
 import android.media.MediaCodecList
+import android.net.Uri
 import androidx.core.content.edit
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
 import androidx.media3.common.MediaItem
+import androidx.media3.common.MimeTypes
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
@@ -42,6 +44,11 @@ internal data class Screen(
     val cursor: String? = null,
     val detail: MediaDetails? = null,
     val tracks: TrackCatalog? = null,
+    val playbackOptions: PlaybackOptions? = null,
+    val audioTrack: Int? = null,
+    val subtitleTrack: Int? = null,
+    val quality: String = "Auto",
+    val conversionStatus: String? = null,
     val syncError: String? = null,
     val videoReady: Boolean = false,
     val fullscreen: Boolean = false,
@@ -56,6 +63,10 @@ class MediaViewModel(app: Application) : AndroidViewModel(app) {
     internal val player = MutableStateFlow<ExoPlayer?>(null)
     internal val pendingSaves = MutableStateFlow(0)
     private var session: MediaSession? = null
+    private var conversion: Pair<ServerConnection, String>? = null
+    private var cleanup: Job? = null
+    private var selectedCaptions = false
+    private var changingQuality = false
     private var connection: ServerConnection? = null
     private var operation: Job? = null
     private var ticker: Job? = null
@@ -87,21 +98,30 @@ class MediaViewModel(app: Application) : AndroidViewModel(app) {
         }
 
     private fun action(block: suspend () -> Unit) {
-        operation?.cancel()
+        val previous = operation
+        previous?.cancel()
         val generation = ++actionId
-        operation =
-            viewModelScope.launch {
-                mutable.update { it.copy(busy = true, error = null) }
-                try {
-                    block()
-                } catch (e: CancellationException) {
-                    throw e
-                } catch (e: Exception) {
-                    if (actionId == generation) mutable.update { it.copy(error = message(e)) }
-                } finally {
-                    if (actionId == generation) mutable.update { it.copy(busy = false) }
-                }
+        operation = viewModelScope.launch {
+            previous?.join()
+            mutable.update { it.copy(busy = true, error = null) }
+            try {
+                block()
+            } catch (e: TimeoutCancellationException) {
+                if (actionId == generation)
+                    mutable.update {
+                        it.copy(
+                            error =
+                                "The server operation timed out. Check the connection and retry."
+                        )
+                    }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                if (actionId == generation) mutable.update { it.copy(error = message(e)) }
+            } finally {
+                if (actionId == generation) mutable.update { it.copy(busy = false) }
             }
+        }
     }
 
     internal fun connect(address: String, remember: Boolean) = action {
@@ -178,21 +198,20 @@ class MediaViewModel(app: Application) : AndroidViewModel(app) {
         refreshNow(conn)
     }
 
-    private fun validate(items: List<MediaSummary>): List<MediaSummary> =
-        items.also { list ->
-            require(
-                list.size <= 200 &&
-                    list.all {
-                        it.id > 0 &&
-                            it.title.length <= 512 &&
-                            it.duration.isFinite() &&
-                            it.duration in 0.0..1e9 &&
-                            it.size >= 0
-                    }
-            ) {
-                "Invalid media response."
-            }
+    private fun validate(items: List<MediaSummary>): List<MediaSummary> = items.also { list ->
+        require(
+            list.size <= 200 &&
+                list.all {
+                    it.id > 0 &&
+                        it.title.length <= 512 &&
+                        it.duration.isFinite() &&
+                        it.duration in 0.0..1e9 &&
+                        it.size >= 0
+                }
+        ) {
+            "Invalid media response."
         }
+    }
 
     private suspend fun refreshNow(conn: ServerConnection, more: Boolean = false) {
         val old = mutable.value
@@ -261,13 +280,47 @@ class MediaViewModel(app: Application) : AndroidViewModel(app) {
         ) {
             "Invalid tracks."
         }
-        mutable.update { it.copy(detail = detail, tracks = tracks) }
+        val options =
+            try {
+                conn.api.playbackOptions(id)
+            } catch (e: HttpException) {
+                if (e.code() == 404) null else throw e
+            }
+        if (options != null)
+            require(
+                options.tracks.size <= 256 &&
+                    options.encoders.size <= 5 &&
+                    options.conversionNotice.length <= 2048
+            ) {
+                "Invalid playback options."
+            }
+        mutable.update {
+            it.copy(
+                detail = detail,
+                tracks = tracks,
+                playbackOptions = options,
+                audioTrack = null,
+                subtitleTrack = null,
+                conversionStatus = null,
+                quality = "Auto",
+            )
+        }
     }
 
     internal fun play() = action {
+        stopPlayer()
+        cleanup?.join()
+        awaitSaves()
+        startPlayback()
+    }
+
+    private suspend fun awaitSaves() {
+        withTimeout(10000) { while (pendingSaves.value > 0) delay(25) }
+    }
+
+    private suspend fun startPlayback(prepared: ConversionState? = null) {
         val conn = requireNotNull(connection)
         val media = requireNotNull(mutable.value.detail)
-        stopPlayer(false)
         ++playbackGeneration
         val saved = conn.api.progress(media.id)
         require(
@@ -297,7 +350,10 @@ class MediaViewModel(app: Application) : AndroidViewModel(app) {
         active.addListener(
             object : Player.Listener {
                 override fun onRenderedFirstFrame() {
-                    if (player.value === active) mutable.update { it.copy(videoReady = true) }
+                    if (player.value === active) {
+                        changingQuality = false
+                        mutable.update { it.copy(videoReady = true) }
+                    }
                 }
 
                 override fun onIsPlayingChanged(isPlaying: Boolean) {
@@ -338,20 +394,115 @@ class MediaViewModel(app: Application) : AndroidViewModel(app) {
         )
         player.value = active
         session = MediaSession.Builder(getApplication<Application>(), active).build()
-        active.setMediaItem(MediaItem.fromUri(conn.streamUrl(media.id)))
+        active.setMediaItem(
+            if (prepared == null) MediaItem.fromUri(conn.streamUrl(media.id))
+            else hlsItem(conn, prepared.id)
+        )
         if (!saved.completed) active.seekTo((saved.seconds * 1000).toLong())
         active.prepare()
         active.play()
-        ticker =
-            viewModelScope.launch {
-                while (isActive) {
-                    delay(5000)
-                    if (active.isPlaying && pendingSaves.value == 0) save()
+        ticker = viewModelScope.launch {
+            while (isActive) {
+                delay(5000)
+                if (active.isPlaying && pendingSaves.value == 0) save()
+            }
+        }
+    }
+
+    internal fun chooseAudio(index: Int?) {
+        mutable.update { it.copy(audioTrack = index) }
+    }
+
+    internal fun chooseSubtitle(index: Int?) {
+        mutable.update { it.copy(subtitleTrack = index) }
+    }
+
+    internal fun chooseQuality(value: String) {
+        require(value in listOf("Auto", "360p", "480p", "720p"))
+        mutable.update { it.copy(quality = value) }
+        val (conn, id) = conversion ?: return
+        val active = player.value ?: return
+        val position = active.currentPosition
+        val playing = active.playWhenReady
+        changingQuality = true
+        mutable.update { it.copy(videoReady = false) }
+        active.setMediaItem(hlsItem(conn, id), position)
+        active.prepare()
+        active.playWhenReady = playing
+    }
+
+    private fun hlsItem(conn: ServerConnection, id: String): MediaItem {
+        val file =
+            if (mutable.value.quality == "Auto") "master.m3u8" else "${mutable.value.quality}.m3u8"
+        val item =
+            MediaItem.Builder()
+                .setUri(conn.playbackUrl(id, file))
+                .setMimeType(MimeTypes.APPLICATION_M3U8)
+        if (selectedCaptions)
+            item.setSubtitleConfigurations(
+                listOf(
+                    MediaItem.SubtitleConfiguration.Builder(
+                            Uri.parse(conn.playbackUrl(id, "captions.vtt"))
+                        )
+                        .setMimeType(MimeTypes.TEXT_VTT)
+                        .setLanguage("und")
+                        .setSelectionFlags(C.SELECTION_FLAG_DEFAULT)
+                        .build()
+                )
+            )
+        return item.build()
+    }
+
+    internal fun prepareHls() = action {
+        val conn = requireNotNull(connection)
+        val media = requireNotNull(mutable.value.detail)
+        val selection = mutable.value
+        stopPlayer()
+        cleanup?.join()
+        awaitSaves()
+        var consumed = false
+        try {
+            var state =
+                PlaybackResources.validate(
+                    conn.api.prepare(
+                        media.id,
+                        conn.token(),
+                        PlaybackSelection(selection.audioTrack, selection.subtitleTrack),
+                    )
+                )
+            conversion = Pair(conn, state.id)
+            selectedCaptions = selection.subtitleTrack != null
+            withTimeout(31 * 60 * 1000L) {
+                while (state.state == "preparing") {
+                    mutable.update { it.copy(conversionStatus = "Preparing HLS on the server…") }
+                    delay(1500)
+                    ensureActive()
+                    require(connection === conn && mutable.value.detail?.id == media.id) {
+                        "Playback selection changed."
+                    }
+                    val next = PlaybackResources.validate(conn.api.conversion(state.id))
+                    require(next.id == state.id) { "Conversion identity changed." }
+                    state = next
                 }
             }
+            require(state.state == "ready") {
+                "HLS conversion failed. Check FFmpeg and server limits."
+            }
+            mutable.update { it.copy(conversionStatus = "HLS ready · ${state.encoder}") }
+            startPlayback(state)
+            consumed = true
+        } finally {
+            if (!consumed) stopPlayer(false)
+        }
+    }
+
+    internal fun cancelPreparation() {
+        operation?.cancel()
+        mutable.update { it.copy(conversionStatus = "Preparation cancelled") }
     }
 
     internal fun save(completed: Boolean = false) {
+        if (changingQuality) return
         val active = player.value ?: return
         val conn = connection ?: return
         val id = mutable.value.detail?.id ?: return
@@ -415,6 +566,19 @@ class MediaViewModel(app: Application) : AndroidViewModel(app) {
         player.value = null
         active?.release()
         mutable.update { it.copy(fullscreen = false, videoReady = false) }
+        val previous = conversion
+        conversion = null
+        changingQuality = false
+        if (previous != null)
+            cleanup = viewModelScope.launch {
+                try {
+                    withTimeout(5000) {
+                        previous.first.api.release(previous.second, previous.first.token())
+                    }
+                } catch (_: Exception) {
+                    /* Revoked/unreachable sessions expire on the server. */
+                }
+            }
     }
 
     internal fun fullscreen() {
@@ -422,6 +586,7 @@ class MediaViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     internal fun back() {
+        if (mutable.value.busy) operation?.cancel()
         when {
             mutable.value.fullscreen -> fullscreen()
             player.value != null -> stopPlayer()

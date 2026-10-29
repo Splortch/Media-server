@@ -40,6 +40,14 @@ async fn stream_url(
     client.stream_url(id).await
 }
 #[tauri::command]
+async fn playback_url(
+    session: String,
+    file: String,
+    client: tauri::State<'_, DesktopClient>,
+) -> Result<String, ClientError> {
+    client.playback_url(&session, &file).await
+}
+#[tauri::command]
 fn preferences(app: tauri::AppHandle) -> Result<Value, String> {
     let p = app
         .path()
@@ -103,6 +111,7 @@ fn main() {
             logout,
             api_request,
             stream_url,
+            playback_url,
             preferences,
             save_preferences,
             desktop_capabilities

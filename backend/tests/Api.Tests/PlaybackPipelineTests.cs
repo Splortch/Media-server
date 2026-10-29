@@ -138,6 +138,56 @@ public sealed class PlaybackPipelineTests
         Assert.Contains("hello", caption);
     }
 
+    [Fact]
+    public async Task WidescreenRenditionsHaveEvenDimensions()
+    {
+        var root = Path.Combine(TestPaths.TempRoot, "scaling-test-" + Guid.NewGuid());
+        Directory.CreateDirectory(root);
+        try
+        {
+            var runner = new FfmpegRunner("ffmpeg");
+            var probe = new Ffprobe("ffprobe");
+            using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(60));
+            foreach (var level in TranscodeProfile.Ladder)
+            {
+                var output = level.Name + ".mp4";
+                await runner.RunAsync(
+                    [
+                        "-filter_threads",
+                        "1",
+                        "-f",
+                        "lavfi",
+                        "-i",
+                        "testsrc2=size=1280x720:rate=24",
+                        "-frames:v",
+                        "1",
+                        "-vf",
+                        TranscodeProfile.Filter(level, false),
+                        "-c:v",
+                        "libx264",
+                        "-preset",
+                        "ultrafast",
+                        "-threads",
+                        "1",
+                        output,
+                    ],
+                    root,
+                    timeout.Token
+                );
+                var result = await probe.ProbeAsync(Path.Combine(root, output), timeout.Token);
+                var color = JsonSerializer.Deserialize<VideoColor>(result.ColorJson)!;
+                Assert.Equal(level.Height, color.Height);
+                Assert.Equal(0, color.Width % 2);
+                Assert.Equal(0, color.Height % 2);
+                Assert.Equal("h264", result.VideoCodec);
+            }
+        }
+        finally
+        {
+            Directory.Delete(root, true);
+        }
+    }
+
     [Theory]
     [InlineData("libx265", "hevc")]
     [InlineData("libaom-av1", "av1")]
@@ -261,7 +311,7 @@ public sealed class PlaybackPipelineTests
     [Fact]
     public async Task HlsConversionAndEveryAssetRequireOwningSession()
     {
-        using var server = new Server(["h264_nvenc"]);
+        using var server = new Server(["h264_nvenc"], realProbe: true);
         using var admin = await server.Admin();
         var path = Path.Combine(server.MediaPath, "synthetic.mkv");
         var start = new ProcessStartInfo("ffmpeg")
@@ -319,6 +369,11 @@ public sealed class PlaybackPipelineTests
             Path.ChangeExtension(path, ".vtt"),
             "WEBVTT\n\n00:00:00.000 --> 00:00:01.000\n<b>Accessible caption</b>\n"
         );
+        var externalSrt = Path.Combine(server.MediaPath, "synthetic.swe.srt");
+        await File.WriteAllTextAsync(
+            externalSrt,
+            "1\n00:00:00,000 --> 00:00:01,000\n<b>Swedish caption</b>\n"
+        );
         var observed = await new Ffprobe("ffprobe").ProbeAsync(path, CancellationToken.None);
         using (var scope = server.Services.CreateScope())
         {
@@ -368,9 +423,44 @@ public sealed class PlaybackPipelineTests
             )!;
         }
         Assert.True(state.State == "ready", state.Error);
+        string ownerSession;
+        using (var scope = server.Services.CreateScope())
+            ownerSession = await scope
+                .ServiceProvider.GetRequiredService<MediaDb>()
+                .Sessions.Select(x => x.Id)
+                .SingleAsync();
+        var playback = server.Services.GetRequiredService<PlaybackSessions>();
+        var rejected = 0;
+        Parallel.For(
+            0,
+            10000,
+            _ =>
+            {
+                if (playback.Get(state.Id, 1, 1, ownerSession) is null)
+                    Interlocked.Increment(ref rejected);
+            }
+        );
+        Assert.Equal(0, rejected);
+        var resources = await Task.WhenAll(
+            Enumerable
+                .Range(0, 32)
+                .Select(i =>
+                    admin.GetAsync(
+                        i % 2 == 0
+                            ? state.Manifest
+                            : state.Manifest.Replace("master.m3u8", "captions.vtt")
+                    )
+                )
+        );
+        foreach (var resource in resources)
+        {
+            Assert.Equal(HttpStatusCode.OK, resource.StatusCode);
+            resource.Dispose();
+        }
         var manifest = await admin.GetStringAsync(state.Manifest);
         Assert.Contains("360p.m3u8", manifest);
         Assert.Contains("720p.m3u8", manifest);
+        Assert.Contains("RESOLUTION=160x90", manifest);
         var baseUrl = state.Manifest[..state.Manifest.LastIndexOf('/')];
         foreach (var level in TranscodeProfile.Ladder)
         {
@@ -400,11 +490,132 @@ public sealed class PlaybackPipelineTests
             new { name = "admin", password = "twelve-character-password" }
         );
         Assert.Equal(HttpStatusCode.NotFound, (await other.GetAsync(state.Manifest)).StatusCode);
+        await Server.Csrf(other);
+        var joined = await other.PostAsJsonAsync(
+            "/api/v1/media/1/playback-sessions",
+            new PlaybackSelection(AudioTrack: 2, SubtitleTrack: -1, Encoder: "h264_nvenc")
+        );
+        Assert.Equal(HttpStatusCode.Accepted, joined.StatusCode);
+        Assert.Equal(state.Id, (await joined.Content.ReadFromJsonAsync<ConversionState>())!.Id);
+        Assert.Equal(HttpStatusCode.OK, (await other.GetAsync(state.Manifest)).StatusCode);
+
+        var account = await admin.PostAsJsonAsync(
+            "/api/users",
+            new
+            {
+                name = "cache-viewer",
+                password = "cache-viewer-password",
+                allLibraries = true,
+            }
+        );
+        Assert.Equal(HttpStatusCode.Created, account.StatusCode);
+        var viewerId = (await account.Content.ReadFromJsonAsync<JsonElement>())
+            .GetProperty("id")
+            .GetInt32();
+        using var viewer = server.CreateClient();
+        await Server.Csrf(viewer);
+        Assert.Equal(
+            HttpStatusCode.OK,
+            (
+                await viewer.PostAsJsonAsync(
+                    "/api/auth/login",
+                    new { name = "cache-viewer", password = "cache-viewer-password" }
+                )
+            ).StatusCode
+        );
+        Assert.Equal(HttpStatusCode.NotFound, (await viewer.GetAsync(state.Manifest)).StatusCode);
+        await Server.Csrf(viewer);
+        var viewerLease = await viewer.PostAsJsonAsync(
+            "/api/v1/media/1/playback-sessions",
+            new PlaybackSelection(AudioTrack: 2, SubtitleTrack: -1, Encoder: "h264_nvenc")
+        );
+        Assert.Equal(HttpStatusCode.Accepted, viewerLease.StatusCode);
+        Assert.Equal(
+            state.Id,
+            (await viewerLease.Content.ReadFromJsonAsync<ConversionState>())!.Id
+        );
+        Assert.Equal(HttpStatusCode.OK, (await viewer.GetAsync(state.Manifest)).StatusCode);
+        using (var scope = server.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<MediaDb>();
+            var user = (await db.Users.FindAsync(viewerId))!;
+            user.AllLibraries = false;
+            await db.SaveChangesAsync();
+        }
+        // Keep the login alive to prove each asset rechecks ACL independently of revocation.
+        Assert.Equal(HttpStatusCode.OK, (await viewer.GetAsync("/api/auth/me")).StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, (await viewer.GetAsync(state.Manifest)).StatusCode);
+        Assert.Equal(
+            HttpStatusCode.NoContent,
+            (await viewer.DeleteAsync("/api/v1/playback-sessions/" + state.Id)).StatusCode
+        );
+
         Assert.Equal(
             HttpStatusCode.NoContent,
             (await admin.DeleteAsync("/api/v1/playback-sessions/" + state.Id)).StatusCode
         );
         Assert.Equal(HttpStatusCode.NotFound, (await admin.GetAsync(state.Manifest)).StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await other.GetAsync(state.Manifest)).StatusCode);
+        Assert.Equal(
+            HttpStatusCode.NoContent,
+            (await other.DeleteAsync("/api/v1/playback-sessions/" + state.Id)).StatusCode
+        );
+        Assert.Equal(HttpStatusCode.NotFound, (await other.GetAsync(state.Manifest)).StatusCode);
+        var externalTrack = options
+            .GetProperty("tracks")
+            .EnumerateArray()
+            .Single(x =>
+                x.GetProperty("codec").GetString() == "subrip"
+                && x.GetProperty("language").GetString() == "swe"
+            );
+        var selected = new PlaybackSelection(
+            SubtitleTrack: externalTrack.GetProperty("index").GetInt32()
+        );
+        Assert.True(selected.SubtitleTrack < -1);
+        async Task<ConversionState> PrepareCaption()
+        {
+            var response = await admin.PostAsJsonAsync(
+                "/api/v1/media/1/playback-sessions",
+                selected
+            );
+            Assert.Equal(HttpStatusCode.Accepted, response.StatusCode);
+            var value = (await response.Content.ReadFromJsonAsync<ConversionState>())!;
+            for (var i = 0; i < 200 && value.State == "preparing"; i++)
+            {
+                await Task.Delay(100);
+                value = (
+                    await admin.GetFromJsonAsync<ConversionState>(
+                        "/api/v1/playback-sessions/" + value.Id
+                    )
+                )!;
+            }
+            Assert.True(value.State == "ready", value.Error);
+            return value;
+        }
+        var firstCaption = await PrepareCaption();
+        var firstCaptionUrl = firstCaption.Manifest.Replace("master.m3u8", "captions.vtt");
+        var rendered = await admin.GetStringAsync(firstCaptionUrl);
+        Assert.Contains("Swedish caption", rendered);
+        Assert.DoesNotContain("<b>", rendered);
+        await File.WriteAllTextAsync(
+            externalSrt,
+            "1\n00:00:00,000 --> 00:00:01,000\nUpdated caption\n"
+        );
+        var updatedCaption = await PrepareCaption();
+        Assert.NotEqual(firstCaption.Id, updatedCaption.Id);
+        Assert.Contains(
+            "Updated caption",
+            await admin.GetStringAsync(
+                updatedCaption.Manifest.Replace("master.m3u8", "captions.vtt")
+            )
+        );
+        Assert.Contains("Swedish caption", await admin.GetStringAsync(firstCaptionUrl));
+        Assert.Equal(
+            HttpStatusCode.Unauthorized,
+            (await anonymous.GetAsync(firstCaptionUrl)).StatusCode
+        );
+        await admin.DeleteAsync("/api/v1/playback-sessions/" + firstCaption.Id);
+        await admin.DeleteAsync("/api/v1/playback-sessions/" + updatedCaption.Id);
         Assert.True(File.Exists(path));
     }
 }

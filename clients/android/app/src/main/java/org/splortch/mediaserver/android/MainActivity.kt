@@ -17,6 +17,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
@@ -70,7 +71,10 @@ class MainActivity : ComponentActivity() {
                         }
                     } else {
                         LazyColumn(
-                            Modifier.fillMaxSize().safeDrawingPadding().padding(horizontal = 20.dp),
+                            Modifier.fillMaxSize()
+                                .testTag("main-list")
+                                .safeDrawingPadding()
+                                .padding(horizontal = 20.dp),
                             verticalArrangement = Arrangement.spacedBy(14.dp),
                             contentPadding = PaddingValues(vertical = 20.dp),
                         ) {
@@ -163,7 +167,7 @@ class MainActivity : ComponentActivity() {
                                     }
                                 item {
                                     Text(
-                                        "Direct Play alpha · Media stays on your server. Remote connections require HTTPS.",
+                                        "Direct Play and HLS · Media stays on your server. Remote connections require HTTPS.",
                                         style = MaterialTheme.typography.bodySmall,
                                     )
                                 }
@@ -223,11 +227,89 @@ class MainActivity : ComponentActivity() {
                                 }
                                 detail.playback.warning?.let { item { Text(it.take(512)) } }
                                 item {
-                                    Text("Tracks", style = MaterialTheme.typography.titleLarge)
                                     Text(
-                                        "Track switching is not yet available in this Android client. Use the web player for HLS audio and subtitle selection.",
-                                        style = MaterialTheme.typography.bodySmall,
+                                        "Playback options",
+                                        style = MaterialTheme.typography.titleLarge,
                                     )
+                                    val options = screen.playbackOptions
+                                    if (options != null) {
+                                        Text(
+                                            options.conversionNotice.take(2048),
+                                            style = MaterialTheme.typography.bodySmall,
+                                        )
+                                        Choice(
+                                            "Audio track",
+                                            screen.audioTrack,
+                                            listOf(null to "Default audio") +
+                                                options.tracks
+                                                    .filter { it.type == "audio" }
+                                                    .map {
+                                                        it.index to
+                                                            "${it.language ?: "und"} · ${it.title ?: it.codec} · ${it.index}"
+                                                    },
+                                            !screen.busy,
+                                            model::chooseAudio,
+                                        )
+                                        Choice(
+                                            "Subtitles",
+                                            screen.subtitleTrack,
+                                            listOf(null to "Off") +
+                                                (if (
+                                                    options.externalWebVtt &&
+                                                        options.tracks.none { it.index == -1 }
+                                                )
+                                                    listOf(-1 to "External WebVTT")
+                                                else emptyList()) +
+                                                options.tracks
+                                                    .filter {
+                                                        it.type == "subtitle" &&
+                                                            it.codec in
+                                                                listOf(
+                                                                    "subrip",
+                                                                    "ass",
+                                                                    "ssa",
+                                                                    "webvtt",
+                                                                    "mov_text",
+                                                                    "text",
+                                                                )
+                                                    }
+                                                    .map {
+                                                        it.index to
+                                                            "${it.language ?: "und"} · ${it.title ?: it.codec} · ${it.index}"
+                                                    },
+                                            !screen.busy,
+                                            model::chooseSubtitle,
+                                        )
+                                        Row(Modifier.horizontalScroll(rememberScrollState())) {
+                                            listOf("Auto", "360p", "480p", "720p").forEach { quality
+                                                ->
+                                                FilterChip(
+                                                    selected = screen.quality == quality,
+                                                    onClick = { model.chooseQuality(quality) },
+                                                    label = { Text(quality) },
+                                                    enabled = !screen.busy,
+                                                )
+                                            }
+                                        }
+                                        Button(
+                                            onClick = model::prepareHls,
+                                            enabled = !screen.busy,
+                                        ) {
+                                            Text("Prepare HLS playback")
+                                        }
+                                        if (screen.busy && screen.conversionStatus != null)
+                                            TextButton(onClick = model::cancelPreparation) {
+                                                Text("Cancel preparation")
+                                            }
+                                        if (player != null)
+                                            TextButton(
+                                                onClick = model::play,
+                                                enabled = !screen.busy,
+                                            ) {
+                                                Text("Direct Play")
+                                            }
+                                    }
+                                    screen.conversionStatus?.let { Text(it) }
                                 }
                                 items(screen.tracks?.tracks ?: emptyList()) { track ->
                                     Text(
@@ -374,6 +456,33 @@ private fun MediaCard(media: MediaSummary, enabled: Boolean, open: () -> Unit) {
                 "${(media.duration / 60).toInt()} min · ${media.container.take(32)} · ${media.videoCodec.take(64)}",
                 style = MaterialTheme.typography.bodySmall,
             )
+        }
+    }
+}
+
+@Composable
+private fun Choice(
+    label: String,
+    selected: Int?,
+    choices: List<Pair<Int?, String>>,
+    enabled: Boolean,
+    change: (Int?) -> Unit,
+) {
+    var expanded by remember { mutableStateOf(false) }
+    Column {
+        OutlinedButton(onClick = { expanded = true }, enabled = enabled) {
+            Text("$label: ${choices.firstOrNull { it.first == selected }?.second ?: "Default"}")
+        }
+        DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+            choices.forEach { (index, title) ->
+                DropdownMenuItem(
+                    text = { Text(title.take(256)) },
+                    onClick = {
+                        expanded = false
+                        change(index)
+                    },
+                )
+            }
         }
     }
 }

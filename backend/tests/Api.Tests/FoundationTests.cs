@@ -22,10 +22,12 @@ public sealed class Server : WebApplicationFactory<Program>
     public string DataPath => Path.Combine(Root, "data");
 
     private readonly string[]? hardware;
+    private readonly bool realProbe;
 
-    public Server(string[]? hardware = null)
+    public Server(string[]? hardware = null, bool realProbe = false)
     {
         this.hardware = hardware;
+        this.realProbe = realProbe;
         Directory.CreateDirectory(MediaPath);
         Environment.SetEnvironmentVariable("MediaServer__DataDirectory", DataPath);
         Environment.SetEnvironmentVariable("MediaServer__AllowedRoots__0", MediaPath);
@@ -37,7 +39,10 @@ public sealed class Server : WebApplicationFactory<Program>
         builder.ConfigureServices(services =>
         {
             services.RemoveAll<IMediaProbe>();
-            services.AddSingleton<IMediaProbe, TestProbe>();
+            if (realProbe)
+                services.AddSingleton<IMediaProbe>(new Ffprobe("ffprobe"));
+            else
+                services.AddSingleton<IMediaProbe, TestProbe>();
             if (hardware is not null)
                 services.Replace(
                     ServiceDescriptor.Singleton(
@@ -336,6 +341,53 @@ public sealed class FoundationTests
         );
         Assert.Equal(HttpStatusCode.Unauthorized, (await viewer.GetAsync("/api/media")).StatusCode);
         Assert.Equal(HttpStatusCode.Unauthorized, (await copied.GetAsync("/api/media")).StatusCode);
+    }
+
+    [Fact]
+    public async Task PlaybackQuotaIsPerUserAndDoesNotSpendSignInBudget()
+    {
+        using var server = new Server();
+        using var admin = await server.Admin();
+        for (var i = 0; i < 6; i++)
+            Assert.Equal(
+                HttpStatusCode.NotFound,
+                (
+                    await admin.PostAsJsonAsync(
+                        "/api/v1/media/999/playback-sessions",
+                        new { encoder = "libx264" }
+                    )
+                ).StatusCode
+            );
+        Assert.Equal(
+            HttpStatusCode.TooManyRequests,
+            (
+                await admin.PostAsJsonAsync(
+                    "/api/v1/media/999/playback-sessions",
+                    new { encoder = "libx264" }
+                )
+            ).StatusCode
+        );
+        using var other = server.CreateClient();
+        await Server.Csrf(other);
+        Assert.Equal(
+            HttpStatusCode.OK,
+            (
+                await other.PostAsJsonAsync(
+                    "/api/auth/login",
+                    new { name = "admin", password = "twelve-character-password" }
+                )
+            ).StatusCode
+        );
+        await Server.Csrf(other);
+        Assert.Equal(
+            HttpStatusCode.TooManyRequests,
+            (
+                await other.PostAsJsonAsync(
+                    "/api/v1/media/999/playback-sessions",
+                    new { encoder = "libx264" }
+                )
+            ).StatusCode
+        );
     }
 
     [Fact]

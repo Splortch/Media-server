@@ -166,9 +166,15 @@ var permittedEncoders =
     builder.Configuration.GetSection("MediaServer:HardwareEncoders").Get<string[]>() ?? [];
 if (permittedEncoders.Any(x => !EncoderDiscovery.Encoders.Contains(x)))
     throw new InvalidOperationException("Unknown configured hardware encoder.");
-builder.Services.AddSingleton(
-    new TranscodeSettings(new[] { "libx264" }.Concat(permittedEncoders).Distinct().ToArray())
+var transcodeSettings = new TranscodeSettings(
+    new[] { "libx264" }.Concat(permittedEncoders).Distinct().ToArray(),
+    builder.Configuration["MediaServer:VaapiDevice"] ?? "/dev/dri/renderD128",
+    builder.Configuration.GetValue<int?>("MediaServer:NvencGpu") ?? -1,
+    builder.Configuration["MediaServer:QsvDevice"]
 );
+transcodeSettings.Validate();
+builder.Services.AddSingleton(transcodeSettings);
+
 builder.Services.AddSingleton(sp => new PlaybackSessions(
     data,
     sp.GetRequiredService<FfmpegRunner>(),
@@ -245,6 +251,19 @@ builder.Services.AddRateLimiter(o =>
                 _ => new FixedWindowRateLimiterOptions
                 {
                     PermitLimit = 10,
+                    Window = TimeSpan.FromMinutes(1),
+                    QueueLimit = 0,
+                }
+            )
+    );
+    o.AddPolicy(
+        "playback",
+        context =>
+            RateLimitPartition.GetFixedWindowLimiter(
+                context.User.FindFirstValue(ClaimTypes.NameIdentifier) ?? "anonymous",
+                _ => new FixedWindowRateLimiterOptions
+                {
+                    PermitLimit = 6,
                     Window = TimeSpan.FromMinutes(1),
                     QueueLimit = 0,
                 }
@@ -350,8 +369,8 @@ app.Use(
         }
     }
 );
-app.UseRateLimiter();
 app.UseAuthentication();
+app.UseRateLimiter();
 app.UseAuthorization();
 app.Use(
     async (context, next) =>
