@@ -331,6 +331,10 @@ for (const attempt of [1, 2]) {
               video.addEventListener(
                 'click',
                 () => {
+                  // Start loading in the gesture too: unsupported codecs can otherwise
+                  // finish and remove the element before Playwright delivers its click.
+                  video.src = `/api/v1/media/${id}/stream`;
+                  video.load();
                   void video.play().catch(() => {
                     code = video.error?.code ?? 0;
                     finish(
@@ -342,8 +346,6 @@ for (const attempt of [1, 2]) {
                 },
                 { once: true },
               );
-              video.src = `/api/v1/media/${id}/stream`;
-              video.load();
               // Expose the click target only after its handler and diagnostics are ready.
               video.dataset.testid = 'codec-probe';
             });
@@ -376,7 +378,7 @@ for (const attempt of [1, 2]) {
       );
       const [result] = await Promise.all([
         probe,
-        page.getByTestId('codec-probe').click(),
+        page.getByTestId('codec-probe').click({ timeout: 5000 }),
       ]);
       matrix.push({ codec: title, ...result });
       // Preserve diagnostics before asserting, including baseline timeouts/network errors.
