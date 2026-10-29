@@ -38,7 +38,9 @@ class RealServerTest {
         compose.runOnUiThread {
             assertTrue(compose.activity.model.player.value!!.currentPosition >= 2900)
         }
-        compose.onNodeWithText("Prepare HLS playback").performScrollTo().performClick()
+        assertNotNull(compose.activity.model.screen.value.playbackOptions)
+        compose.onNodeWithTag("main-list").performScrollToNode(hasText("Prepare HLS playback"))
+        compose.onNodeWithText("Prepare HLS playback").performClick()
         compose.waitUntil(180000) {
             compose.activity.model.screen.value.conversionStatus?.startsWith("HLS ready") == true &&
                 compose.activity.model.screen.value.videoReady
