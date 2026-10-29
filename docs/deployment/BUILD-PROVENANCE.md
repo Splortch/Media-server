@@ -6,7 +6,7 @@ Issue #2 tracks distribution acceptance. Pinning image bases prevents an unchang
 
 `docker/Dockerfile` pins the Node, .NET SDK and ASP.NET runtime references to SHA-256 manifest digests. The initial pins were retrieved on 29 October 2026 directly from Docker Hub's official `library/node` repository and Microsoft's `mcr.microsoft.com` registry. The SHA-256 of each returned manifest body was checked against the registry's `Docker-Content-Digest` header before committing it. Tags remain beside the digest to make version review clear; the digest selects the actual immutable manifest.
 
-CI runs `python3 scripts/check-container-bases.py` before the real Docker build. The policy permits only the three reviewed external image repositories, requires a non-latest tag and full SHA-256 digest, and allows references to earlier local stages and `scratch`. A real Docker build then verifies that those image references can be pulled and used. Six policy tests exercise missing/malformed digests, unreviewed sources, missing bases and latest tags.
+CI runs `python3 scripts/check-container-bases.py` before the real Docker build. The policy permits only the three reviewed external image repositories, requires a non-latest tag and full SHA-256 digest, and allows references to earlier local stages and `scratch`. A real Docker build then verifies that those image references can be pulled and used. Policy tests exercise missing/malformed digests, unreviewed sources, missing bases and latest tags.
 
 Dependabot's Docker ecosystem updates can propose new tags/digests. Review them and run CI; do not remove digests to make an update pass. To inspect a candidate with Docker installed:
 
