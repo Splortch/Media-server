@@ -78,6 +78,8 @@ jobs:
           pactl info
       - name: Measure network adaptation and browser decoder compatibility
         env:
+          # Headless WebKit can suspend its pipeline before the source is assigned.
+          WEBKIT_GST_ALLOW_PLAYBACK_OF_INVISIBLE_VIDEOS: '1'
           GST_DEBUG: '2'
           GST_DEBUG_NO_COLOR: '1'
           GST_DEBUG_FILE: ${{ github.workspace }}/frontend/benchmark-results/gstreamer.log
