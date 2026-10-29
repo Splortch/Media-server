@@ -136,6 +136,7 @@ public static class PlaybackApi
                 string file,
                 MediaDb db,
                 PlaybackSessions sessions,
+                StreamRegistry registry,
                 ClaimsPrincipal user,
                 HttpContext context
             ) =>
@@ -159,11 +160,15 @@ public static class PlaybackApi
                 try
                 {
                     return Results.File(
-                        new FileStream(
-                            path,
-                            FileMode.Open,
-                            FileAccess.Read,
-                            FileShare.Read | FileShare.Delete
+                        registry.Track(
+                            new FileStream(
+                                path,
+                                FileMode.Open,
+                                FileAccess.Read,
+                                FileShare.Read | FileShare.Delete
+                            ),
+                            uid,
+                            media.Value
                         ),
                         mime,
                         enableRangeProcessing: true

@@ -467,6 +467,13 @@ public sealed class PlaybackPipelineTests
             Assert.Equal(HttpStatusCode.OK, resource.StatusCode);
             resource.Dispose();
         }
+        Assert.True(
+            SpinWait.SpinUntil(
+                () => server.Services.GetRequiredService<StreamRegistry>().Snapshot().Length == 0,
+                TimeSpan.FromSeconds(2)
+            ),
+            "Completed HLS transfers must release monitoring counters."
+        );
         var manifest = await admin.GetStringAsync(state.Manifest);
         Assert.Contains("360p.m3u8", manifest);
         Assert.Contains("720p.m3u8", manifest);

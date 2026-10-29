@@ -61,7 +61,7 @@ actual storage and server before setting a tighter service target.
 
 Admin Settings displays server-process CPU (normalized across available logical processors), process/managed
 memory, data-volume free/total capacity, uptime, queued/running scans and active authenticated HTTP transfer
-requests with bytes read. Finished transfers disappear even if a buffered video keeps playing. CPU is null on
+requests with bytes read, including Direct Play and authorized HLS manifests/segments/captions. Finished transfers disappear even if a buffered video keeps playing. CPU is null on
 its first sample; unavailable disk values remain null. Paths and bearer session identifiers are never returned.
 The web client polls every five seconds and clears stale samples if access is revoked or the request fails. No external telemetry service is involved.
 
