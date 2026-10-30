@@ -41,11 +41,24 @@ try {
     $shortcut = (New-Object -ComObject WScript.Shell).CreateShortcut($startMenu)
     if ($shortcut.Arguments -notlike '*MediaServer.Tray.ps1*') { throw 'Start menu does not launch the real tray host.' }
     if (Test-Path (Join-Path ([Environment]::GetFolderPath('Startup')) 'Media Server.lnk')) { throw 'Sign-in startup must be opt-in.' }
+    $desktop = Join-Path ([Environment]::GetFolderPath('DesktopDirectory')) 'Media Server Control.lnk'
+    if (Test-Path $desktop) { throw 'Desktop shortcut must be opt-in.' }
+    Run-Installer $Installer '/S /DESKTOP'
+    if (-not (Test-Path $desktop)) { throw 'Opt-in desktop shortcut missing.' }
+    $desktopLink = (New-Object -ComObject WScript.Shell).CreateShortcut($desktop)
+    if ($desktopLink.Arguments -notlike '*MediaServer.Tray.ps1* -Command Show') { throw 'Desktop shortcut does not reopen Server Control.' }
     New-Item -ItemType Directory $data -Force | Out-Null
     @{ media = $media } | ConvertTo-Json | Set-Content (Join-Path $data 'launcher.json') -Encoding UTF8
     $hostProcess = Start-Tray
     & python scripts/test-installed-server.py $data $media initialize
     if ($LASTEXITCODE -ne 0) { throw 'Installed real-backend integration failed.' }
+    # Reopening must dispatch to the original controller, not take .server.lock again.
+    $originalBackend = (Get-Process Api | Select-Object -First 1).Id
+    foreach ($suffix in @('', ' -Command Show')) {
+        $second = Start-Process -FilePath $ps -ArgumentList ('-NoProfile -ExecutionPolicy Bypass -STA -File "' + $trayScript + '" -NonInteractive' + $suffix) -PassThru
+        if (-not $second.WaitForExit(15000) -or $second.ExitCode -ne 0) { throw 'Second control launch did not reopen the existing controller.' }
+        if ($hostProcess.HasExited -or -not (Get-Process -Id $originalBackend -ErrorAction SilentlyContinue)) { throw 'Reopening replaced or stopped the original server.' }
+    }
     # Do not overwrite files or remove an application while either lease is held.
     Run-Installer $Installer '/S' 2
     Run-Installer (Join-Path $install 'Uninstall.exe') ('/S _?=' + $install) 2
@@ -73,6 +86,31 @@ try {
         }
     }
     Stop-Tray $hostProcess; $hostProcess = $null
+    # A separately launched backend must remain untouched by an observing control.
+    $env:MediaServer__DataDirectory = $data
+    $env:MediaServer__AllowedRoots__0 = $media
+    $env:MediaServer__FfprobePath = (Get-Command ffprobe).Source
+    $env:ASPNETCORE_URLS = 'http://127.0.0.1:5050'
+    $external = Start-Process -FilePath (Join-Path $install 'app/Api.exe') -WorkingDirectory (Join-Path $install 'app') -PassThru -RedirectStandardOutput (Join-Path $temporary 'external.log') -RedirectStandardError (Join-Path $temporary 'external-error.log')
+    try {
+        $ready = $false
+        for ($attempt = 0; $attempt -lt 60; $attempt++) {
+            if ($external.HasExited) { throw 'External fixture server exited.' }
+            try { $ready = (Invoke-RestMethod 'http://127.0.0.1:5050/health' -TimeoutSec 1).status -eq 'ok' } catch {}
+            if ($ready) { break }; Start-Sleep -Seconds 1
+        }
+        if (-not $ready) { throw 'External fixture did not start.' }
+        $hostProcess = Start-Tray
+        Start-Sleep -Seconds 3
+        if ($hostProcess.HasExited) { throw 'Control failed to open alongside an external server.' }
+        Stop-Tray $hostProcess; $hostProcess = $null
+        if ($external.HasExited) { throw 'Control terminated a server it did not own.' }
+        & python scripts/test-installed-server.py $data $media verify
+        if ($LASTEXITCODE -ne 0) { throw 'External backend was not usable after exiting control.' }
+    } finally {
+        if ($hostProcess) { Stop-Tray $hostProcess; $hostProcess = $null }
+        if (-not $external.HasExited) { $external.Kill(); $external.WaitForExit() }
+    }
     $database = Get-ChildItem $data -Filter '*.db' | Select-Object -First 1
     if (-not $database) { throw 'Installed database missing.' }
     $databaseHash = (Get-FileHash $database.FullName).Hash
@@ -98,6 +136,7 @@ try {
     $unknown = Join-Path $install 'app/operator-note.txt'; Set-Content $unknown 'explicit fixture'
     $databaseHash = (Get-FileHash $database.FullName).Hash
     Run-Installer (Join-Path $install 'Uninstall.exe') ('/S _?=' + $install)
+    if (Test-Path $desktop) { throw 'Uninstall left the desktop shortcut.' }
     if ((Test-Path (Join-Path $install 'app/Api.exe')) -or (Test-Path $startMenu)) { throw 'Uninstall left registered application files.' }
     if (-not (Test-Path $sentinel) -or -not (Test-Path $unknown)) { throw 'Uninstall removed an unowned file.' }
     if ((Get-FileHash $database.FullName).Hash -ne $databaseHash) { throw 'Uninstall modified the database.' }

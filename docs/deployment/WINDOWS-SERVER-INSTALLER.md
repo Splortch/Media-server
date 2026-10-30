@@ -7,7 +7,7 @@ For Windows x64 releases built after this change, choose **`MediaServer-v0.2.0-a
 1. Download the server setup.exe and optionally compare its SHA-256 with that release's `SHA256SUMS`. Builds are unsigned early alphas; investigate unexpected security warnings instead of disabling Windows protection.
 2. Run setup using your ordinary Windows account. It requests no administrator elevation, creates no service and opens no firewall/router ports.
 3. Read the license and component choices. **Start automatically when I sign in** is optional and unchecked by default. It starts only after this user signs in; it is not a system service.
-4. Finish with **Start Media Server and open first-time setup** selected. Later, use **Start → Media Server → Media Server Control**. The original Media Server shortcut remains available too.
+4. Finish with **Start Media Server and open first-time setup** selected. Later, use **Start → Media Server → Media Server Control**. The original Media Server shortcut remains available too. You can also press the Windows key and search **Media Server Control** after installation. Windows may take a moment to index a new Start-menu entry.
 5. Select a real media subfolder outside the application/data directories. If FFprobe is missing, choose whether to download the pinned, checksum-verified GyanD tools. This separate download needs internet access and retains its upstream GPL/LGPL licenses. Offline users can install FFprobe on PATH beforehand. No video is uploaded.
 6. A local setup-token window and browser open. Copy the token into **http://127.0.0.1:5050**, create a local administrator (12–256 character password), then sign in. The token is private and is removed after successful setup.
 7. In browser **Settings**, add the selected folder as a library and select **Scan library**. Folder selection grants allowed-root access; it does not automatically create or scan the library.
@@ -24,7 +24,7 @@ For Windows x64 releases built after this change, choose **`MediaServer-v0.2.0-a
 
 The tray menu also offers Start, Stop and Restart, private logs, the first-run token, and opt-in **Start when I sign in**. Closing the browser does not stop the server. Signing out of Windows ends the per-user session; this is not a Windows service. Controls apply only to the server process owned by this launcher, not a remote server or a separately started portable instance. Stopping interrupts active streams; a client may not yet have saved its latest few seconds of playback.
 
-Opening a second shortcut reopens the existing control window instead of starting another backend. A portable instance using the same data directory must be stopped first. Port conflicts and unavailable media/tools remain startup errors; no remote shutdown endpoint or new network listener is introduced.
+Opening a second shortcut reopens the existing control window instead of starting another backend. If a portable or separately launched instance holds the data directory, the controller opens in observation mode instead of trying to launch a duplicate. Open in browser remains available; stop/restart are disabled because the controller does not own that process. Stop it in its original terminal/app, then close and reopen the control to start a managed instance. Port conflicts and unavailable media/tools remain startup errors; no remote shutdown endpoint or new network listener is introduced.
 
 ## Data, upgrades and uninstall
 
@@ -54,3 +54,13 @@ python scripts/build-server-installer.py
 ```
 
 The artifact filename is versioned to distinguish server/client and architecture. You may save it locally as `setup.exe`; its payload remains the same. Actual publication follows a reviewed merge and the existing exact-commit CI gate; a PR build does not publish a release.
+
+## Desktop shortcut
+
+During setup, select **Desktop shortcut (Media Server Control)** on the components
+page; it is off by default. Later, choose **Create desktop shortcut** from the tray
+menu. Both shortcuts reopen the control window and connect to an existing
+controller instead of starting a duplicate server. Silent installation can opt in
+with `/S /DESKTOP`. Uninstall removes the generated shortcut and preserves data.
+A portable extraction does not register a Start-menu entry; use setup.exe for
+Windows Search integration.

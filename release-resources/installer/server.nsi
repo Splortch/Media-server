@@ -2,6 +2,7 @@ Unicode true
 !include "MUI2.nsh"
 !include "LogicLib.nsh"
 !include "x64.nsh"
+!include "FileFunc.nsh"
 !ifndef VERSION
   !error "VERSION is required"
 !endif
@@ -20,6 +21,7 @@ ShowInstDetails show
 ShowUninstDetails show
 Var ServerLease
 Var TrayLease
+Var WantDesktop
 !define MUI_WELCOMEPAGE_TEXT "Install the Media Server and its browser interface for your Windows account. This does not install the separate Windows client.$\r$\n$\r$\nA Server Control window and tray icon let you start, stop or restart the server. First launch selects a media folder and offers verified FFprobe tools, then opens browser account setup.$\r$\n$\r$\nUpdates can migrate your database. Stop the server and back up data before upgrading. Uninstall keeps your media and private server data. Builds are unsigned early alphas."
 !define MUI_FINISHPAGE_RUN
 !define MUI_FINISHPAGE_RUN_TEXT "Start Media Server and open first-time setup"
@@ -61,6 +63,12 @@ Function .onInit
     SetErrorLevel 4
     Abort
   ${EndIf}
+  ${GetParameters} $0
+  ClearErrors
+  ${GetOptions} $0 "/DESKTOP" $1
+  ${IfNot} ${Errors}
+    StrCpy $WantDesktop "1"
+  ${EndIf}
   ClearErrors
 FunctionEnd
 Section "Server and browser interface (required)"
@@ -69,9 +77,12 @@ Section "Server and browser interface (required)"
   SetOutPath "$INSTDIR\app"
   File /r "${PAYLOAD}\*"
   WriteUninstaller "$INSTDIR\Uninstall.exe"
+  ${If} $WantDesktop == "1"
+  CreateShortcut "$DESKTOP\Media Server Control.lnk" "$SYSDIR\WindowsPowerShell\v1.0\powershell.exe" '-NoProfile -ExecutionPolicy Bypass -STA -WindowStyle Hidden -File "$INSTDIR\app\MediaServer.Tray.ps1" -Command Show'
+  ${EndIf}
   CreateDirectory "$SMPROGRAMS\Media Server"
   CreateShortcut "$SMPROGRAMS\Media Server\Media Server.lnk" "$SYSDIR\WindowsPowerShell\v1.0\powershell.exe" '-NoProfile -ExecutionPolicy Bypass -STA -WindowStyle Hidden -File "$INSTDIR\app\MediaServer.Tray.ps1"'
-  CreateShortcut "$SMPROGRAMS\Media Server\Media Server Control.lnk" "$SYSDIR\WindowsPowerShell\v1.0\powershell.exe" '-NoProfile -ExecutionPolicy Bypass -STA -WindowStyle Hidden -File "$INSTDIR\app\MediaServer.Tray.ps1"'
+  CreateShortcut "$SMPROGRAMS\Media Server\Media Server Control.lnk" "$SYSDIR\WindowsPowerShell\v1.0\powershell.exe" '-NoProfile -ExecutionPolicy Bypass -STA -WindowStyle Hidden -File "$INSTDIR\app\MediaServer.Tray.ps1" -Command Show'
   CreateShortcut "$SMPROGRAMS\Media Server\Uninstall.lnk" "$INSTDIR\Uninstall.exe"
   WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\Splortch.MediaServer" "DisplayName" "Media Server (server)"
   WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\Splortch.MediaServer" "DisplayVersion" "${VERSION}"
@@ -81,6 +92,10 @@ Section "Server and browser interface (required)"
   WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\Splortch.MediaServer" "UninstallString" '$\"$INSTDIR\Uninstall.exe$\"'
   WriteRegDWORD HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\Splortch.MediaServer" "NoModify" 1
   WriteRegDWORD HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\Splortch.MediaServer" "NoRepair" 1
+SectionEnd
+Section /o "Desktop shortcut (Media Server Control)"
+  SetShellVarContext current
+  CreateShortcut "$DESKTOP\Media Server Control.lnk" "$SYSDIR\WindowsPowerShell\v1.0\powershell.exe" '-NoProfile -ExecutionPolicy Bypass -STA -WindowStyle Hidden -File "$INSTDIR\app\MediaServer.Tray.ps1" -Command Show'
 SectionEnd
 Section /o "Start automatically when I sign in"
   CreateShortcut "$SMSTARTUP\Media Server.lnk" "$SYSDIR\WindowsPowerShell\v1.0\powershell.exe" '-NoProfile -ExecutionPolicy Bypass -STA -WindowStyle Hidden -File "$INSTDIR\app\MediaServer.Tray.ps1" -NoBrowser'
@@ -112,6 +127,7 @@ Section "Uninstall"
   SetShellVarContext current
   ; Remove only files from the packaged manifest. Never recurse into user data.
   !include "${UNINSTALL_MANIFEST}"
+  Delete "$DESKTOP\Media Server Control.lnk"
   Delete "$SMSTARTUP\Media Server.lnk"
   Delete "$SMPROGRAMS\Media Server\Media Server.lnk"
   Delete "$SMPROGRAMS\Media Server\Media Server Control.lnk"
