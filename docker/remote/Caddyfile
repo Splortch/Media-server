@@ -1,0 +1,12 @@
+{
+    admin off
+    auto_https disable_redirects
+}
+
+# Use your own trusted certificate/key, or read REMOTE-ACCESS.md for automatic TLS.
+{$MEDIA_SERVER_HOST} {
+    tls "{$MEDIA_SERVER_CERT}" "{$MEDIA_SERVER_KEY}"
+    reverse_proxy {$MEDIA_SERVER_UPSTREAM} {
+        header_up Host {host}
+    }
+}

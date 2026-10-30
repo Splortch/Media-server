@@ -1573,6 +1573,25 @@
         }
       }
     },
+    "/api/v1/remote-readiness": {
+      "get": {
+        "tags": [
+          "RemoteAccess"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RemoteReadiness"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/auth/guest": {
       "get": {
         "tags": [
@@ -2638,6 +2657,37 @@
           }
         }
       },
+      "RemoteReadiness": {
+        "required": [
+          "configured",
+          "requestIsHttps",
+          "secureCookies",
+          "trustedProxyCount",
+          "warnings"
+        ],
+        "type": "object",
+        "properties": {
+          "configured": {
+            "type": "boolean"
+          },
+          "requestIsHttps": {
+            "type": "boolean"
+          },
+          "secureCookies": {
+            "type": "boolean"
+          },
+          "trustedProxyCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "warnings": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
       "Rendition": {
         "required": [
           "name",
@@ -2905,6 +2955,9 @@
     },
     {
       "name": "Features"
+    },
+    {
+      "name": "RemoteAccess"
     }
   ]
 }
