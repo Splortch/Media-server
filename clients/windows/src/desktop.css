@@ -6,7 +6,7 @@
 .check {
   display: flex;
   align-items: center;
-  line-height: 1.5;
+  line-height: 1.7;
 }
 .check input {
   width: 18px;
@@ -15,10 +15,12 @@
 .desktop-card {
   background: transparent;
   color: inherit;
+  border: 0;
   padding: 0;
   display: block;
   text-align: left;
   font-weight: 400;
+  min-height: 0;
 }
 .desktop-card:hover {
   background: transparent;
@@ -29,52 +31,55 @@
 .desktop-card h3 {
   margin-top: 12px;
 }
-select {
-  padding: 12px;
-  border: 1px solid #454b56;
-  border-radius: 8px;
-  background: #1d222b;
-  color: inherit;
+.desktop-library-tools {
+  margin: 27px 0 36px;
 }
 .pagination {
   display: flex;
   justify-content: space-between;
-  margin-top: 30px;
+  gap: 20px;
+  margin-top: 32px;
+  padding-top: 24px;
+  border-top: 1px solid var(--border);
 }
 :root[data-theme='light'] {
   color-scheme: light;
-  color: #172018;
-  background: #f3f5f0;
-}
-:root[data-theme='light'] .panel {
-  background: #fff;
-  color: #172018;
-}
-:root[data-theme='light'] .muted {
-  color: #535f53;
-}
-:root[data-theme='light'] input,
-:root[data-theme='light'] select {
-  background: white;
-  color: #172018;
-  border-color: #8b9689;
+  --bg: #f3f5f0;
+  --sidebar: #fafbf7;
+  --surface: #ffffff;
+  --surface-raised: #edf1e8;
+  --field: #fafcf7;
+  --text: #1c291c;
+  --muted: #53614f;
+  --border: #cbd5c4;
+  --accent: #355e2c;
+  --accent-hover: #416e35;
+  --accent-ink: #ffffff;
+  --accent-tint: #e2edd9;
+  --danger: #a42342;
+  --danger-bg: #fff0f1;
 }
 @media (prefers-color-scheme: light) {
   :root[data-theme='system'] {
     color-scheme: light;
-    color: #172018;
-    background: #f3f5f0;
+    --bg: #f3f5f0;
+    --sidebar: #fafbf7;
+    --surface: #ffffff;
+    --surface-raised: #edf1e8;
+    --field: #fafcf7;
+    --text: #1c291c;
+    --muted: #53614f;
+    --border: #cbd5c4;
+    --accent: #355e2c;
+    --accent-hover: #416e35;
+    --accent-ink: #ffffff;
+    --accent-tint: #e2edd9;
+    --danger: #a42342;
+    --danger-bg: #fff0f1;
   }
-  :root[data-theme='system'] .panel {
-    background: #fff;
-    color: #172018;
-  }
-  :root[data-theme='system'] .muted {
-    color: #535f53;
-  }
-  :root[data-theme='system'] input,
-  :root[data-theme='system'] select {
-    background: white;
-    color: #172018;
+}
+@media (max-width: 600px) {
+  .desktop-nav {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }

@@ -21,6 +21,7 @@ import {
   type SessionInfo,
 } from '../../../shared/api/src/client';
 import Player from '../../../frontend/src/components/Player';
+import Icon from '../../../frontend/src/components/Icon';
 import { duration } from '../../../frontend/src/services/api';
 type Selection = {
   item: Detail;
@@ -49,7 +50,7 @@ function MediaCards({
               {m.title[0]}
             </span>
             <span className="play-symbol" aria-hidden="true">
-              ▶
+              <Icon name="play" />
             </span>
           </div>
           <h3>{m.title}</h3>
@@ -469,33 +470,46 @@ export default function App() {
           <span className="brand-icon">M</span> MEDIA SERVER
         </a>
         <p className="nav-label">WINDOWS CLIENT</p>
-        <nav>
+        <nav className="desktop-nav" aria-label="Main navigation">
           <button
             className="secondary"
+            aria-current={!selection && view === 'library' ? 'page' : undefined}
             onClick={() => {
               void back();
               setView('library');
             }}
           >
-            Library
+            <Icon name="library" />
+            <span>Library</span>
           </button>
-          <button className="secondary" onClick={() => void settings()}>
-            Settings
+          <button
+            className="secondary"
+            aria-current={
+              !selection && view === 'settings' ? 'page' : undefined
+            }
+            onClick={() => void settings()}
+          >
+            <Icon name="settings" />
+            <span>Settings</span>
           </button>
         </nav>
         <div className="sidebar-bottom">
           {online ? 'Connected' : 'Connection needs attention'}
           <p>{version} · Client 0.1.0-alpha.1</p>
           <button className="text-button" onClick={() => void signOut()}>
-            Sign out · {user.name}
+            <Icon name="logout" /> Sign out · {user.name}
           </button>
         </div>
       </aside>
       <div className="workspace">
         <header>
           <span className="muted">{address}</span>
-          <button className="secondary" onClick={() => void load()}>
-            Refresh
+          <button
+            className="secondary"
+            disabled={busy}
+            onClick={() => void load()}
+          >
+            <Icon name="refresh" /> Refresh
           </button>
         </header>
         <main>
@@ -508,7 +522,7 @@ export default function App() {
           {selection ? (
             <>
               <button className="text-button" onClick={() => void back()}>
-                ← Back to library
+                <Icon name="back" /> Back to library
               </button>
               <h1>{selection.item.title}</h1>
               <p className="muted">
@@ -540,20 +554,19 @@ export default function App() {
                   await api.me();
                 }}
               />
-              <p className="muted">
-                Audio and subtitle selection is not supported by this server
-                version.
-              </p>
-              <ul>
-                {(Array.isArray(selection.tracks.tracks)
-                  ? selection.tracks.tracks
-                  : []
-                ).map((t, i) => (
-                  <li key={i}>
-                    {t.type} · {t.codec} · {t.language || 'Language unknown'}
-                  </li>
-                ))}
-              </ul>
+              <details className="panel">
+                <summary>File and track details</summary>
+                <ul>
+                  {(Array.isArray(selection.tracks.tracks)
+                    ? selection.tracks.tracks
+                    : []
+                  ).map((t, i) => (
+                    <li key={i}>
+                      {t.type} · {t.codec} · {t.language || 'Language unknown'}
+                    </li>
+                  ))}
+                </ul>
+              </details>
             </>
           ) : view === 'settings' ? (
             <>
@@ -581,8 +594,8 @@ export default function App() {
                   sessions use Windows Credential Manager. Linux/macOS sessions
                   are kept in memory only.
                 </p>
-                <button onClick={() => void signOut()}>
-                  Disconnect and clear saved session
+                <button className="danger-ghost" onClick={() => void signOut()}>
+                  <Icon name="logout" /> Disconnect and clear saved session
                 </button>
               </section>
               <section className="panel">
@@ -617,25 +630,28 @@ export default function App() {
             <>
               <p className="eyebrow">YOUR MEDIA, ANY SCREEN</p>
               <h1>Your private screening room.</h1>
-              <label className="search-label">
-                Search library
-                <input
-                  type="search"
-                  value={search}
-                  maxLength={200}
-                  onChange={(e) => {
-                    const query = e.target.value;
-                    setSearch(query);
-                    setOffset(0);
-                    clearTimeout(searchTimer.current);
-                    searchTimer.current = setTimeout(
-                      () => void load(query, 0),
-                      250,
-                    );
-                  }}
-                  placeholder="Search filenames…"
-                />
-              </label>
+              <div className="desktop-library-tools">
+                <label className="search-label">
+                  Search library
+                  <Icon name="search" />
+                  <input
+                    type="search"
+                    value={search}
+                    maxLength={200}
+                    onChange={(e) => {
+                      const query = e.target.value;
+                      setSearch(query);
+                      setOffset(0);
+                      clearTimeout(searchTimer.current);
+                      searchTimer.current = setTimeout(
+                        () => void load(query, 0),
+                        250,
+                      );
+                    }}
+                    placeholder="Search filenames…"
+                  />
+                </label>
+              </div>
               {!search && watching.length > 0 && (
                 <section>
                   <div className="section-heading">

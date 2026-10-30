@@ -7,6 +7,13 @@ import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -53,10 +60,28 @@ class MainActivity : ComponentActivity() {
             MaterialTheme(
                 colorScheme =
                     darkColorScheme(
-                        primary = Color(0xFF9DB5FF),
-                        background = Color(0xFF10131B),
-                        surface = Color(0xFF1C2130),
-                    )
+                        primary = Color(0xFFC5DFA8),
+                        onPrimary = Color(0xFF1D2D17),
+                        primaryContainer = Color(0xFF2A3824),
+                        onPrimaryContainer = Color(0xFFD7EAC3),
+                        secondary = Color(0xFFB8CBA9),
+                        onSecondary = Color(0xFF1D2D17),
+                        secondaryContainer = Color(0xFF303E2D),
+                        onSecondaryContainer = Color(0xFFE6EFDD),
+                        background = Color(0xFF111512),
+                        onBackground = Color(0xFFEEF2E9),
+                        surface = Color(0xFF1A201B),
+                        onSurface = Color(0xFFEEF2E9),
+                        surfaceVariant = Color(0xFF273127),
+                        onSurfaceVariant = Color(0xFFB8C5B1),
+                        outline = Color(0xFF788A70),
+                        outlineVariant = Color(0xFF3D4B38),
+                    ),
+                shapes = Shapes(
+                    small = RoundedCornerShape(12.dp),
+                    medium = RoundedCornerShape(18.dp),
+                    large = RoundedCornerShape(24.dp),
+                ),
             ) {
                 Surface(Modifier.fillMaxSize()) {
                     if (screen.fullscreen && player != null) {
@@ -449,13 +474,35 @@ private fun SearchScreen(screen: Screen, model: MediaViewModel) {
 
 @Composable
 private fun MediaCard(media: MediaSummary, enabled: Boolean, open: () -> Unit) {
-    Card(onClick = open, enabled = enabled, modifier = Modifier.fillMaxWidth()) {
-        Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            Text(media.title, style = MaterialTheme.typography.titleMedium)
-            Text(
-                "${(media.duration / 60).toInt()} min · ${media.container.take(32)} · ${media.videoCodec.take(64)}",
-                style = MaterialTheme.typography.bodySmall,
-            )
+    Card(
+        onClick = open,
+        enabled = enabled,
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+    ) {
+        Row(
+            Modifier.padding(14.dp),
+            horizontalArrangement = Arrangement.spacedBy(16.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Box(
+                Modifier.size(width = 52.dp, height = 68.dp)
+                    .clip(RoundedCornerShape(10.dp))
+                    .background(Brush.linearGradient(listOf(MaterialTheme.colorScheme.primaryContainer, MaterialTheme.colorScheme.surfaceVariant)))
+                    .clearAndSetSemantics {},
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(media.title.take(1).uppercase(), style = MaterialTheme.typography.headlineSmall, color = MaterialTheme.colorScheme.primary)
+            }
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Text(media.title, style = MaterialTheme.typography.titleMedium)
+                Text(
+                    "${(media.duration / 60).toInt()} min · ${media.container.take(32)} · ${media.videoCodec.take(64)}",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
         }
     }
 }

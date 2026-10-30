@@ -82,16 +82,42 @@ test('setup, accounts, collections, diagnostics, stream ranges and persist resum
   await expect(page.getByRole('status')).toHaveText('0 matching videos');
   await expect(page.getByLabel('Search library')).toBeFocused();
   await page.getByLabel('Search library').fill('');
+  await expect(
+    page.getByRole('heading', { name: 'sample', exact: true }),
+  ).toBeVisible();
+  await page.getByRole('link', { name: 'Home', exact: true }).click();
+  await expect(page.locator('.hero')).toBeVisible();
+  await accessible(page);
   await page.screenshot({
-    path: '/tmp/media-library-desktop.png',
+    path: 'test-results/visual/home-desktop.png',
+    fullPage: true,
+  });
+  await page.getByRole('link', { name: 'Library', exact: true }).click();
+  await expect(
+    page.getByRole('heading', { name: 'sample', exact: true }),
+  ).toBeVisible();
+  await page.screenshot({
+    path: 'test-results/visual/media-library-desktop.png',
     fullPage: true,
   });
   await page.setViewportSize({ width: 390, height: 844 });
+  await expect
+    .poll(() =>
+      page.evaluate(() => document.documentElement.scrollWidth <= innerWidth),
+    )
+    .toBe(true);
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await expect(page.locator('.media-card').first()).toHaveCSS(
+    'animation-name',
+    'none',
+  );
+  await accessible(page);
   await page.screenshot({
-    path: '/tmp/media-library-mobile.png',
+    path: 'test-results/visual/media-library-mobile.png',
     fullPage: true,
   });
   await page.setViewportSize({ width: 1280, height: 720 });
+  await page.emulateMedia({ reducedMotion: 'no-preference' });
   await page.getByRole('heading', { name: 'sample', exact: true }).click();
   const video = page.getByLabel('sample', { exact: true });
   await expect(video).toBeVisible();
@@ -187,6 +213,7 @@ test('setup, accounts, collections, diagnostics, stream ranges and persist resum
     page.getByRole('heading', { name: 'sample', exact: true }),
   ).toBeVisible();
   await page.getByRole('heading', { name: 'sample', exact: true }).click();
+  await page.getByText('Manage content rating', { exact: true }).click();
   await page.getByLabel('Content rating', { exact: true }).selectOption('10');
   await page.getByRole('link', { name: 'Settings', exact: true }).click();
   await page.getByLabel('New username', { exact: true }).fill('friend');

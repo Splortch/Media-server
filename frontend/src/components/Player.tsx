@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import Icon from './Icon';
 import PlaybackSettings, { type PlaybackTransport } from './PlaybackSettings';
 import { api, type Media } from '../services/api';
 export default function Player({
@@ -329,60 +330,80 @@ export default function Player({
             <span>{formatPlaybackTime(duration)}</span>
           </div>
           <div className="player-buttons">
-            <button
-              type="button"
-              className="player-play"
-              onClick={() => void togglePlay()}
-              aria-label={paused ? 'Play' : 'Pause'}
+            <div
+              className="player-transport"
+              role="group"
+              aria-label="Play and seek"
             >
-              {paused ? '▶ Play' : 'Ⅱ Pause'}
-            </button>
-            <button
-              type="button"
-              disabled={!duration}
-              onClick={() => seek((videoRef.current?.currentTime ?? 0) - 10)}
-              aria-label="Rewind 10 seconds"
+              <button
+                type="button"
+                className="player-play"
+                onClick={() => void togglePlay()}
+                aria-label={paused ? 'Play' : 'Pause'}
+              >
+                <Icon name={paused ? 'play' : 'pause'} />{' '}
+                <span>{paused ? 'Play' : 'Pause'}</span>
+              </button>
+              <button
+                type="button"
+                disabled={!duration}
+                onClick={() => seek((videoRef.current?.currentTime ?? 0) - 10)}
+                aria-label="Rewind 10 seconds"
+              >
+                <Icon name="rewind" />{' '}
+                <span className="control-caption">10s</span>
+              </button>
+              <button
+                type="button"
+                disabled={!duration}
+                onClick={() => seek((videoRef.current?.currentTime ?? 0) + 10)}
+                aria-label="Forward 10 seconds"
+              >
+                <Icon name="forward" />{' '}
+                <span className="control-caption">10s</span>
+              </button>
+            </div>
+            <div
+              className="player-volume"
+              role="group"
+              aria-label="Audio controls"
             >
-              Rewind 10 seconds
-            </button>
+              <button
+                type="button"
+                onClick={() => {
+                  if (videoRef.current)
+                    videoRef.current.muted = !videoRef.current.muted;
+                }}
+                aria-label={muted ? 'Unmute' : 'Mute'}
+                title={muted ? 'Unmute' : 'Mute'}
+              >
+                <Icon name={muted ? 'muted' : 'volume'} />
+              </button>
+              <input
+                aria-label="Volume"
+                type="range"
+                min="0"
+                max="1"
+                step="0.05"
+                value={muted ? 0 : volume}
+                onChange={(e) => {
+                  if (videoRef.current) {
+                    videoRef.current.volume = Number(e.target.value);
+                    videoRef.current.muted = false;
+                  }
+                }}
+              />
+            </div>
             <button
               type="button"
-              disabled={!duration}
-              onClick={() => seek((videoRef.current?.currentTime ?? 0) + 10)}
-              aria-label="Forward 10 seconds"
-            >
-              Forward 10 seconds
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                if (videoRef.current)
-                  videoRef.current.muted = !videoRef.current.muted;
-              }}
-              aria-label={muted ? 'Unmute' : 'Mute'}
-            >
-              {muted ? 'Unmute' : 'Mute'}
-            </button>
-            <input
-              aria-label="Volume"
-              type="range"
-              min="0"
-              max="1"
-              step="0.05"
-              value={muted ? 0 : volume}
-              onChange={(e) => {
-                if (videoRef.current) {
-                  videoRef.current.volume = Number(e.target.value);
-                  videoRef.current.muted = false;
-                }
-              }}
-            />
-            <button
-              type="button"
+              aria-label={fullscreen ? 'Exit fullscreen' : 'Fullscreen'}
               className="player-fullscreen"
               onClick={() => void toggleFullscreen()}
             >
-              {fullscreen ? 'Exit fullscreen' : 'Fullscreen'}
+              <Icon name="fullscreen" />
+              <span className="control-caption">
+                {fullscreen ? 'Exit fullscreen' : 'Fullscreen'}
+              </span>
             </button>
           </div>
         </div>
