@@ -1477,3 +1477,40 @@ details[open] > summary {
   border-top: 1px solid var(--border);
   padding-top: 8px;
 }
+
+/* The title's artwork grows into the viewing area, then reveals decoded video. */
+.player-video-stage {
+  position: relative;
+}
+.playback-entrance {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  display: grid;
+  place-items: center;
+  pointer-events: none;
+  transform-origin: top left;
+  background: var(--action-gradient);
+  color: var(--action-ink, #061a23);
+  transition: opacity 550ms ease 180ms;
+  animation: entrance-safety 0s 8s forwards;
+}
+.playback-entrance .monogram {
+  font-size: clamp(4rem, 18vw, 14rem);
+}
+.playback-entrance-ready {
+  opacity: 0;
+}
+@keyframes entrance-safety {
+  to {
+    opacity: 0;
+    visibility: hidden;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .playback-entrance {
+    display: none;
+    transition: none;
+    animation: none;
+  }
+}
