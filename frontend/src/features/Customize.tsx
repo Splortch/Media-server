@@ -22,6 +22,7 @@ export default function Customize({
       mounted.current = false;
     };
   }, []);
+  const [pendingHidden, setPendingHidden] = useState<string[] | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   async function save(path: string, method: string, body?: unknown) {
@@ -33,6 +34,7 @@ export default function Customize({
     } catch (e) {
       setError((e as Error).message);
     } finally {
+      setPendingHidden(null);
       setBusy(false);
     }
   }
@@ -81,7 +83,11 @@ export default function Customize({
               <label className="check">
                 <input
                   type="checkbox"
-                  checked={!feature.hidden}
+                  checked={
+                    !(pendingHidden
+                      ? pendingHidden.includes(feature.key)
+                      : feature.hidden)
+                  }
                   disabled={busy || !feature.enabled}
                   onChange={(event) => {
                     const hidden = new Set(
@@ -89,6 +95,7 @@ export default function Customize({
                     );
                     if (event.target.checked) hidden.delete(feature.key);
                     else hidden.add(feature.key);
+                    setPendingHidden([...hidden]);
                     void save('/preferences/features', 'PUT', {
                       hidden: [...hidden],
                     });

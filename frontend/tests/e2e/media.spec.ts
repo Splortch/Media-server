@@ -330,6 +330,9 @@ test('setup, accounts, collections, diagnostics, stream ranges and persist resum
   await expect(
     page.getByLabel('Show Smart collections', { exact: true }),
   ).toBeDisabled();
+  await page
+    .locator('#settings-customize')
+    .screenshot({ path: 'test-results/visual/customize-settings.png' });
   await accessible(page);
   await page.getByRole('link', { name: 'Library', exact: true }).click();
   await expect(page.getByLabel('Search library')).toBeVisible();

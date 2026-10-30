@@ -124,3 +124,34 @@ it('does not apply a previous account response after the settings view unmounts'
   await Promise.resolve();
   expect(changed).not.toHaveBeenCalled();
 });
+
+it('reflects a checkbox change immediately while persistence is pending', async () => {
+  let resolve!: (value: unknown) => void;
+  vi.mocked(api).mockImplementationOnce(
+    () =>
+      new Promise((r) => {
+        resolve = r;
+      }),
+  );
+  render(<Harness />);
+  fireEvent.click(screen.getByLabelText('Show Watch history navigation'));
+  expect(
+    screen.getByLabelText('Show Watch history navigation'),
+  ).not.toBeChecked();
+  expect(screen.getByLabelText('Show Watch history navigation')).toBeDisabled();
+  resolve({
+    features: initial.features.map((f) => ({
+      ...f,
+      visible: f.key !== 'watch-history',
+      hidden: f.key === 'watch-history',
+    })),
+  });
+  await waitFor(() =>
+    expect(
+      screen.getByLabelText('Show Watch history navigation'),
+    ).toBeEnabled(),
+  );
+  expect(
+    screen.getByLabelText('Show Watch history navigation'),
+  ).not.toBeChecked();
+});
