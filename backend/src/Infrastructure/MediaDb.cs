@@ -7,6 +7,8 @@ public class MediaDb(DbContextOptions<MediaDb> options, IUserContext? context = 
     : DbContext(options)
 {
     private int? CurrentUserId => context?.UserId;
+    public DbSet<FeaturePolicy> FeaturePolicies => Set<FeaturePolicy>();
+    public DbSet<FeatureVisibility> FeatureVisibility => Set<FeatureVisibility>();
     public DbSet<LibraryGrant> Grants => Set<LibraryGrant>();
     public DbSet<WatchHistory> History => Set<WatchHistory>();
     public DbSet<SmartCollection> Collections => Set<SmartCollection>();
@@ -23,6 +25,9 @@ public class MediaDb(DbContextOptions<MediaDb> options, IUserContext? context = 
 
     protected override void OnModelCreating(ModelBuilder b)
     {
+        b.Entity<FeaturePolicy>().HasKey(x => x.Key);
+        b.Entity<FeatureVisibility>().HasKey(x => new { x.UserId, x.Key });
+        b.Entity<FeatureVisibility>().HasOne<User>().WithMany().HasForeignKey(x => x.UserId);
         b.Entity<Library>()
             .HasQueryFilter(library =>
                 CurrentUserId == null

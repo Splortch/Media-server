@@ -16,6 +16,27 @@ vi.mock('../src/services/api', () => ({
   resetCsrf: vi.fn(),
   duration: () => '1 min',
   api: async (path: string, method = 'GET') => {
+    if (path === '/features')
+      return {
+        features: [
+          {
+            key: 'smart-collections',
+            name: 'Smart collections',
+            enabled: true,
+            visible: true,
+            hidden: false,
+            serverConfigurable: true,
+          },
+          {
+            key: 'watch-history',
+            name: 'Watch history navigation',
+            enabled: true,
+            visible: true,
+            hidden: false,
+            serverConfigurable: false,
+          },
+        ],
+      };
     if (path === '/setup') return { required: false };
     if (path === '/auth/me') return { name: 'Alice', role: 'Admin' };
     if (path === '/auth/login' && method === 'POST') {

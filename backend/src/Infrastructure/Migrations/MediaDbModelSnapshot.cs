@@ -17,6 +17,32 @@ namespace Infrastructure.Migrations
 #pragma warning disable 612, 618
             modelBuilder.HasAnnotation("ProductVersion", "10.0.14");
 
+            modelBuilder.Entity("MediaServer.Core.FeaturePolicy", b =>
+                {
+                    b.Property<string>("Key")
+                        .HasColumnType("TEXT");
+
+                    b.Property<bool>("Enabled")
+                        .HasColumnType("INTEGER");
+
+                    b.HasKey("Key");
+
+                    b.ToTable("FeaturePolicies");
+                });
+
+            modelBuilder.Entity("MediaServer.Core.FeatureVisibility", b =>
+                {
+                    b.Property<int>("UserId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Key")
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("UserId", "Key");
+
+                    b.ToTable("FeatureVisibility");
+                });
+
             modelBuilder.Entity("MediaServer.Core.Library", b =>
                 {
                     b.Property<int>("Id")
@@ -71,6 +97,10 @@ namespace Infrastructure.Migrations
                         .IsRequired()
                         .HasColumnType("TEXT");
 
+                    b.Property<string>("ColorJson")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
                     b.Property<string>("Container")
                         .IsRequired()
                         .HasColumnType("TEXT");
@@ -108,8 +138,6 @@ namespace Infrastructure.Migrations
                     b.Property<string>("Title")
                         .IsRequired()
                         .HasColumnType("TEXT");
-
-                    b.Property<string>("ColorJson").IsRequired().HasColumnType("TEXT");
 
                     b.Property<string>("TracksJson")
                         .IsRequired()
@@ -363,6 +391,15 @@ namespace Infrastructure.Migrations
                     b.HasIndex("MediaItemId");
 
                     b.ToTable("History");
+                });
+
+            modelBuilder.Entity("MediaServer.Core.FeatureVisibility", b =>
+                {
+                    b.HasOne("MediaServer.Core.User", null)
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("MediaServer.Core.LibraryGrant", b =>

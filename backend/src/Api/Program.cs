@@ -397,6 +397,7 @@ MapApi(app.MapGroup("/api/v1").WithGroupName("client-v1"));
 app.MapClientV1();
 app.MapPlayback();
 app.MapOperations(credentialGate);
+app.MapFeatures();
 void MapApi(RouteGroupBuilder root)
 {
     root.MapGet(

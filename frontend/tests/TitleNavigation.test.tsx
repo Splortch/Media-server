@@ -21,6 +21,27 @@ beforeEach(() => {
   vi.spyOn(HTMLMediaElement.prototype, 'play').mockResolvedValue(undefined);
   vi.spyOn(window, 'scrollTo').mockImplementation(() => {});
   vi.mocked(api).mockImplementation(async (path) => {
+    if (path === '/features')
+      return {
+        features: [
+          {
+            key: 'smart-collections',
+            name: 'Smart collections',
+            enabled: true,
+            visible: true,
+            hidden: false,
+            serverConfigurable: true,
+          },
+          {
+            key: 'watch-history',
+            name: 'Watch history navigation',
+            enabled: true,
+            visible: true,
+            hidden: false,
+            serverConfigurable: false,
+          },
+        ],
+      };
     if (path === '/setup') return { required: false };
     if (path === '/auth/me') return { name: 'Alice', role: 'Viewer' };
     if (path === '/status')

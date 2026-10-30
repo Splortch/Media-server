@@ -15,6 +15,12 @@ import {
 import Player from './components/Player';
 import Icon from './components/Icon';
 import TitleDetails from './components/TitleDetails';
+import {
+  featureVisible,
+  loadFeatures,
+  unavailableFeatures,
+  type FeatureState,
+} from './services/features';
 import Settings from './pages/Settings';
 import { History, type Collection } from './features/Personal';
 type User = { name: string; role: string };
@@ -25,6 +31,7 @@ export default function App() {
     'loading' | 'setup' | 'login' | 'ready' | 'offline'
   >('loading');
   const [user, setUser] = useState<User>();
+  const [features, setFeatures] = useState<FeatureState>(unavailableFeatures);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   const [route, setRoute] = useState(location.hash.slice(1) || 'home');
@@ -54,6 +61,29 @@ export default function App() {
     mediaCount: number;
     libraryCount: number;
   }>();
+  function changeFeatures(state: FeatureState) {
+    setFeatures(state);
+    if (!featureVisible(state, 'smart-collections')) setCollection('');
+  }
+  useEffect(() => {
+    if (phase !== 'ready') return;
+    let active = true;
+    const refresh = () => {
+      void loadFeatures()
+        .then((state) => {
+          if (active) changeFeatures(state);
+        })
+        .catch(() => {
+          if (active) changeFeatures(unavailableFeatures);
+        });
+    };
+    refresh();
+    window.addEventListener('focus', refresh);
+    return () => {
+      active = false;
+      window.removeEventListener('focus', refresh);
+    };
+  }, [phase]);
   useEffect(() => {
     let active = true;
     (async () => {
@@ -89,6 +119,7 @@ export default function App() {
     resetCsrf();
     setPhase('login');
     setUser(undefined);
+    setFeatures(unavailableFeatures);
     setServer(undefined);
     setError('');
     setMoreBusy(false);
@@ -469,13 +500,15 @@ export default function App() {
           >
             <Icon name="settings" /> <span>Settings</span>
           </a>
-          <a
-            aria-current={route === 'history' ? 'page' : undefined}
-            className={route === 'history' ? 'active' : ''}
-            href="#history"
-          >
-            <Icon name="history" /> <span>Watch history</span>
-          </a>
+          {featureVisible(features, 'watch-history') && (
+            <a
+              aria-current={route === 'history' ? 'page' : undefined}
+              className={route === 'history' ? 'active' : ''}
+              href="#history"
+            >
+              <Icon name="history" /> <span>Watch history</span>
+            </a>
+          )}
         </nav>
         <div className="sidebar-bottom">
           <div className="connection-label">
@@ -526,7 +559,11 @@ export default function App() {
           )}
           {loading && <p role="status">Loading your collection…</p>}
           {route === 'settings' ? (
-            <Settings admin={user?.role === 'Admin'} />
+            <Settings
+              admin={user?.role === 'Admin'}
+              features={features}
+              onFeaturesChanged={changeFeatures}
+            />
           ) : route === 'history' ? (
             <History />
           ) : route.startsWith('media/') ? (
@@ -666,21 +703,23 @@ export default function App() {
                     )}
                   </div>
                   <div className="library-toolbar">
-                    <label>
-                      Smart collection
-                      <select
-                        aria-label="Smart collection"
-                        value={collection}
-                        onChange={(e) => setCollection(e.target.value)}
-                      >
-                        <option value="">All media</option>
-                        {collections.map((c) => (
-                          <option value={c.id} key={c.id}>
-                            {c.name}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
+                    {featureVisible(features, 'smart-collections') && (
+                      <label>
+                        Smart collection
+                        <select
+                          aria-label="Smart collection"
+                          value={collection}
+                          onChange={(e) => setCollection(e.target.value)}
+                        >
+                          <option value="">All media</option>
+                          {collections.map((c) => (
+                            <option value={c.id} key={c.id}>
+                              {c.name}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                    )}
                     <label className="search-label">
                       <span className="sr-only">Search library</span>
                       <Icon name="search" />

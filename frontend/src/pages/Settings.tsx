@@ -1,5 +1,11 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import Accounts from '../features/admin/Accounts';
+import Customize from '../features/Customize';
+import {
+  featureVisible,
+  unavailableFeatures,
+  type FeatureState,
+} from '../services/features';
 import Icon, { type IconName } from '../components/Icon';
 import Monitoring from '../features/admin/Monitoring';
 import LibraryTools from '../features/admin/LibraryTools';
@@ -7,7 +13,15 @@ import { Collections, Sessions } from '../features/Personal';
 import { api, type Library } from '../services/api';
 type ScanIssue = { fileName: string; code: string; correlationId: string };
 type Job = { id: number; state: string; discovered: number; failed: number };
-export default function Settings({ admin = true }: { admin?: boolean }) {
+export default function Settings({
+  admin = true,
+  features = unavailableFeatures,
+  onFeaturesChanged = () => {},
+}: {
+  admin?: boolean;
+  features?: FeatureState;
+  onFeaturesChanged?: (state: FeatureState) => void;
+}) {
   const [issues, setIssues] = useState<Record<number, ScanIssue[]>>({});
   const [passwordError, setPasswordError] = useState('');
   const [passwordBusy, setPasswordBusy] = useState(false);
@@ -137,7 +151,16 @@ export default function Settings({ admin = true }: { admin?: boolean }) {
         ]
       : []),
     { id: 'settings-account', label: 'Account', icon: 'shield' },
-    { id: 'settings-collections', label: 'Collections', icon: 'library' },
+    { id: 'settings-customize', label: 'Customize', icon: 'settings' },
+    ...(featureVisible(features, 'smart-collections')
+      ? [
+          {
+            id: 'settings-collections',
+            label: 'Collections',
+            icon: 'library' as const,
+          },
+        ]
+      : []),
   ];
   return (
     <>
@@ -345,9 +368,16 @@ export default function Settings({ admin = true }: { admin?: boolean }) {
         </form>
       </section>
       <Sessions />
-      <div id="settings-collections" tabIndex={-1} className="settings-target">
-        <Collections />
-      </div>
+      <Customize state={features} admin={admin} onChange={onFeaturesChanged} />
+      {featureVisible(features, 'smart-collections') && (
+        <div
+          id="settings-collections"
+          tabIndex={-1}
+          className="settings-target"
+        >
+          <Collections />
+        </div>
+      )}
       <section className="panel">
         <h2>Alpha capabilities</h2>
         <p className="muted">

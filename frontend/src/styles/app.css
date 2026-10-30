@@ -1411,3 +1411,14 @@ details[open] > summary {
     width: 140px;
   }
 }
+
+.feature-option {
+  margin: 18px 0;
+  display: grid;
+  gap: 10px;
+}
+.feature-policy {
+  margin-top: 20px;
+  border-top: 1px solid var(--border);
+  padding-top: 8px;
+}

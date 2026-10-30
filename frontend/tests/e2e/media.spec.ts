@@ -298,6 +298,56 @@ test('setup, accounts, collections, diagnostics, stream ranges and persist resum
     .getByLabel('Password', { exact: true })
     .fill('test-only-long-password');
   await page.getByRole('button', { name: 'Sign in', exact: true }).click();
+  await page.getByRole('link', { name: 'Settings', exact: true }).click();
+  await page
+    .getByLabel('Show Watch history navigation', { exact: true })
+    .uncheck();
+  await expect(
+    page.getByRole('link', { name: 'Watch history', exact: true }),
+  ).toHaveCount(0);
+  await page.reload();
+  await expect(
+    page.getByLabel('Show Watch history navigation', { exact: true }),
+  ).not.toBeChecked();
+  await expect(
+    page.getByRole('link', { name: 'Watch history', exact: true }),
+  ).toHaveCount(0);
+  await page
+    .getByRole('button', { name: 'Reset visibility to defaults', exact: true })
+    .click();
+  await expect(
+    page.getByRole('link', { name: 'Watch history', exact: true }),
+  ).toBeVisible();
+  await page.getByText('Server-wide availability', { exact: true }).click();
+  await page
+    .getByRole('button', {
+      name: 'Disable Smart collections for everyone',
+      exact: true,
+    })
+    .click();
+  await expect(
+    page.getByLabel('Show Smart collections', { exact: true }),
+  ).toBeDisabled();
+  await accessible(page);
+  await page.getByRole('link', { name: 'Library', exact: true }).click();
+  await expect(page.getByLabel('Search library')).toBeVisible();
+  await expect(
+    page.getByLabel('Smart collection', { exact: true }),
+  ).toHaveCount(0);
+  await page.getByRole('link', { name: 'Settings', exact: true }).click();
+  await page.getByText('Server-wide availability', { exact: true }).click();
+  await page
+    .getByRole('button', {
+      name: 'Enable Smart collections for everyone',
+      exact: true,
+    })
+    .click();
+  await expect(
+    page.getByRole('button', {
+      name: 'Delete collection Samples',
+      exact: true,
+    }),
+  ).toBeVisible();
   await page.getByRole('link', { name: 'Library', exact: true }).click();
   await expect(
     page.getByRole('heading', { name: 'Media library', exact: true }),

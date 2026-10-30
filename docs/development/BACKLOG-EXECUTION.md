@@ -54,3 +54,12 @@ card is still on the loaded page. A direct title URL falls back to the library.
 Titles still come from filenames. No synopsis, poster, season, year or cast is
 invented. This increment does not finish #10 or the series criteria of #52.
 Android retains its existing separate details/playback flow.
+
+## Second increment: optional features
+
+The first feature registry covers existing smart collections and watch-history
+navigation, with server-persisted personal visibility, reset, and an admin switch
+for smart collections. It does not advertise requests, activity, profiles or
+other modules before they ship. See [contract and defaults](../architecture/OPTIONAL-FEATURES.md).
+The current Customize editor is in the web client; native clients retain core
+functionality and can adopt the versioned preference contract separately.
