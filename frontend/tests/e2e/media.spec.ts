@@ -11,6 +11,7 @@ async function accessible(page: Page) {
 }
 test('setup, accounts, collections, diagnostics, stream ranges and persist resume', async ({
   page,
+  browser,
 }) => {
   test.setTimeout(120000);
   const data = process.env.E2E_DATA!;
@@ -358,6 +359,73 @@ test('setup, accounts, collections, diagnostics, stream ranges and persist resum
     page.getByRole('heading', { name: 'Media library', exact: true }),
   ).toBeVisible();
   await page.getByRole('heading', { name: 'sample', exact: true }).click();
+  const titleHash = await page.evaluate(() => location.hash);
+  await page.getByRole('link', { name: 'Experimental', exact: true }).click();
+  await expect(
+    page.getByRole('heading', { name: 'Experimental', exact: true }),
+  ).toBeVisible();
+  await page.getByLabel('Test collection', { exact: true }).check();
+  await page.getByLabel('Enable guest access', { exact: true }).check();
+  await page
+    .getByRole('button', { name: 'Save guest policy', exact: true })
+    .click();
+  await expect(page.getByRole('status')).toContainText('Guest policy saved');
+  await accessible(page);
+  await page.screenshot({
+    path: 'test-results/visual/experimental-settings.png',
+    fullPage: true,
+  });
+  const visitorContext = await browser.newContext({
+    baseURL: 'http://127.0.0.1:5173',
+  });
+  try {
+    const visitor = await visitorContext.newPage();
+    await visitor.goto('/');
+    await visitor
+      .getByRole('button', { name: 'Continue as guest', exact: true })
+      .click();
+    await expect(
+      visitor.getByRole('link', { name: 'Settings', exact: true }),
+    ).toHaveCount(0);
+    await expect(
+      visitor.getByRole('link', { name: 'Watch history', exact: true }),
+    ).toHaveCount(0);
+    await visitor.getByRole('link', { name: 'Library', exact: true }).click();
+    await visitor.getByRole('heading', { name: 'sample', exact: true }).click();
+    await visitor
+      .getByRole('button', { name: 'Play from beginning', exact: true })
+      .click();
+    await expect
+      .poll(() =>
+        visitor
+          .locator('video')
+          .evaluate((element: HTMLVideoElement) => element.currentTime),
+      )
+      .toBeGreaterThan(0.2);
+    await expect(
+      visitor.getByText(
+        'Guest playback · Progress is not saved. Direct Play only.',
+      ),
+    ).toBeVisible();
+    await page.getByLabel('Enable guest access', { exact: true }).uncheck();
+    await page
+      .getByRole('button', { name: 'Save guest policy', exact: true })
+      .click();
+    await expect(page.getByRole('status')).toContainText('Guest policy saved');
+    await visitor.reload();
+    await expect(
+      visitor.getByRole('heading', { name: 'Sign in', exact: true }),
+    ).toBeVisible();
+    await expect(
+      visitor.getByRole('button', { name: 'Continue as guest', exact: true }),
+    ).toHaveCount(0);
+  } finally {
+    await visitorContext.close();
+  }
+  await page.goto('/' + titleHash);
+  await expect(
+    page.getByRole('region', { name: 'Title information' }),
+  ).toBeVisible();
   // Missing media produces actionable diagnostics, not a leaked server pathname.
   const { unlink } = await import('node:fs/promises');
   await unlink(path.join(media, 'sample.webm'));
