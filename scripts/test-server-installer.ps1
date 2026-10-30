@@ -37,6 +37,7 @@ try {
     }
     $startMenu = Join-Path ([Environment]::GetFolderPath('Programs')) 'Media Server/Media Server.lnk'
     if (-not (Test-Path $startMenu)) { throw 'Start menu shortcut missing.' }
+    if (-not (Test-Path (Join-Path ([Environment]::GetFolderPath('Programs')) 'Media Server/Media Server Control.lnk'))) { throw 'Server Control shortcut missing.' }
     $shortcut = (New-Object -ComObject WScript.Shell).CreateShortcut($startMenu)
     if ($shortcut.Arguments -notlike '*MediaServer.Tray.ps1*') { throw 'Start menu does not launch the real tray host.' }
     if (Test-Path (Join-Path ([Environment]::GetFolderPath('Startup')) 'Media Server.lnk')) { throw 'Sign-in startup must be opt-in.' }
@@ -48,6 +49,29 @@ try {
     # Do not overwrite files or remove an application while either lease is held.
     Run-Installer $Installer '/S' 2
     Run-Installer (Join-Path $install 'Uninstall.exe') ('/S _?=' + $install) 2
+    # Exercise the same local commands used by the control window/tray. Stop
+    # leaves the controller alive so it can start the server again without login.
+    foreach ($action in @('Stop', 'Start', 'Restart')) {
+        $previousServer = Get-Process Api -ErrorAction SilentlyContinue | Select-Object -First 1
+        $previousId = if ($previousServer) { $previousServer.Id } else { 0 }
+        & $ps -NoProfile -ExecutionPolicy Bypass -File $trayScript -Command $action
+        if ($LASTEXITCODE -ne 0) { throw "Control command failed: $action" }
+        $expectedRunning = $action -ne 'Stop'
+        $matched = $false
+        for ($attempt = 0; $attempt -lt 90; $attempt++) {
+            if ($hostProcess.HasExited) { throw 'Control window exited during a start/stop command.' }
+            $healthy = $false
+            try { $healthy = (Invoke-RestMethod 'http://127.0.0.1:5050/health' -TimeoutSec 1).status -eq 'ok' } catch {}
+            $oldExited = $action -ne 'Restart' -or -not (Get-Process -Id $previousId -ErrorAction SilentlyContinue)
+            if (($healthy -eq $expectedRunning) -and $oldExited) { $matched = $true; break }
+            Start-Sleep -Seconds 1
+        }
+        if (-not $matched) { throw "Server did not reach expected state after $action" }
+        if ($expectedRunning) {
+            & python scripts/test-installed-server.py $data $media verify
+            if ($LASTEXITCODE -ne 0) { throw "Persisted account/library/progress failed after $action" }
+        }
+    }
     Stop-Tray $hostProcess; $hostProcess = $null
     $database = Get-ChildItem $data -Filter '*.db' | Select-Object -First 1
     if (-not $database) { throw 'Installed database missing.' }

@@ -1,4 +1,7 @@
-param([switch]$NoBrowser, [switch]$Stop, [switch]$NonInteractive)
+param(
+    [switch]$NoBrowser, [switch]$Stop, [switch]$NonInteractive,
+    [ValidateSet('Start', 'Stop', 'Restart', 'Show')][string]$Command
+)
 $ErrorActionPreference = 'Stop'
 $data = Join-Path $env:LOCALAPPDATA 'Splortch/MediaServer'
 $app = $PSScriptRoot
@@ -7,20 +10,39 @@ if ($Stop) {
     try { $signal = [Threading.EventWaitHandle]::OpenExisting($eventName); $signal.Set() | Out-Null; $signal.Dispose(); exit 0 }
     catch [Threading.WaitHandleCannotBeOpenedException] { exit 0 }
 }
+$commandPrefix = 'Local\Splortch.MediaServer.Command.' + [Security.Principal.WindowsIdentity]::GetCurrent().User.Value + '.'
+if ($Command) {
+    try {
+        $request = [Threading.EventWaitHandle]::OpenExisting($commandPrefix + $Command)
+        try { $request.Set() | Out-Null } finally { $request.Dispose() }
+        exit 0
+    } catch [Threading.WaitHandleCannotBeOpenedException] {
+        if ($Command -eq 'Stop') { exit 0 }
+        # Start, Restart and Show can launch a controller when none exists.
+    }
+}
 Add-Type -AssemblyName System.Windows.Forms
 Add-Type -AssemblyName System.Drawing
 [Windows.Forms.Application]::EnableVisualStyles()
 $exitCode = 0
 $lease = $null; $signal = $null; $server = $null; $tray = $null; $timer = $null
+$control = $null; $commandSignals = @{}; $busy = $false
+$expectedStopped = $false; $unexpectedReported = $false
 try {
     New-Item -ItemType Directory -Path $data -Force | Out-Null
     try { $lease = [IO.File]::Open((Join-Path $data 'tray-host.lock'), 'OpenOrCreate', 'ReadWrite', 'None') }
     catch [IO.IOException] {
-        if (-not $NoBrowser) { Start-Process 'http://127.0.0.1:5050' }
+        if (-not $NoBrowser) {
+            $show = [Threading.EventWaitHandle]::OpenExisting($commandPrefix + 'Show')
+            try { $show.Set() | Out-Null } finally { $show.Dispose() }
+        }
         exit 0
     }
     $signal = New-Object Threading.EventWaitHandle($false, [Threading.EventResetMode]::ManualReset, $eventName)
     $signal.Reset() | Out-Null
+    foreach ($action in @('Start', 'Stop', 'Restart', 'Show')) {
+        $commandSignals[$action] = New-Object Threading.EventWaitHandle($false, [Threading.EventResetMode]::AutoReset, ($commandPrefix + $action))
+    }
     # Do not launch a second backend, including alongside a portable server.
     $lockPath = Join-Path $data '.server.lock'
     if (Test-Path -LiteralPath $lockPath) {
@@ -78,24 +100,37 @@ try {
     $env:MediaServer__AllowedRoots__0 = $config.media
     $env:MediaServer__FfprobePath = $probePath
     $env:ASPNETCORE_URLS = 'http://127.0.0.1:5050'
-    foreach ($name in @('server.log', 'server-error.log')) {
-        $path = Join-Path $data $name
-        if (Test-Path -LiteralPath $path) { Move-Item -LiteralPath $path -Destination ($path + '.previous') -Force }
+    function Start-OwnedServer {
+        $script:expectedStopped = $false; $script:unexpectedReported = $false
+        if ($script:server -and -not $script:server.HasExited) { return }
+        foreach ($name in @('server.log', 'server-error.log')) {
+            $path = Join-Path $data $name
+            if (Test-Path -LiteralPath $path) { Move-Item -LiteralPath $path -Destination ($path + '.previous') -Force }
+        }
+        $script:server = Start-Process -FilePath (Join-Path $app 'Api.exe') -WorkingDirectory $app -WindowStyle Hidden -PassThru -RedirectStandardOutput (Join-Path $data 'server.log') -RedirectStandardError (Join-Path $data 'server-error.log')
+        $ready = $false
+        for ($i = 0; $i -lt 60; $i++) {
+            if ($server.HasExited) { throw 'Server startup failed. Check server.log and server-error.log in the data folder.' }
+            try {
+                $health = Invoke-RestMethod 'http://127.0.0.1:5050/health' -TimeoutSec 1
+                if ($health.status -eq 'ok') { $ready = $true; break }
+            } catch {}
+            Start-Sleep -Seconds 1
+        }
+        if (-not $ready) { throw 'The server was not ready after 60 seconds. Check logs and whether port 5050 is occupied.' }
+        # A port occupied by another app must never be treated as our healthy backend.
+        Start-Sleep -Milliseconds 300
+        if ($server.HasExited) { throw 'The server exited. Check for another application using port 5050.' }
     }
-    $server = Start-Process -FilePath (Join-Path $app 'Api.exe') -WorkingDirectory $app -WindowStyle Hidden -PassThru -RedirectStandardOutput (Join-Path $data 'server.log') -RedirectStandardError (Join-Path $data 'server-error.log')
-    $ready = $false
-    for ($i = 0; $i -lt 60; $i++) {
-        if ($server.HasExited) { throw 'Server startup failed. Check server.log and server-error.log in the data folder.' }
-        try {
-            $health = Invoke-RestMethod 'http://127.0.0.1:5050/health' -TimeoutSec 1
-            if ($health.status -eq 'ok') { $ready = $true; break }
-        } catch {}
-        Start-Sleep -Seconds 1
+    function Stop-OwnedServer {
+        $script:expectedStopped = $true
+        # Only the child process created by this controller is ever stopped.
+        if ($script:server -and -not $script:server.HasExited) {
+            $script:server.Kill()
+            if (-not $script:server.WaitForExit(15000)) { throw 'The server did not stop. Check the server logs.' }
+        }
     }
-    if (-not $ready) { throw 'The server was not ready after 60 seconds. Check logs and whether port 5050 is occupied.' }
-    # A port occupied by another app must never be treated as our healthy backend.
-    Start-Sleep -Milliseconds 300
-    if ($server.HasExited) { throw 'The server exited. Check for another application using port 5050.' }
+    Start-OwnedServer
     $context = New-Object Windows.Forms.ApplicationContext
     $tray = New-Object Windows.Forms.NotifyIcon
     $tray.Icon = [Drawing.SystemIcons]::Application
@@ -135,21 +170,91 @@ try {
             } else { Remove-Item -LiteralPath $startupPath -ErrorAction SilentlyContinue }
         } catch { $startup.Checked = Test-Path -LiteralPath $startupPath; [Windows.Forms.MessageBox]::Show('Could not change the sign-in shortcut.', 'Media Server') | Out-Null }
     })
-    $quit = $menu.Items.Add('Stop server and exit'); $quit.add_Click({ $context.ExitThread() })
+    $control = New-Object Windows.Forms.Form
+    $control.AutoScaleMode = 'Dpi'; $control.Font = New-Object Drawing.Font('Segoe UI', 9)
+    $control.Text = 'Media Server Control'; $control.ClientSize = New-Object Drawing.Size(540, 250)
+    $control.StartPosition = 'CenterScreen'; $control.FormBorderStyle = 'FixedDialog'; $control.MaximizeBox = $false
+    $heading = New-Object Windows.Forms.Label
+    $heading.Text = 'Your media server'; $heading.SetBounds(24, 20, 480, 30)
+    $heading.Font = New-Object Drawing.Font('Segoe UI', 16)
+    $controlStatus = New-Object Windows.Forms.Label
+    $controlStatus.SetBounds(24, 60, 480, 38); $controlStatus.AccessibleName = 'Server status'
+    $startButton = New-Object Windows.Forms.Button
+    $startButton.Text = 'Start server'; $startButton.SetBounds(24, 108, 145, 42)
+    $stopButton = New-Object Windows.Forms.Button
+    $stopButton.Text = 'Stop server'; $stopButton.SetBounds(183, 108, 145, 42)
+    $restartButton = New-Object Windows.Forms.Button
+    $restartButton.Text = 'Restart server'; $restartButton.SetBounds(342, 108, 170, 42)
+    $openButton = New-Object Windows.Forms.Button
+    $openButton.Text = 'Open in browser'; $openButton.SetBounds(24, 165, 170, 36)
+    $openButton.add_Click({ Start-Process 'http://127.0.0.1:5050' })
+    $hint = New-Object Windows.Forms.Label
+    $hint.Text = 'Stopping interrupts playback on all devices. Closing this window keeps the tray control available.'
+    $hint.SetBounds(24, 211, 488, 35)
+    $control.Controls.AddRange(@($heading, $controlStatus, $startButton, $stopButton, $restartButton, $openButton, $hint))
+    $control.add_FormClosing({ param($sender, $eventArgs) $eventArgs.Cancel = $true; $sender.Hide() })
+    function Update-ControlStatus {
+        $running = $script:server -and -not $script:server.HasExited
+        $controlStatus.Text = if ($running) { 'Running - http://127.0.0.1:5050' } else { 'Stopped - select Start server to go online again.' }
+        $status.Text = $controlStatus.Text
+        $tray.Text = if ($running) { 'Media Server - running locally' } else { 'Media Server - stopped' }
+        $startButton.Enabled = -not $busy -and -not $running
+        $stopButton.Enabled = -not $busy -and $running
+        $restartButton.Enabled = -not $busy -and $running
+        $openButton.Enabled = -not $busy -and $running
+        $open.Enabled = $openButton.Enabled
+        $startItem.Enabled = $startButton.Enabled; $stopItem.Enabled = $stopButton.Enabled; $restartItem.Enabled = $restartButton.Enabled
+    }
+    function Invoke-ControlAction([string]$Action) {
+        if ($script:busy) { return }
+        $script:busy = $true
+        Update-ControlStatus
+        $controlStatus.Text = $Action + ' in progress...'; $control.Refresh()
+        try {
+            if ($Action -in @('Stop', 'Restart')) { Stop-OwnedServer }
+            if ($Action -in @('Start', 'Restart')) { Start-OwnedServer }
+        } catch {
+            Stop-OwnedServer
+            if (-not $NonInteractive) { [Windows.Forms.MessageBox]::Show($_.Exception.Message, 'Media Server control', 'OK', 'Error') | Out-Null }
+            else { [Console]::Error.WriteLine($_.Exception.Message) }
+        } finally { $script:busy = $false; Update-ControlStatus }
+    }
+    $startButton.add_Click({ Invoke-ControlAction 'Start' })
+    $stopButton.add_Click({ Invoke-ControlAction 'Stop' })
+    $restartButton.add_Click({ Invoke-ControlAction 'Restart' })
+    $showControl = { $control.Show(); $control.WindowState = 'Normal'; $control.Activate() }
+    $menu.Items.Insert(1, (New-Object Windows.Forms.ToolStripMenuItem('Server Control')))
+    $menu.Items[1].add_Click($showControl)
+    $startItem = $menu.Items.Add('Start server'); $startItem.add_Click({ Invoke-ControlAction 'Start' })
+    $stopItem = $menu.Items.Add('Stop server'); $stopItem.add_Click({ Invoke-ControlAction 'Stop' })
+    $restartItem = $menu.Items.Add('Restart server'); $restartItem.add_Click({ Invoke-ControlAction 'Restart' })
+    $quit = $menu.Items.Add('Stop server and exit control'); $quit.add_Click({ $context.ExitThread() })
+    Update-ControlStatus
     $tray.ContextMenuStrip = $menu; $tray.Visible = $true
-    $tray.add_DoubleClick({ Start-Process 'http://127.0.0.1:5050' })
+    $tray.add_DoubleClick($showControl)
     $timer = New-Object Windows.Forms.Timer
     $timer.Interval = 500
     $timer.add_Tick({
         if ($signal.WaitOne(0)) { $context.ExitThread() }
-        elseif ($server.HasExited) {
-            $tray.Text = 'Media Server - stopped'; $status.Text = 'Server stopped; see logs'; $timer.Stop()
-            if ($NonInteractive) { $script:exitCode = 1; $context.ExitThread() }
-            else { [Windows.Forms.MessageBox]::Show('The server stopped unexpectedly. Open server data and logs from the tray menu, then restart Media Server.', 'Media Server') | Out-Null }
+        else {
+            foreach ($action in @('Start', 'Stop', 'Restart', 'Show')) {
+                if ($commandSignals[$action].WaitOne(0)) {
+                    if ($action -eq 'Show') { & $showControl }
+                    elseif ($action -eq 'Start') { $startButton.PerformClick() }
+                    elseif ($action -eq 'Stop') { $stopButton.PerformClick() }
+                    elseif ($action -eq 'Restart') { $restartButton.PerformClick() }
+                }
+            }
+            if ($server.HasExited -and -not $expectedStopped -and -not $unexpectedReported) {
+                $script:unexpectedReported = $true
+                if ($NonInteractive) { $script:exitCode = 1; $context.ExitThread() }
+                else { [Windows.Forms.MessageBox]::Show('The server stopped unexpectedly. Open server data and logs from the tray menu, then select Start server to retry.', 'Media Server') | Out-Null }
+            }
+            Update-ControlStatus
         }
     })
     $timer.Start()
-    if (-not $NoBrowser) { Start-Process 'http://127.0.0.1:5050'; & $showToken }
+    if (-not $NoBrowser) { & $showControl; Start-Process 'http://127.0.0.1:5050'; & $showToken }
     [Windows.Forms.Application]::Run($context)
     if ($exitCode -ne 0) { throw 'The owned server stopped unexpectedly.' }
 } catch {
@@ -158,6 +263,8 @@ try {
     exit 1
 } finally {
     if ($timer) { $timer.Stop(); $timer.Dispose() }
+    if ($control) { $control.Dispose() }
+    foreach ($handle in $commandSignals.Values) { $handle.Dispose() }
     if ($tray) { $tray.Visible = $false; $tray.Dispose() }
     if ($server -and -not $server.HasExited) { $server.Kill(); $server.WaitForExit() }
     if ($signal) { $signal.Dispose() }
