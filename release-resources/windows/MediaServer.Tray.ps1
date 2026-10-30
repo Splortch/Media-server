@@ -21,20 +21,44 @@ if ($Command) {
         # Start, Restart and Show can launch a controller when none exists.
     }
 }
+# PowerShell wraps File.Open IOExceptions in MethodInvocationException.
+function Test-SharingViolation($record) {
+    $exception = $record.Exception
+    while ($exception) {
+        if ($exception -is [IO.IOException] -and (($exception.HResult -band 0xffff) -in @(32, 33))) { return $true }
+        $exception = $exception.InnerException
+    }
+    return $false
+}
+function Test-ExternalServerLock {
+    $path = Join-Path $data '.server.lock'
+    if (-not (Test-Path -LiteralPath $path)) { return $false }
+    try { $handle = [IO.File]::Open($path, 'Open', 'ReadWrite', 'None'); $handle.Dispose(); return $false }
+    catch { if (Test-SharingViolation $_) { return $true }; throw }
+}
 Add-Type -AssemblyName System.Windows.Forms
 Add-Type -AssemblyName System.Drawing
 [Windows.Forms.Application]::EnableVisualStyles()
 $exitCode = 0
 $lease = $null; $signal = $null; $server = $null; $tray = $null; $timer = $null
 $control = $null; $commandSignals = @{}; $busy = $false
-$expectedStopped = $false; $unexpectedReported = $false
+$expectedStopped = $false; $unexpectedReported = $false; $externalMode = $false
 try {
     New-Item -ItemType Directory -Path $data -Force | Out-Null
     try { $lease = [IO.File]::Open((Join-Path $data 'tray-host.lock'), 'OpenOrCreate', 'ReadWrite', 'None') }
-    catch [IO.IOException] {
-        if (-not $NoBrowser) {
-            $show = [Threading.EventWaitHandle]::OpenExisting($commandPrefix + 'Show')
-            try { $show.Set() | Out-Null } finally { $show.Dispose() }
+    catch {
+        if (-not (Test-SharingViolation $_)) { throw }
+        # A second launch can arrive before the first host creates its events.
+        if (-not $NoBrowser -or $Command) {
+            $delivered = $false
+            for ($attempt = 0; $attempt -lt 30; $attempt++) {
+                try {
+                    $show = [Threading.EventWaitHandle]::OpenExisting($commandPrefix + $(if ($Command) { $Command } else { 'Show' }))
+                    try { $show.Set() | Out-Null } finally { $show.Dispose() }
+                    $delivered = $true; break
+                } catch [Threading.WaitHandleCannotBeOpenedException] { Start-Sleep -Milliseconds 100 }
+            }
+            if (-not $delivered) { throw 'The server control is still starting or closing. Wait a moment and open it again.' }
         }
         exit 0
     }
@@ -43,12 +67,9 @@ try {
     foreach ($action in @('Start', 'Stop', 'Restart', 'Show')) {
         $commandSignals[$action] = New-Object Threading.EventWaitHandle($false, [Threading.EventResetMode]::AutoReset, ($commandPrefix + $action))
     }
-    # Do not launch a second backend, including alongside a portable server.
-    $lockPath = Join-Path $data '.server.lock'
-    if (Test-Path -LiteralPath $lockPath) {
-        $check = [IO.File]::Open($lockPath, 'Open', 'ReadWrite', 'None')
-        $check.Dispose()
-    }
+    # A separately launched server is observed, never adopted or terminated.
+    $externalMode = Test-ExternalServerLock
+    if (-not $externalMode) {
     $configPath = Join-Path $data 'launcher.json'
     if (Test-Path -LiteralPath $configPath) { $config = Get-Content -LiteralPath $configPath -Raw | ConvertFrom-Json }
     else {
@@ -100,6 +121,7 @@ try {
     $env:MediaServer__AllowedRoots__0 = $config.media
     $env:MediaServer__FfprobePath = $probePath
     $env:ASPNETCORE_URLS = 'http://127.0.0.1:5050'
+    }
     function Start-OwnedServer {
         $script:expectedStopped = $false; $script:unexpectedReported = $false
         if ($script:server -and -not $script:server.HasExited) { return }
@@ -130,7 +152,7 @@ try {
             if (-not $script:server.WaitForExit(15000)) { throw 'The server did not stop. Check the server logs.' }
         }
     }
-    Start-OwnedServer
+    if (-not $externalMode) { Start-OwnedServer }
     $context = New-Object Windows.Forms.ApplicationContext
     $tray = New-Object Windows.Forms.NotifyIcon
     $tray.Icon = [Drawing.SystemIcons]::Application
@@ -189,7 +211,7 @@ try {
     $openButton.Text = 'Open in browser'; $openButton.SetBounds(24, 165, 170, 36)
     $openButton.add_Click({ Start-Process 'http://127.0.0.1:5050' })
     $hint = New-Object Windows.Forms.Label
-    $hint.Text = 'Stopping interrupts playback on all devices. Closing this window keeps the tray control available.'
+    $hint.Text = if ($externalMode) { 'Started outside this controller. Stop it in its original terminal or app. Close and reopen this control after it stops to start a managed server.' } else { 'Stopping interrupts playback on all devices. Closing this window keeps the tray control available.' }
     $hint.SetBounds(24, 211, 488, 35)
     $control.Controls.AddRange(@($heading, $controlStatus, $startButton, $stopButton, $restartButton, $openButton, $hint))
     $control.add_FormClosing({
@@ -199,13 +221,13 @@ try {
         } else { $context.ExitThread() }
     })
     function Update-ControlStatus {
-        $running = $script:server -and -not $script:server.HasExited
-        $controlStatus.Text = if ($running) { 'Running - http://127.0.0.1:5050' } else { 'Stopped - select Start server to go online again.' }
+        $running = if ($externalMode) { Test-ExternalServerLock } else { $script:server -and -not $script:server.HasExited }
+        $controlStatus.Text = if ($externalMode) { if ($running) { 'Running outside this controller - http://127.0.0.1:5050' } else { 'External server stopped. Close and reopen this controller to start it.' } } elseif ($running) { 'Running - http://127.0.0.1:5050' } else { 'Stopped - select Start server to go online again.' }
         $status.Text = $controlStatus.Text
         $tray.Text = if ($running) { 'Media Server - running locally' } else { 'Media Server - stopped' }
-        $startButton.Enabled = -not $busy -and -not $running
-        $stopButton.Enabled = -not $busy -and $running
-        $restartButton.Enabled = -not $busy -and $running
+        $startButton.Enabled = -not $externalMode -and -not $busy -and -not $running
+        $stopButton.Enabled = -not $externalMode -and -not $busy -and $running
+        $restartButton.Enabled = -not $externalMode -and -not $busy -and $running
         $openButton.Enabled = -not $busy -and $running
         $open.Enabled = $openButton.Enabled
         $startItem.Enabled = $startButton.Enabled; $stopItem.Enabled = $stopButton.Enabled; $restartItem.Enabled = $restartButton.Enabled
@@ -233,7 +255,20 @@ try {
     $startItem = $menu.Items.Add('Start server'); $startItem.add_Click({ Invoke-ControlAction 'Start' })
     $stopItem = $menu.Items.Add('Stop server'); $stopItem.add_Click({ Invoke-ControlAction 'Stop' })
     $restartItem = $menu.Items.Add('Restart server'); $restartItem.add_Click({ Invoke-ControlAction 'Restart' })
-    $quit = $menu.Items.Add('Stop server and exit control'); $quit.add_Click({ $context.ExitThread() })
+    $desktopItem = $menu.Items.Add('Create desktop shortcut')
+    $desktopItem.add_Click({
+        try {
+            $shell = New-Object -ComObject WScript.Shell
+            $link = $shell.CreateShortcut((Join-Path ([Environment]::GetFolderPath('DesktopDirectory')) 'Media Server Control.lnk'))
+            $link.TargetPath = Join-Path $PSHOME 'powershell.exe'
+            $link.Arguments = '-NoProfile -ExecutionPolicy Bypass -STA -WindowStyle Hidden -File "' + (Join-Path $app 'MediaServer.Tray.ps1') + '" -Command Show'
+            $link.WorkingDirectory = $app
+            $link.Description = 'Open Media Server Control to manage your local media server'
+            $link.Save()
+            $tray.ShowBalloonTip(3000, 'Media Server', 'Desktop shortcut created.', [Windows.Forms.ToolTipIcon]::Info)
+        } catch { [Windows.Forms.MessageBox]::Show($_.Exception.Message, 'Could not create shortcut', 'OK', 'Error') | Out-Null }
+    })
+    $quit = $menu.Items.Add($(if ($externalMode) { 'Exit control (leave server running)' } else { 'Stop server and exit control' })); $quit.add_Click({ $context.ExitThread() })
     Update-ControlStatus
     $tray.ContextMenuStrip = $menu; $tray.Visible = $true
     $tray.add_DoubleClick($showControl)
@@ -255,7 +290,7 @@ try {
                     }
                 }
             }
-            if ($server.HasExited -and -not $expectedStopped -and -not $unexpectedReported) {
+            if ($server -and $server.HasExited -and -not $expectedStopped -and -not $unexpectedReported) {
                 $script:unexpectedReported = $true
                 if ($NonInteractive) { $script:exitCode = 1; $context.ExitThread() }
                 else { [Windows.Forms.MessageBox]::Show('The server stopped unexpectedly. Open server data and logs from the tray menu, then select Start server to retry.', 'Media Server') | Out-Null }
