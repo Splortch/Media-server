@@ -49,15 +49,19 @@ public static partial class Operations
         api.MapGet(
             "/collections",
             async (MediaDb db, ClaimsPrincipal user) =>
-                await db
-                    .Collections.Where(x => x.UserId == Uid(user))
-                    .OrderBy(x => x.Name)
-                    .ToListAsync()
+                !await Features.Enabled(db, "smart-collections")
+                    ? []
+                    : await db
+                        .Collections.Where(x => x.UserId == Uid(user))
+                        .OrderBy(x => x.Name)
+                        .ToListAsync()
         );
         api.MapPost(
             "/collections",
             async (CollectionInput input, MediaDb db, ClaimsPrincipal user) =>
             {
+                if (!await Features.Enabled(db, "smart-collections"))
+                    return Results.Forbid();
                 if (string.IsNullOrWhiteSpace(input.Name) || input.Name.Length > 80)
                     throw new ArgumentException("Collection name must contain 1–80 characters.");
                 ValidateSearch(input.Prefix, input.VideoCodec);
@@ -113,6 +117,8 @@ public static partial class Operations
                     var uid = Uid(user);
                     if (collectionId is not null)
                     {
+                        if (!await Features.Enabled(db, "smart-collections"))
+                            return Results.Forbid();
                         var collection = await db.Collections.SingleOrDefaultAsync(x =>
                             x.Id == collectionId && x.UserId == uid
                         );

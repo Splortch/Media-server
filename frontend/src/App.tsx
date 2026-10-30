@@ -14,6 +14,13 @@ import {
 } from './services/api';
 import Player from './components/Player';
 import Icon from './components/Icon';
+import TitleDetails from './components/TitleDetails';
+import {
+  featureVisible,
+  loadFeatures,
+  unavailableFeatures,
+  type FeatureState,
+} from './services/features';
 import Settings from './pages/Settings';
 import { History, type Collection } from './features/Personal';
 type User = { name: string; role: string };
@@ -24,12 +31,21 @@ export default function App() {
     'loading' | 'setup' | 'login' | 'ready' | 'offline'
   >('loading');
   const [user, setUser] = useState<User>();
+  const [features, setFeatures] = useState<FeatureState>(unavailableFeatures);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   const [route, setRoute] = useState(location.hash.slice(1) || 'home');
   const [items, setItems] = useState<Media[]>([]);
   const [progress, setProgress] = useState<Progress[]>([]);
   const [item, setItem] = useState<Media>();
+  const [playFrom, setPlayFrom] = useState<number>();
+  const [playBusy, setPlayBusy] = useState(false);
+  const [returnTo, setReturnTo] = useState({
+    route: 'library',
+    mediaId: 0,
+    scroll: 0,
+  });
+  const restoreList = useRef(false);
   const focusedRoute = useRef('');
   const requestEpoch = useRef(0);
   const [watching, setWatching] = useState<Media[]>([]);
@@ -45,6 +61,29 @@ export default function App() {
     mediaCount: number;
     libraryCount: number;
   }>();
+  function changeFeatures(state: FeatureState) {
+    setFeatures(state);
+    if (!featureVisible(state, 'smart-collections')) setCollection('');
+  }
+  useEffect(() => {
+    if (phase !== 'ready') return;
+    let active = true;
+    const refresh = () => {
+      void loadFeatures()
+        .then((state) => {
+          if (active) changeFeatures(state);
+        })
+        .catch(() => {
+          if (active) changeFeatures(unavailableFeatures);
+        });
+    };
+    refresh();
+    window.addEventListener('focus', refresh);
+    return () => {
+      active = false;
+      window.removeEventListener('focus', refresh);
+    };
+  }, [phase]);
   useEffect(() => {
     let active = true;
     (async () => {
@@ -80,12 +119,17 @@ export default function App() {
     resetCsrf();
     setPhase('login');
     setUser(undefined);
+    setFeatures(unavailableFeatures);
     setServer(undefined);
     setError('');
     setMoreBusy(false);
     setItems([]);
     setProgress([]);
     setItem(undefined);
+    setPlayFrom(undefined);
+    setPlayBusy(false);
+    setReturnTo({ route: 'library', mediaId: 0, scroll: 0 });
+    restoreList.current = false;
     setWatching([]);
     setCollections([]);
     setNextCursor(null);
@@ -100,10 +144,13 @@ export default function App() {
   }, [query]);
   useEffect(() => {
     const change = () => {
+      requestEpoch.current++;
       setRoute(location.hash.slice(1) || 'home');
       setLoading(true);
       setError('');
       setItem(undefined);
+      setPlayFrom(undefined);
+      setPlayBusy(false);
     };
     window.addEventListener('hashchange', change);
     window.addEventListener('session-expired', endSession);
@@ -198,7 +245,17 @@ export default function App() {
     const key = phase + ':' + route;
     if (phase === 'ready' && !loading) {
       if (focusedRoute.current !== key) {
-        mainRef.current?.focus();
+        if (restoreList.current && route === returnTo.route) {
+          const card = document.querySelector<HTMLElement>(
+            `[data-media-id="${returnTo.mediaId}"]`,
+          );
+          (card ?? mainRef.current)?.focus({ preventScroll: true });
+          window.scrollTo({
+            top: returnTo.scroll,
+            behavior: 'instant',
+          });
+          restoreList.current = false;
+        } else mainRef.current?.focus();
         focusedRoute.current = key;
       }
       document.title = `${route === 'settings' ? 'Settings' : route === 'history' ? 'Watch history' : item?.title || (route === 'library' ? 'Library' : 'Home')} · Media Server`;
@@ -209,7 +266,7 @@ export default function App() {
       }
       document.title = `${phase === 'setup' ? 'Set up your server' : 'Sign in'} · Media Server`;
     }
-  }, [phase, route, loading, item]);
+  }, [phase, route, loading, item, returnTo]);
   async function authenticate(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     const f = new FormData(e.currentTarget);
@@ -244,6 +301,24 @@ export default function App() {
       setError((e as Error).message);
     }
   }
+  async function beginPlayback(resume: boolean) {
+    if (!item || playBusy) return;
+    const epoch = requestEpoch.current;
+    const id = item.id;
+    setPlayBusy(true);
+    setError('');
+    try {
+      const fresh = await api<Progress[]>('/progress?mediaIds=' + id);
+      if (epoch !== requestEpoch.current) return;
+      const current = fresh.find((p) => p.mediaItemId === id);
+      setProgress(fresh);
+      setPlayFrom(resume && !current?.completed ? (current?.seconds ?? 0) : 0);
+    } catch (e) {
+      if (epoch === requestEpoch.current) setError((e as Error).message);
+    } finally {
+      if (epoch === requestEpoch.current) setPlayBusy(false);
+    }
+  }
   const position = (id: number) =>
     progress.find((p) => p.mediaItemId === id)?.seconds || 0;
   const cards = (list: Media[]) => (
@@ -252,6 +327,10 @@ export default function App() {
         <a
           className={`media-card tone-${i % 4}`}
           href={`#media/${m.id}`}
+          data-media-id={m.id}
+          onClick={() => {
+            setReturnTo({ route, mediaId: m.id, scroll: window.scrollY });
+          }}
           key={m.id}
         >
           <div className="cover">
@@ -262,7 +341,7 @@ export default function App() {
               {m.title.slice(0, 1).toUpperCase()}
             </span>
             <span className="play-symbol" aria-hidden="true">
-              <Icon name="play" />
+              <Icon name="arrow" />
             </span>
             {position(m.id) > 0 && (
               <progress
@@ -421,13 +500,15 @@ export default function App() {
           >
             <Icon name="settings" /> <span>Settings</span>
           </a>
-          <a
-            aria-current={route === 'history' ? 'page' : undefined}
-            className={route === 'history' ? 'active' : ''}
-            href="#history"
-          >
-            <Icon name="history" /> <span>Watch history</span>
-          </a>
+          {featureVisible(features, 'watch-history') && (
+            <a
+              aria-current={route === 'history' ? 'page' : undefined}
+              className={route === 'history' ? 'active' : ''}
+              href="#history"
+            >
+              <Icon name="history" /> <span>Watch history</span>
+            </a>
+          )}
         </nav>
         <div className="sidebar-bottom">
           <div className="connection-label">
@@ -476,26 +557,45 @@ export default function App() {
               {error}
             </p>
           )}
-          {loading && <p role="status">Loading your collection…</p>}
+          {loading && !(query && (route === 'home' || route === 'library')) && (
+            <p role="status">Loading your collection…</p>
+          )}
           {route === 'settings' ? (
-            <Settings admin={user?.role === 'Admin'} />
+            <Settings
+              admin={user?.role === 'Admin'}
+              features={features}
+              onFeaturesChanged={changeFeatures}
+            />
           ) : route === 'history' ? (
             <History />
           ) : route.startsWith('media/') ? (
             item && (
               <>
-                <a href="#library" className="back-link">
-                  <Icon name="back" /> Back to library
+                <a
+                  href={'#' + returnTo.route}
+                  className="back-link"
+                  onClick={() => {
+                    document.querySelector('video')?.pause();
+                    restoreList.current = true;
+                  }}
+                >
+                  <Icon name="back" /> Back to collection
                 </a>
-                <div className="detail-heading">
-                  <p className="eyebrow">FROM YOUR COLLECTION</p>
+                {playFrom === undefined ? (
+                  <TitleDetails
+                    item={item}
+                    resume={
+                      progress.find((p) => p.mediaItemId === item.id)?.completed
+                        ? 0
+                        : position(item.id)
+                    }
+                    busy={playBusy}
+                    onPlay={() => void beginPlayback(false)}
+                    onResume={() => void beginPlayback(true)}
+                  />
+                ) : (
                   <h1>{item.title}</h1>
-                  <p className="muted">
-                    {duration(item.duration)} · {item.videoCodec.toUpperCase()}{' '}
-                    / {item.audioCodec.toUpperCase() || 'No audio'} ·{' '}
-                    {(item.size / 1024 ** 3).toFixed(2)} GB
-                  </p>
-                </div>
+                )}
                 {user?.role === 'Admin' && (
                   <details className="title-admin">
                     <summary>Manage content rating</summary>
@@ -521,14 +621,18 @@ export default function App() {
                     </label>
                   </details>
                 )}
-                <Player
-                  item={item}
-                  resume={position(item.id)}
-                  progressRevision={
-                    progress.find((p) => p.mediaItemId === item.id)?.revision ??
-                    0
-                  }
-                />
+                {playFrom !== undefined && (
+                  <Player
+                    key={item.id}
+                    item={item}
+                    startPlaying
+                    resume={playFrom}
+                    progressRevision={
+                      progress.find((p) => p.mediaItemId === item.id)
+                        ?.revision ?? 0
+                    }
+                  />
+                )}
               </>
             )
           ) : (
@@ -601,21 +705,23 @@ export default function App() {
                     )}
                   </div>
                   <div className="library-toolbar">
-                    <label>
-                      Smart collection
-                      <select
-                        aria-label="Smart collection"
-                        value={collection}
-                        onChange={(e) => setCollection(e.target.value)}
-                      >
-                        <option value="">All media</option>
-                        {collections.map((c) => (
-                          <option value={c.id} key={c.id}>
-                            {c.name}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
+                    {featureVisible(features, 'smart-collections') && (
+                      <label>
+                        Smart collection
+                        <select
+                          aria-label="Smart collection"
+                          value={collection}
+                          onChange={(e) => setCollection(e.target.value)}
+                        >
+                          <option value="">All media</option>
+                          {collections.map((c) => (
+                            <option value={c.id} key={c.id}>
+                              {c.name}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                    )}
                     <label className="search-label">
                       <span className="sr-only">Search library</span>
                       <Icon name="search" />
@@ -629,7 +735,7 @@ export default function App() {
                   </div>
                 </div>
                 {query && (
-                  <p role="status">
+                  <p role="status" aria-label="Search results">
                     {query !== debouncedQuery || loading
                       ? 'Searching…'
                       : `${items.length} matching videos${nextCursor ? ' loaded' : ''}`}

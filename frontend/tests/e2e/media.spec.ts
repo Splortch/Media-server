@@ -79,7 +79,9 @@ test('setup, accounts, collections, diagnostics, stream ranges and persist resum
   await page.keyboard.press('Tab');
   await expect(page.getByLabel('Search library')).toBeFocused();
   await page.getByLabel('Search library').fill('does-not-exist');
-  await expect(page.getByRole('status')).toHaveText('0 matching videos');
+  await expect(page.getByRole('status', { name: 'Search results' })).toHaveText(
+    '0 matching videos',
+  );
   await expect(page.getByLabel('Search library')).toBeFocused();
   await page.getByLabel('Search library').fill('');
   await expect(
@@ -118,7 +120,25 @@ test('setup, accounts, collections, diagnostics, stream ranges and persist resum
   });
   await page.setViewportSize({ width: 1280, height: 720 });
   await page.emulateMedia({ reducedMotion: 'no-preference' });
+  const earlyStreams: string[] = [];
+  page.on('request', (request) => {
+    if (/\/media\/\d+\/stream|\/playback-sessions/.test(request.url()))
+      earlyStreams.push(request.url());
+  });
   await page.getByRole('heading', { name: 'sample', exact: true }).click();
+  await expect(
+    page.getByRole('region', { name: 'Title information' }),
+  ).toBeVisible();
+  await expect(page.locator('video')).toHaveCount(0);
+  await accessible(page);
+  await page.screenshot({
+    path: 'test-results/visual/title-desktop.png',
+    fullPage: true,
+  });
+  expect(earlyStreams).toHaveLength(0);
+  await page
+    .getByRole('button', { name: 'Play from beginning', exact: true })
+    .click();
   const video = page.getByLabel('sample', { exact: true });
   await expect(video).toBeVisible();
   await accessible(page);
@@ -129,6 +149,10 @@ test('setup, accounts, collections, diagnostics, stream ranges and persist resum
     .poll(() => video.evaluate((v: HTMLVideoElement) => v.readyState))
     .toBeGreaterThanOrEqual(1);
   await expect(video).not.toHaveAttribute('controls');
+  await video.evaluate((v: HTMLVideoElement) => v.pause());
+  await expect(
+    page.getByRole('button', { name: 'Play', exact: true }),
+  ).toBeVisible();
   await page.getByRole('button', { name: 'Mute', exact: true }).click();
   await page.getByRole('button', { name: 'Play', exact: true }).click();
   await expect
@@ -177,6 +201,8 @@ test('setup, accounts, collections, diagnostics, stream ranges and persist resum
   await page.getByLabel('Playback quality').selectOption('-1');
   await page.getByRole('button', { name: 'Direct Play', exact: true }).click();
   await page.reload();
+  await expect(page.locator('video')).toHaveCount(0);
+  await page.getByRole('button', { name: /^Resume from/ }).click();
   await expect
     .poll(() =>
       page
@@ -274,6 +300,59 @@ test('setup, accounts, collections, diagnostics, stream ranges and persist resum
     .getByLabel('Password', { exact: true })
     .fill('test-only-long-password');
   await page.getByRole('button', { name: 'Sign in', exact: true }).click();
+  await page.getByRole('link', { name: 'Settings', exact: true }).click();
+  await page
+    .getByLabel('Show Watch history navigation', { exact: true })
+    .uncheck();
+  await expect(
+    page.getByRole('link', { name: 'Watch history', exact: true }),
+  ).toHaveCount(0);
+  await page.reload();
+  await expect(
+    page.getByLabel('Show Watch history navigation', { exact: true }),
+  ).not.toBeChecked();
+  await expect(
+    page.getByRole('link', { name: 'Watch history', exact: true }),
+  ).toHaveCount(0);
+  await page
+    .getByRole('button', { name: 'Reset visibility to defaults', exact: true })
+    .click();
+  await expect(
+    page.getByRole('link', { name: 'Watch history', exact: true }),
+  ).toBeVisible();
+  await page.getByText('Server-wide availability', { exact: true }).click();
+  await page
+    .getByRole('button', {
+      name: 'Disable Smart collections for everyone',
+      exact: true,
+    })
+    .click();
+  await expect(
+    page.getByLabel('Show Smart collections', { exact: true }),
+  ).toBeDisabled();
+  await page
+    .locator('#settings-customize')
+    .screenshot({ path: 'test-results/visual/customize-settings.png' });
+  await accessible(page);
+  await page.getByRole('link', { name: 'Library', exact: true }).click();
+  await expect(page.getByLabel('Search library')).toBeVisible();
+  await expect(
+    page.getByLabel('Smart collection', { exact: true }),
+  ).toHaveCount(0);
+  await page.getByRole('link', { name: 'Settings', exact: true }).click();
+  await page.getByText('Server-wide availability', { exact: true }).click();
+  await page
+    .getByRole('button', {
+      name: 'Enable Smart collections for everyone',
+      exact: true,
+    })
+    .click();
+  await expect(
+    page.getByRole('button', {
+      name: 'Delete collection Samples',
+      exact: true,
+    }),
+  ).toBeVisible();
   await page.getByRole('link', { name: 'Library', exact: true }).click();
   await expect(
     page.getByRole('heading', { name: 'Media library', exact: true }),
@@ -283,6 +362,10 @@ test('setup, accounts, collections, diagnostics, stream ranges and persist resum
   const { unlink } = await import('node:fs/promises');
   await unlink(path.join(media, 'sample.webm'));
   await page.reload();
+  await expect(page.locator('video')).toHaveCount(0);
+  await page
+    .getByRole('button', { name: 'Play from beginning', exact: true })
+    .click();
   await expect(page.getByRole('alert')).toContainText(
     'server cannot read this media file',
   );

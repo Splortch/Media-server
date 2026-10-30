@@ -79,6 +79,9 @@ test('track controls expose instructions and support keyboard selection', async 
   const items = await connect(page);
   const item = items.find((x) => x.title === 'bandwidth')!;
   await page.goto(`/#media/${item.id}`);
+  await page
+    .getByRole('button', { name: 'Play from beginning', exact: true })
+    .click();
   const summary = page.getByText('Quality, audio and subtitles', {
     exact: true,
   });
@@ -139,8 +142,15 @@ test('measure bandwidth adaptation, rebuffering and accessible track selection',
   const item = items.find((x) => x.title === 'bandwidth')!;
   expect(item).toBeTruthy();
   await page.goto(`/#media/${item.id}`);
+  await page
+    .getByRole('button', { name: 'Play from beginning', exact: true })
+    .click();
   const video = page.getByLabel('bandwidth', { exact: true });
   await expect(video).toBeVisible();
+  await expect
+    .poll(() => video.evaluate((v: HTMLVideoElement) => v.readyState))
+    .toBeGreaterThanOrEqual(1);
+  await video.evaluate((v: HTMLVideoElement) => v.pause());
   await page.getByText('Quality, audio and subtitles', { exact: true }).click();
   const subtitles = page.getByLabel('Subtitles', { exact: true });
   await expect(subtitles).toContainText('swe');

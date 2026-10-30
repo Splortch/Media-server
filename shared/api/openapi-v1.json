@@ -1468,6 +1468,110 @@
           }
         }
       }
+    },
+    "/api/v1/features": {
+      "get": {
+        "tags": [
+          "Features"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FeatureState"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/features/{key}": {
+      "put": {
+        "tags": [
+          "Api"
+        ],
+        "parameters": [
+          {
+            "name": "key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FeaturePolicyInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FeatureState"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/preferences/features": {
+      "put": {
+        "tags": [
+          "Api"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FeatureVisibilityInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FeatureState"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Api"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FeatureState"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -1838,6 +1942,82 @@
           },
           "diagnostic": {
             "type": "string"
+          }
+        }
+      },
+      "FeatureCapability": {
+        "required": [
+          "key",
+          "name",
+          "enabled",
+          "visible",
+          "hidden",
+          "serverConfigurable"
+        ],
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "visible": {
+            "type": "boolean"
+          },
+          "hidden": {
+            "type": "boolean"
+          },
+          "serverConfigurable": {
+            "type": "boolean"
+          }
+        }
+      },
+      "FeaturePolicyInput": {
+        "required": [
+          "enabled"
+        ],
+        "type": "object",
+        "properties": {
+          "enabled": {
+            "type": [
+              "null",
+              "boolean"
+            ]
+          }
+        }
+      },
+      "FeatureState": {
+        "required": [
+          "features"
+        ],
+        "type": "object",
+        "properties": {
+          "features": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FeatureCapability"
+            }
+          }
+        }
+      },
+      "FeatureVisibilityInput": {
+        "required": [
+          "hidden"
+        ],
+        "type": "object",
+        "properties": {
+          "hidden": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "type": "string"
+            }
           }
         }
       },
@@ -2617,6 +2797,9 @@
   "tags": [
     {
       "name": "Api"
+    },
+    {
+      "name": "Features"
     }
   ]
 }
