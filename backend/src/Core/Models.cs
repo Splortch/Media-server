@@ -162,3 +162,15 @@ public class SmartCollection
     public int? LibraryId { get; set; }
     public string? VideoCodec { get; set; }
 }
+
+public class FeaturePolicy
+{
+    public string Key { get; set; } = "";
+    public bool Enabled { get; set; } = true;
+}
+
+public class FeatureVisibility
+{
+    public int UserId { get; set; }
+    public string Key { get; set; } = "";
+}

@@ -22,11 +22,13 @@ import {
 } from '../../../shared/api/src/client';
 import Player from '../../../frontend/src/components/Player';
 import Icon from '../../../frontend/src/components/Icon';
+import TitleDetails from '../../../frontend/src/components/TitleDetails';
 import { duration } from '../../../frontend/src/services/api';
 type Selection = {
   item: Detail;
   progress: ProgressState;
-  url: string;
+  url?: string;
+  startAt?: number;
   tracks: Tracks;
   writer: ProgressWriter;
 };
@@ -43,6 +45,7 @@ function MediaCards({
         <button
           className={`media-card desktop-card tone-${i % 4}`}
           key={m.id}
+          data-media-id={m.id}
           onClick={() => void onOpen(m)}
         >
           <div className="cover">
@@ -50,7 +53,7 @@ function MediaCards({
               {m.title[0]}
             </span>
             <span className="play-symbol" aria-hidden="true">
-              <Icon name="play" />
+              <Icon name="arrow" />
             </span>
           </div>
           <h3>{m.title}</h3>
@@ -92,6 +95,9 @@ export default function App() {
   const [watching, setWatching] = useState<ProgressState[]>([]);
   const [continueItems, setContinueItems] = useState<Detail[]>([]);
   const [selection, setSelection] = useState<Selection>();
+  const detailHeading = useRef<HTMLHeadingElement>(null);
+  const listContext = useRef({ id: 0, scroll: 0 });
+  const restoreList = useRef(false);
   const [sessions, setSessions] = useState<SessionInfo[]>([]);
   const [view, setView] = useState<'library' | 'settings'>('library');
   const [search, setSearch] = useState('');
@@ -104,6 +110,19 @@ export default function App() {
     undefined,
   );
   const loadVersion = useRef(0);
+  useEffect(() => {
+    if (selection && !selection.url) detailHeading.current?.focus();
+    else if (!selection && restoreList.current && !busy) {
+      document
+        .querySelector<HTMLElement>(
+          `[data-media-id="${listContext.current.id}"]`,
+        )
+        ?.focus({ preventScroll: true });
+      window.scrollTo({ top: listContext.current.scroll, behavior: 'instant' });
+      restoreList.current = false;
+    }
+  }, [selection, busy]);
+
   useEffect(() => {
     mounted.current = true;
     preferences()
@@ -284,25 +303,49 @@ export default function App() {
     }
   }
   async function open(item: Media | Detail) {
-    const requestVersion = loadVersion.current;
+    const requestVersion = ++loadVersion.current;
+    listContext.current = { id: item.id, scroll: window.scrollY };
     setBusy(true);
     setError('');
     try {
-      const [detail, progress, url, tracks] = await Promise.all([
+      const [detail, progress, tracks] = await Promise.all([
         api.detail(item.id),
         api.progress(item.id),
-        api.transport.streamUrl(item.id),
         api.tracks(item.id),
       ]);
       if (requestVersion !== loadVersion.current) return;
       setSelection({
         item: detail,
         progress,
-        url,
         tracks,
         writer: new ProgressWriter(api, item.id, progress.revision),
       });
       setOnline(true);
+    } catch (e) {
+      if (requestVersion === loadVersion.current) failure(e);
+    } finally {
+      if (requestVersion === loadVersion.current) setBusy(false);
+    }
+  }
+  async function beginPlayback(resume: boolean) {
+    if (!selection || busy) return;
+    const requestVersion = loadVersion.current;
+    const id = selection.item.id;
+    setBusy(true);
+    setError('');
+    try {
+      const [url, progress] = await Promise.all([
+        api.transport.streamUrl(id),
+        api.progress(id),
+      ]);
+      if (requestVersion !== loadVersion.current) return;
+      setSelection({
+        ...selection,
+        url,
+        progress,
+        startAt: resume && !progress.completed ? progress.seconds : 0,
+        writer: new ProgressWriter(api, id, progress.revision),
+      });
     } catch (e) {
       if (requestVersion === loadVersion.current) failure(e);
     } finally {
@@ -319,7 +362,9 @@ export default function App() {
         setError(errorMessage(e));
       }
     }
+    ++loadVersion.current;
     setSelection(undefined);
+    restoreList.current = true;
     await load();
   }
   async function signOut() {
@@ -524,36 +569,47 @@ export default function App() {
               <button className="text-button" onClick={() => void back()}>
                 <Icon name="back" /> Back to library
               </button>
-              <h1>{selection.item.title}</h1>
-              <p className="muted">
-                Video · {duration(selection.item.duration)} ·{' '}
-                {selection.item.videoCodec} / {selection.item.audioCodec}
-              </p>
-              <Player
-                key={selection.item.id}
-                item={selection.item}
-                resume={
-                  selection.progress.completed ? 0 : selection.progress.seconds
-                }
-                progressRevision={selection.progress.revision}
-                streamUrl={selection.url}
-                playbackTransport={{
-                  request: playbackRequest,
-                  fileUrl: playbackFileUrl,
-                  directUrl: selection.url,
-                }}
-                onSaveProgress={(seconds, completed) =>
-                  selection.writer.save(seconds, completed)
-                }
-                onPlaybackError={async () => {
-                  await api.report(
-                    selection.item.id,
-                    'unknown',
-                    `${clientPlatform}-${playerEngine.toLowerCase()}`,
-                  );
-                  await api.me();
-                }}
-              />
+              {selection.url && <h1>{selection.item.title}</h1>}
+              {!selection.url && (
+                <TitleDetails
+                  item={selection.item}
+                  headingRef={detailHeading}
+                  resume={
+                    selection.progress.completed
+                      ? 0
+                      : selection.progress.seconds
+                  }
+                  busy={busy}
+                  onPlay={() => void beginPlayback(false)}
+                  onResume={() => void beginPlayback(true)}
+                />
+              )}
+              {selection.url && (
+                <Player
+                  startPlaying
+                  key={selection.item.id}
+                  item={selection.item}
+                  resume={selection.startAt ?? 0}
+                  progressRevision={selection.progress.revision}
+                  streamUrl={selection.url}
+                  playbackTransport={{
+                    request: playbackRequest,
+                    fileUrl: playbackFileUrl,
+                    directUrl: selection.url,
+                  }}
+                  onSaveProgress={(seconds, completed) =>
+                    selection.writer.save(seconds, completed)
+                  }
+                  onPlaybackError={async () => {
+                    await api.report(
+                      selection.item.id,
+                      'unknown',
+                      `${clientPlatform}-${playerEngine.toLowerCase()}`,
+                    );
+                    await api.me();
+                  }}
+                />
+              )}
               <details className="panel">
                 <summary>File and track details</summary>
                 <ul>

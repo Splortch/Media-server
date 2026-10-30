@@ -86,6 +86,7 @@ public static class ClientV1
                             "accounts",
                             "prefix-search",
                             "smart-collections",
+                            "optional-features",
                             "library-reconciliation",
                             "monitoring",
                             "maintenance-v1",
