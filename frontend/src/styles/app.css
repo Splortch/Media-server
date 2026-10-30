@@ -1045,6 +1045,11 @@ details[open] > summary {
   min-width: 90px;
   padding: 10px 16px;
 }
+.player-buttons .player-play:hover {
+  background: #d7eac3;
+  border-color: #d7eac3;
+  color: #1d2d17;
+}
 .player-transport {
   gap: 6px;
 }

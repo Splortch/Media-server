@@ -524,7 +524,9 @@ export default function App() {
               {error}
             </p>
           )}
-          {loading && <p role="status">Loading your collection…</p>}
+          {loading && !(query && (route === 'home' || route === 'library')) && (
+            <p role="status">Loading your collection…</p>
+          )}
           {route === 'settings' ? (
             <Settings admin={user?.role === 'Admin'} />
           ) : route === 'history' ? (
@@ -694,7 +696,7 @@ export default function App() {
                   </div>
                 </div>
                 {query && (
-                  <p role="status">
+                  <p role="status" aria-label="Search results">
                     {query !== debouncedQuery || loading
                       ? 'Searching…'
                       : `${items.length} matching videos${nextCursor ? ' loaded' : ''}`}
