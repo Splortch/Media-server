@@ -351,7 +351,7 @@ export default function Player({
                 aria-label="Rewind 10 seconds"
               >
                 <Icon name="rewind" />{' '}
-                <span className="control-caption">10s</span>
+                <span className="control-caption">10 seconds</span>
               </button>
               <button
                 type="button"
@@ -360,7 +360,7 @@ export default function Player({
                 aria-label="Forward 10 seconds"
               >
                 <Icon name="forward" />{' '}
-                <span className="control-caption">10s</span>
+                <span className="control-caption">10 seconds</span>
               </button>
             </div>
             <div
