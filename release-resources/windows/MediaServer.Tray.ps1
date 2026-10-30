@@ -192,7 +192,12 @@ try {
     $hint.Text = 'Stopping interrupts playback on all devices. Closing this window keeps the tray control available.'
     $hint.SetBounds(24, 211, 488, 35)
     $control.Controls.AddRange(@($heading, $controlStatus, $startButton, $stopButton, $restartButton, $openButton, $hint))
-    $control.add_FormClosing({ param($sender, $eventArgs) $eventArgs.Cancel = $true; $sender.Hide() })
+    $control.add_FormClosing({
+        param($sender, $eventArgs)
+        if ($eventArgs.CloseReason -eq [Windows.Forms.CloseReason]::UserClosing) {
+            $eventArgs.Cancel = $true; $sender.Hide()
+        } else { $context.ExitThread() }
+    })
     function Update-ControlStatus {
         $running = $script:server -and -not $script:server.HasExited
         $controlStatus.Text = if ($running) { 'Running - http://127.0.0.1:5050' } else { 'Stopped - select Start server to go online again.' }
