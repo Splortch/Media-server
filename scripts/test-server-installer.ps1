@@ -62,6 +62,23 @@ try {
     # Do not overwrite files or remove an application while either lease is held.
     Run-Installer $Installer '/S' 2
     Run-Installer (Join-Path $install 'Uninstall.exe') ('/S _?=' + $install) 2
+    # Explicit update consent closes the live owned backend AND its controller.
+    $oldHost = $hostProcess
+    Run-Installer $Installer '/S /CLOSESERVER'
+    if (-not $oldHost.WaitForExit(15000)) { throw 'Opted-in running update left the old controller alive.' }
+    $hostProcess = Start-Tray
+    & python scripts/test-installed-server.py $data $media verify
+    if ($LASTEXITCODE -ne 0) { throw 'Running update lost the account/library/progress.' }
+    # Reject downgrades before stopping a working server, even with shutdown consent.
+    $registration = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\Splortch.MediaServer'
+    $installedNumber = (Get-ItemProperty $registration).ReleaseNumber
+    if ($installedNumber -lt 65535) {
+        try {
+            Set-ItemProperty $registration -Name ReleaseNumber -Value ($installedNumber + 1)
+            Run-Installer $Installer '/S /CLOSESERVER' 4
+            if ($hostProcess.HasExited) { throw 'A rejected downgrade stopped the controller.' }
+        } finally { Set-ItemProperty $registration -Name ReleaseNumber -Value $installedNumber }
+    }
     # Exercise the same local commands used by the control window/tray. Stop
     # leaves the controller alive so it can start the server again without login.
     foreach ($action in @('Stop', 'Start', 'Restart')) {
@@ -85,6 +102,21 @@ try {
             if ($LASTEXITCODE -ne 0) { throw "Persisted account/library/progress failed after $action" }
         }
     }
+    # Stopping playback leaves the controller lock held: update must close that too.
+    & $ps -NoProfile -ExecutionPolicy Bypass -File $trayScript -Command Stop
+    $stopped = $false
+    for ($attempt = 0; $attempt -lt 30; $attempt++) {
+        $healthy = $false
+        try { $healthy = (Invoke-RestMethod 'http://127.0.0.1:5050/health' -TimeoutSec 1).status -eq 'ok' } catch {}
+        if (-not $healthy) { $stopped = $true; break }; Start-Sleep -Seconds 1
+    }
+    if (-not $stopped -or $hostProcess.HasExited) { throw 'Stopped-controller update fixture was not ready.' }
+    $oldHost = $hostProcess
+    Run-Installer $Installer '/S /CLOSESERVER'
+    if (-not $oldHost.WaitForExit(15000)) { throw 'Update failed to close the stopped controller.' }
+    $hostProcess = Start-Tray
+    & python scripts/test-installed-server.py $data $media verify
+    if ($LASTEXITCODE -ne 0) { throw 'Stopped-controller update lost persisted data.' }
     Stop-Tray $hostProcess; $hostProcess = $null
     # A separately launched backend must remain untouched by an observing control.
     $env:MediaServer__DataDirectory = $data
@@ -103,7 +135,10 @@ try {
         $hostProcess = Start-Tray
         Start-Sleep -Seconds 3
         if ($hostProcess.HasExited) { throw 'Control failed to open alongside an external server.' }
-        Stop-Tray $hostProcess; $hostProcess = $null
+        # Consent may close our observing controller, but cannot stop an external backend.
+        Run-Installer $Installer '/S /CLOSESERVER' 2
+        if (-not $hostProcess.WaitForExit(15000)) { throw 'External observer did not close.' }
+        $hostProcess = $null
         if ($external.HasExited) { throw 'Control terminated a server it did not own.' }
         & python scripts/test-installed-server.py $data $media verify
         if ($LASTEXITCODE -ne 0) { throw 'External backend was not usable after exiting control.' }
