@@ -20,6 +20,17 @@ with tempfile.TemporaryDirectory(prefix='media release smoke ') as temporary:
     folder = Path(temporary).resolve()
     shutil.unpack_archive(archives[0], folder / 'unpacked')
     package, = (folder / 'unpacked').iterdir()
+    inventory = json.loads((package / 'inventory/SBOM.spdx.json').read_text(encoding='utf-8'))
+    evidence = json.loads((package / 'inventory/THIRD-PARTY-INVENTORY.json').read_text(encoding='utf-8'))
+    if inventory['spdxVersion'] != 'SPDX-2.3' or not inventory['packages'] or evidence['runtime'] != os.environ['RID']:
+        raise RuntimeError('Packaged dependency inventory is missing or mismatched')
+    if inventory['name'] != 'MediaServer-' + evidence['runtime']:
+        raise RuntimeError('SBOM runtime does not match package')
+    for component in evidence['components']:
+        for notice in component['notices']:
+            path = (package / 'inventory' / notice).resolve()
+            if not path.is_relative_to((package / 'inventory/license-evidence').resolve()) or not path.is_file():
+                raise RuntimeError('Packaged license evidence is incomplete')
     executable = package / ('Api.exe' if os.name == 'nt' else 'Api')
     if os.name != 'nt' and (not os.access(executable, os.X_OK) or not os.access(package / ('Start-MediaServer.command' if sys.platform == 'darwin' else 'start-media-server.sh'), os.X_OK)):
         raise RuntimeError('Linux archive did not preserve executable permissions')
