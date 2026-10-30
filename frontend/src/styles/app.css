@@ -1077,7 +1077,6 @@ details[open] > summary {
 }
 @keyframes surface-in {
   from {
-    opacity: 0.25;
     transform: translateY(8px);
   }
   to {
@@ -1087,7 +1086,6 @@ details[open] > summary {
 }
 @keyframes card-in {
   from {
-    opacity: 0.3;
     transform: translateY(12px);
   }
   to {
