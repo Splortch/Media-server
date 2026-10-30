@@ -47,3 +47,16 @@ Ubuntu FFmpeg with its own license configuration, package inventory and correspo
 archive. See docs/deployment/RELEASES.md in the source repository for distribution details,
 checksums, source commit and the complete installation/update guide.
 
+
+## Dependency inventory
+
+Native server archives and installers include `inventory/SBOM.spdx.json`, an
+SPDX 2.3 dependency metadata inventory, and `THIRD-PARTY-INVENTORY.json` with copied
+license/notice evidence. These are generated from the exact restored NuGet graph
+and installed production browser packages before packaging. Archive checksums
+cover these files too. The inventory includes NuGet build/design packages, so
+listing a dependency does not establish that its code is redistributed. Microsoft
+runtime/OS components and native client dependencies are not fully inventoried by
+this first generator. Native server packages do not bundle FFmpeg; separately
+downloaded tools have their own notices. Container package/source evidence is
+published separately. See [distribution evidence](DISTRIBUTION-EVIDENCE.md).
