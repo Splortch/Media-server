@@ -240,9 +240,14 @@ try {
             foreach ($action in @('Start', 'Stop', 'Restart', 'Show')) {
                 if ($commandSignals[$action].WaitOne(0)) {
                     if ($action -eq 'Show') { & $showControl }
-                    elseif ($action -eq 'Start') { $startButton.PerformClick() }
-                    elseif ($action -eq 'Stop') { $stopButton.PerformClick() }
-                    elseif ($action -eq 'Restart') { $restartButton.PerformClick() }
+                    else {
+                        # WinForms PerformClick requires a visible parent. Reveal
+                        # the controller for explicit local control commands.
+                        & $showControl
+                        if ($action -eq 'Start') { $startButton.PerformClick() }
+                        elseif ($action -eq 'Stop') { $stopButton.PerformClick() }
+                        elseif ($action -eq 'Restart') { $restartButton.PerformClick() }
+                    }
                 }
             }
             if ($server.HasExited -and -not $expectedStopped -and -not $unexpectedReported) {
