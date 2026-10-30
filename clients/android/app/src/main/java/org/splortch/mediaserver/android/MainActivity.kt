@@ -22,7 +22,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.text.input.KeyboardType
@@ -57,32 +56,7 @@ class MainActivity : ComponentActivity() {
                 else window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
             }
             BackHandler(screen.detail != null) { model.back() }
-            MaterialTheme(
-                colorScheme =
-                    darkColorScheme(
-                        primary = Color(0xFFC5DFA8),
-                        onPrimary = Color(0xFF1D2D17),
-                        primaryContainer = Color(0xFF2A3824),
-                        onPrimaryContainer = Color(0xFFD7EAC3),
-                        secondary = Color(0xFFB8CBA9),
-                        onSecondary = Color(0xFF1D2D17),
-                        secondaryContainer = Color(0xFF303E2D),
-                        onSecondaryContainer = Color(0xFFE6EFDD),
-                        background = Color(0xFF111512),
-                        onBackground = Color(0xFFEEF2E9),
-                        surface = Color(0xFF1A201B),
-                        onSurface = Color(0xFFEEF2E9),
-                        surfaceVariant = Color(0xFF273127),
-                        onSurfaceVariant = Color(0xFFB8C5B1),
-                        outline = Color(0xFF788A70),
-                        outlineVariant = Color(0xFF3D4B38),
-                    ),
-                shapes = Shapes(
-                    small = RoundedCornerShape(12.dp),
-                    medium = RoundedCornerShape(18.dp),
-                    large = RoundedCornerShape(24.dp),
-                ),
-            ) {
+            MediaTheme {
                 Surface(Modifier.fillMaxSize()) {
                     if (screen.fullscreen && player != null) {
                         Box(Modifier.fillMaxSize()) {
@@ -222,7 +196,10 @@ class MainActivity : ComponentActivity() {
                                 item {
                                     val current = player
                                     if (current == null)
-                                        Button(onClick = model::play, enabled = !screen.busy) {
+                                        GradientButton(
+                                            onClick = model::play,
+                                            enabled = !screen.busy,
+                                        ) {
                                             Text("Play / resume")
                                         }
                                     else {
@@ -316,7 +293,7 @@ class MainActivity : ComponentActivity() {
                                                 )
                                             }
                                         }
-                                        Button(
+                                        GradientButton(
                                             onClick = model::prepareHls,
                                             enabled = !screen.busy,
                                         ) {
@@ -392,7 +369,9 @@ private fun ConnectionScreen(saved: String, busy: Boolean, connect: (String, Boo
             Checkbox(rememberSession, { rememberSession = it })
             Text("Remember this session on this device", Modifier.padding(top = 12.dp))
         }
-        Button(onClick = { connect(address, rememberSession) }, enabled = !busy) { Text("Connect") }
+        GradientButton(onClick = { connect(address, rememberSession) }, enabled = !busy) {
+            Text("Connect")
+        }
         Text(
             "Use https://your-server.example. For private USB testing: adb reverse tcp:5050 tcp:5050, then http://127.0.0.1:5050. LAN HTTP is blocked.",
             style = MaterialTheme.typography.bodySmall,
@@ -424,7 +403,7 @@ private fun LoginScreen(server: String, busy: Boolean, login: (String, String) -
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
             modifier = Modifier.fillMaxWidth(),
         )
-        Button(
+        GradientButton(
             onClick = {
                 val supplied = password
                 password = ""
@@ -449,7 +428,7 @@ private fun SearchScreen(screen: Screen, model: MediaViewModel) {
             singleLine = true,
             modifier = Modifier.fillMaxWidth(),
         )
-        Button(onClick = { model.search(prefix) }, enabled = !screen.busy) { Text("Search") }
+        GradientButton(onClick = { model.search(prefix) }, enabled = !screen.busy) { Text("Search") }
         Row(
             Modifier.horizontalScroll(rememberScrollState()),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -490,12 +469,7 @@ private fun MediaCard(media: MediaSummary, enabled: Boolean, open: () -> Unit) {
                 Modifier.size(width = 52.dp, height = 68.dp)
                     .clip(RoundedCornerShape(10.dp))
                     .background(
-                        Brush.linearGradient(
-                            listOf(
-                                MaterialTheme.colorScheme.primaryContainer,
-                                MaterialTheme.colorScheme.surfaceVariant,
-                            )
-                        )
+                        Brush.linearGradient(MediaColors.Gradient)
                     )
                     .clearAndSetSemantics {},
                 contentAlignment = Alignment.Center,
@@ -503,7 +477,7 @@ private fun MediaCard(media: MediaSummary, enabled: Boolean, open: () -> Unit) {
                 Text(
                     media.title.take(1).uppercase(),
                     style = MaterialTheme.typography.headlineSmall,
-                    color = MaterialTheme.colorScheme.primary,
+                    color = MediaColors.Ink,
                 )
             }
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {

@@ -13,20 +13,39 @@
   font-synthesis: none;
   color-scheme: dark;
   font-weight: 400;
-  --bg: #111512;
-  --sidebar: #151a16;
-  --surface: #1a201b;
-  --surface-raised: #222a23;
-  --field: #131914;
-  --text: #eef2e9;
-  --muted: #a2ada0;
-  --border: #343e34;
-  --accent: #c5dfa8;
-  --accent-hover: #d7eac3;
-  --accent-ink: #1d2d17;
-  --accent-tint: #2a3824;
+  --bg: #080f17;
+  --sidebar: #0c1721;
+  --surface: #111f2b;
+  --surface-raised: #182b38;
+  --field: #0b1721;
+  --text: #effbff;
+  --muted: #abc2ce;
+  --border: #304958;
+  --accent: #2be0a0;
+  --accent-hover: #b5ffdb;
+  --accent-ink: #061a23;
+  --accent-tint: #163b3b;
   --danger: #ffb3bd;
   --danger-bg: #40252d;
+  --cyan: #00b8ff;
+  --mint: #2be0a0;
+  --lime: #c6ff3d;
+  --yellow: #ffe53b;
+  --action-gradient: linear-gradient(
+    110deg,
+    var(--cyan),
+    var(--mint) 43%,
+    var(--lime) 78%,
+    var(--yellow)
+  );
+  --action-gradient-hover: linear-gradient(
+    110deg,
+    #36c7ff,
+    #5bebb8 43%,
+    #d7ff79 78%,
+    #ffed79
+  );
+  --nav-gradient: linear-gradient(110deg, #00b8ff1c, #2be0a01c 58%, #c6ff3d12);
   --radius: 18px;
   --ease: cubic-bezier(0.2, 0.7, 0.2, 1);
 }
@@ -59,7 +78,7 @@ button,
   border: 1px solid transparent;
   border-radius: 11px;
   padding: 11px 18px;
-  background: var(--accent);
+  background: var(--action-gradient);
   color: var(--accent-ink);
   font-size: 13px;
   line-height: 1.4;
@@ -73,7 +92,7 @@ button,
 }
 button:hover,
 .button:hover {
-  background: var(--accent-hover);
+  background: var(--action-gradient-hover);
   transform: translateY(-1px);
 }
 button:active,
@@ -242,7 +261,9 @@ aside {
   display: flex;
   flex-direction: column;
   padding: 32px 20px 22px;
-  background: var(--sidebar);
+  background:
+    linear-gradient(180deg, #00b8ff07, transparent 45%, #2be0a006),
+    var(--sidebar);
   border-right: 1px solid var(--border);
 }
 .brand {
@@ -259,7 +280,7 @@ aside {
   width: 35px;
   height: 37px;
   border-radius: 11px;
-  background: var(--accent);
+  background: var(--action-gradient);
   color: var(--accent-ink);
   font-size: 22px;
   font-weight: 750;
@@ -304,7 +325,7 @@ nav a:hover,
 nav a.active,
 .desktop-nav button[aria-current='page'] {
   color: var(--accent);
-  background: var(--accent-tint);
+  background: var(--nav-gradient);
   border-color: var(--border);
 }
 .sidebar-bottom {
@@ -406,6 +427,13 @@ h2:focus {
   outline: none;
 }
 .hero {
+  --hero-shade: linear-gradient(
+    90deg,
+    #0e2634 12%,
+    #0e2634ed 45%,
+    #0e263470 72%,
+    #0e263440
+  );
   position: relative;
   overflow: hidden;
   isolation: isolate;
@@ -414,12 +442,14 @@ h2:focus {
   min-height: 350px;
   padding: 42px;
   margin-bottom: 38px;
-  border: 1px solid #4b5a42;
+  border: 1px solid #37606b;
   border-radius: 22px;
-  color: #eef2e9;
+  color: #effbff;
   background:
-    radial-gradient(ellipse at 100% 20%, #46573b, transparent 63%),
-    linear-gradient(120deg, #25352a, #1b251e);
+    var(--hero-shade),
+    radial-gradient(ellipse at 93% 75%, #ffe53b9c, transparent 36%),
+    radial-gradient(ellipse at 75% 22%, #2be0a0ab, transparent 48%),
+    linear-gradient(120deg, #12314a, #00b8ffb8 58%, #c6ff3dad);
   animation: surface-in 0.5s var(--ease) both;
 }
 .hero-copy {
@@ -428,7 +458,7 @@ h2:focus {
   max-width: 70%;
 }
 .hero .eyebrow {
-  color: #c9e3a9;
+  color: #88ffd1;
 }
 .hero h1 {
   margin: 17px 0;
@@ -439,7 +469,7 @@ h2:focus {
 }
 .hero-copy > p:not(.eyebrow) {
   max-width: 440px;
-  color: #c0cbba;
+  color: #c1d9df;
   font-size: 13px;
   line-height: 1.9;
   margin-bottom: 25px;
@@ -453,10 +483,10 @@ h2:focus {
   gap: 24px;
   margin-top: 30px;
   font-size: 11px;
-  color: #c0cbba;
+  color: #c1d9df;
 }
 .hero-stats strong {
-  color: #f2f5eb;
+  color: #effbff;
   font-size: 13px;
   font-weight: 600;
   margin-right: 3px;
@@ -468,20 +498,32 @@ h2:focus {
   transform: translateY(-50%);
   width: 240px;
   height: 240px;
-  opacity: 0.75;
+  opacity: 0.9;
   pointer-events: none;
+}
+.hero-art::before {
+  content: '';
+  position: absolute;
+  inset: -70px -25px;
+  border-radius: 48%;
+  background:
+    repeating-linear-gradient(90deg, #ffffff2b 0 1px, transparent 1px 45px),
+    radial-gradient(ellipse at 25% 25%, #00b8ff9c, transparent 60%),
+    radial-gradient(ellipse at 72% 62%, #c6ff3d8c, transparent 57%);
+  mask-image: radial-gradient(ellipse, #000 35%, transparent 72%);
+  transform: rotate(-12deg);
 }
 .hero-orbit {
   position: absolute;
   inset: -35px;
-  border: 1px solid #b8ce9a28;
+  border: 1px solid #a0ffe52b;
   border-radius: 50%;
 }
 .hero-orbit::before,
 .hero-orbit::after {
   content: '';
   position: absolute;
-  border: 1px solid #b8ce9a23;
+  border: 1px solid #a0ffe523;
   border-radius: 50%;
   inset: 26px;
 }
@@ -493,16 +535,22 @@ h2:focus {
   inset: 29px;
   display: grid;
   place-items: center;
-  border: 1px solid #d1e4b54f;
+  border: 1px solid #c1fff17a;
   border-radius: 38px;
   transform: rotate(-12deg);
-  background: linear-gradient(135deg, #9cba7738, #9cba7708);
-  box-shadow: 18px 24px 35px #07170935;
+  background: linear-gradient(
+    135deg,
+    #00b8ff4d,
+    #2be0a047 48%,
+    #c6ff3d38 80%,
+    #ffe53b21
+  );
+  box-shadow: 18px 24px 35px #03142255;
 }
 .cinema-tile svg {
   width: 65px;
   height: 65px;
-  color: #d5e7b7;
+  color: #d7fff0;
   stroke-width: 0.8;
   transform: rotate(12deg);
 }
@@ -518,7 +566,7 @@ h2:focus {
 .film-lines span {
   height: 5px;
   border-radius: 5px;
-  background: #b1ca9366;
+  background: #c6ff3d8c;
 }
 .film-lines span:nth-child(2) {
   width: 70%;
@@ -603,15 +651,15 @@ h2:focus {
   overflow: hidden;
   isolation: isolate;
   aspect-ratio: 2 / 2.65;
-  border: 1px solid #566455;
+  border: 1px solid #3f6976;
   border-radius: 14px;
   display: flex;
   align-items: center;
   justify-content: center;
   padding: 14px;
   background:
-    radial-gradient(ellipse at 20% 10%, #6c8264, transparent 70%),
-    linear-gradient(145deg, #344a3a, #1b2620);
+    radial-gradient(ellipse at 10% 5%, #00b8ff88, transparent 65%),
+    linear-gradient(145deg, #125274, #176b60 55%, #142b32);
   box-shadow: inset 0 1px 0 #fff1;
   transition:
     border-color 0.2s,
@@ -627,21 +675,21 @@ h2:focus {
 }
 .tone-1 .cover {
   background:
-    radial-gradient(ellipse at 80% 10%, #8c7560, transparent 75%),
-    linear-gradient(145deg, #665342, #29251e);
-  border-color: #74614e;
+    radial-gradient(ellipse at 85% 8%, #c6ff3d85, transparent 70%),
+    linear-gradient(145deg, #126a69, #2a6948 55%, #172c2d);
+  border-color: #5e8369;
 }
 .tone-2 .cover {
   background:
-    radial-gradient(ellipse at 30% 10%, #74778c, transparent 75%),
-    linear-gradient(145deg, #42475d, #232833);
-  border-color: #60657c;
+    radial-gradient(ellipse at 25% 10%, #ffe53b85, transparent 70%),
+    linear-gradient(145deg, #668134, #4a6234 55%, #1c3030);
+  border-color: #7b8850;
 }
 .tone-3 .cover {
   background:
-    radial-gradient(ellipse at 80% 20%, #93757c, transparent 75%),
-    linear-gradient(145deg, #684b58, #30232e);
-  border-color: #7e606c;
+    radial-gradient(ellipse at 85% 10%, #2be0a09c, transparent 70%),
+    linear-gradient(145deg, #125f78, #175c68 55%, #152a35);
+  border-color: #3f7c80;
 }
 .media-card:hover .cover,
 .media-card:focus-visible .cover {
@@ -653,21 +701,21 @@ h2:focus {
   font-size: clamp(68px, 7vw, 110px);
   font-weight: 400;
   line-height: 1;
-  color: #f1f3e973;
-  text-shadow: 1px 3px 20px #09100924;
+  color: #e3fff3a3;
+  text-shadow: 1px 3px 20px #03142233;
   transition: transform 0.4s var(--ease);
 }
 .media-card:hover .monogram {
   transform: scale(1.07);
 }
 .format {
-  background: #101910b8;
+  background: #061a23d9;
   border-radius: 5px;
   padding: 3px 6px;
   position: absolute;
   top: 17px;
   left: 17px;
-  color: #f0f2e9;
+  color: #effbff;
   font-size: 9px;
   font-weight: 550;
   letter-spacing: 1.5px;
@@ -681,8 +729,8 @@ h2:focus {
   width: 40px;
   height: 40px;
   border-radius: 50%;
-  background: #d3e7b8;
-  color: #203118;
+  background: var(--action-gradient);
+  color: #061a23;
   opacity: 0;
   transform: translateY(7px);
   transition:
@@ -710,7 +758,7 @@ h2:focus {
   left: 0;
   width: 100%;
   height: 4px;
-  accent-color: #c5dfa8;
+  accent-color: #2be0a0;
 }
 .panel {
   padding: 26px;
@@ -934,7 +982,7 @@ footer {
   top: -80px;
   left: 20px;
   padding: 12px 20px;
-  background: var(--accent);
+  background: var(--action-gradient);
   color: var(--accent-ink);
   z-index: 20;
   border-radius: 10px;
@@ -981,7 +1029,7 @@ details[open] > summary {
 }
 .player-surface {
   overflow: hidden;
-  background: #080d0a;
+  background: #060c13;
   border: 1px solid var(--border);
   border-radius: var(--radius);
   box-shadow: 0 8px 32px #0002;
@@ -992,8 +1040,8 @@ details[open] > summary {
 }
 .player-controls {
   padding: 18px 20px;
-  color: #eef2e9;
-  background: #1a211c;
+  color: #effbff;
+  background: #101e2a;
 }
 .player-timeline {
   display: flex;
@@ -1002,14 +1050,14 @@ details[open] > summary {
   margin-bottom: 12px;
   font-size: 11px;
   font-variant-numeric: tabular-nums;
-  color: #c2cebe;
+  color: #bfd6df;
 }
 .player-timeline input {
   flex: 1;
   min-width: 40px;
 }
 .player-controls input[type='range'] {
-  accent-color: #c5dfa8;
+  accent-color: #2be0a0;
   border: 0;
   background: transparent;
   padding: 0;
@@ -1031,19 +1079,24 @@ details[open] > summary {
   min-width: 44px;
   padding: 10px;
   min-height: 44px;
-  color: #eaf0e5;
-  background: #29342b;
-  border: 1px solid #485b47;
+  color: #effbff;
+  background: #203746;
+  border: 1px solid #4a6c7d;
 }
 .player-buttons button:hover {
-  background: #354632;
+  background: #2a495b;
 }
 .player-buttons .player-play {
-  color: #1d2d17;
-  background: #c5dfa8;
-  border-color: #c5dfa8;
+  color: #061a23;
+  background: var(--action-gradient);
+  border-color: #2be0a0;
   min-width: 90px;
   padding: 10px 16px;
+}
+.player-buttons .player-play:hover {
+  background: var(--action-gradient-hover);
+  color: #061a23;
+  border-color: #88ffd1;
 }
 .player-transport {
   gap: 6px;
@@ -1077,7 +1130,6 @@ details[open] > summary {
 }
 @keyframes surface-in {
   from {
-    opacity: 0.25;
     transform: translateY(8px);
   }
   to {
@@ -1087,7 +1139,6 @@ details[open] > summary {
 }
 @keyframes card-in {
   from {
-    opacity: 0.3;
     transform: translateY(12px);
   }
   to {
@@ -1252,6 +1303,7 @@ details[open] > summary {
     padding: 24px 20px;
   }
   .hero {
+    --hero-shade: linear-gradient(90deg, #0e2634f0, #0e2634cc);
     padding: 28px 25px;
     min-height: 328px;
     margin-bottom: 30px;
