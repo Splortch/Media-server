@@ -384,12 +384,14 @@ test('setup, accounts, collections, diagnostics, stream ranges and persist resum
   await page
     .getByText('Review request: Family future film', { exact: true })
     .click();
-  await page.getByLabel('Status', { exact: true }).selectOption('Added');
+  await page
+    .getByRole('combobox', { name: 'Status', exact: true })
+    .selectOption('Added');
   await expect(
-    page.getByLabel('Confirm library title', { exact: true }),
+    page.getByRole('combobox', { name: 'Confirm library title', exact: true }),
   ).toHaveValue('');
   await page
-    .getByLabel('Confirm library title', { exact: true })
+    .getByRole('combobox', { name: 'Confirm library title', exact: true })
     .selectOption({ label: 'sample' });
   await page
     .getByLabel('Reply', { exact: true })
