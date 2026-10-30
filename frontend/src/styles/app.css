@@ -62,6 +62,7 @@ a {
 }
 button,
 input,
+textarea,
 select {
   font: inherit;
 }
@@ -142,6 +143,7 @@ button:disabled {
   border-color: var(--danger);
 }
 input,
+textarea,
 select {
   width: 100%;
   min-width: 0;
@@ -162,16 +164,19 @@ input::placeholder {
   opacity: 0.85;
 }
 input:hover,
+textarea:hover,
 select:hover {
   border-color: #687a63;
 }
 input:focus-visible,
+textarea:focus-visible,
 select:focus-visible {
   border-color: var(--accent);
   box-shadow: 0 0 0 3px var(--accent-tint);
 }
 :where(
   input,
+  textarea,
   select,
   button,
   a,
@@ -1513,4 +1518,9 @@ details[open] > summary {
     transition: none;
     animation: none;
   }
+}
+
+textarea {
+  min-height: 100px;
+  resize: vertical;
 }

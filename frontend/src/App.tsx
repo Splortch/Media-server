@@ -23,6 +23,7 @@ import {
 } from './services/features';
 import Settings from './pages/Settings';
 import Experimental from './pages/Experimental';
+import Requests from './pages/Requests';
 import { History, type Collection } from './features/Personal';
 type User = { name: string; role: string };
 export default function App() {
@@ -289,7 +290,7 @@ export default function App() {
         } else mainRef.current?.focus();
         focusedRoute.current = key;
       }
-      document.title = `${route === 'experimental' ? 'Experimental' : route === 'settings' ? 'Settings' : route === 'history' ? 'Watch history' : item?.title || (route === 'library' ? 'Library' : 'Home')} · Media Server`;
+      document.title = `${route === 'requests' ? 'Movie requests' : route === 'experimental' ? 'Experimental' : route === 'settings' ? 'Settings' : route === 'history' ? 'Watch history' : item?.title || (route === 'library' ? 'Library' : 'Home')} · Media Server`;
     } else if (phase === 'setup' || phase === 'login') {
       if (focusedRoute.current !== key) {
         authHeading.current?.focus();
@@ -553,6 +554,16 @@ export default function App() {
               <span>Experimental</span>
             </a>
           )}
+          {featureVisible(features, 'movie-requests') && (
+            <a
+              href="#requests"
+              className={route === 'requests' ? 'active' : ''}
+              aria-current={route === 'requests' ? 'page' : undefined}
+            >
+              <Icon name="plus" />
+              <span>Movie requests</span>
+            </a>
+          )}
           {featureVisible(features, 'watch-history') && (
             <a
               aria-current={route === 'history' ? 'page' : undefined}
@@ -588,17 +599,19 @@ export default function App() {
           <div className="workspace-heading">
             <span className="workspace-kicker">YOUR SPACE</span>
             <span>
-              {route === 'experimental'
-                ? 'Experimental'
-                : route === 'settings'
-                  ? 'Server settings'
-                  : route === 'history'
-                    ? 'Watch history'
-                    : route === 'library'
-                      ? 'Media library'
-                      : route.startsWith('media/')
-                        ? 'Now showing'
-                        : 'Home'}
+              {route === 'requests'
+                ? 'Movie requests'
+                : route === 'experimental'
+                  ? 'Experimental'
+                  : route === 'settings'
+                    ? 'Server settings'
+                    : route === 'history'
+                      ? 'Watch history'
+                      : route === 'library'
+                        ? 'Media library'
+                        : route.startsWith('media/')
+                          ? 'Now showing'
+                          : 'Home'}
             </span>
           </div>
           <span className="alpha">EARLY ALPHA</span>
@@ -615,7 +628,16 @@ export default function App() {
           {loading && !(query && (route === 'home' || route === 'library')) && (
             <p role="status">Loading your collection…</p>
           )}
-          {route === 'experimental' ? (
+          {route === 'requests' ? (
+            featureVisible(features, 'movie-requests') ? (
+              <Requests admin={user?.role === 'Admin'} initialTitle={query} />
+            ) : (
+              <p>
+                Movie requests are disabled or hidden. Administrators can enable
+                the feature under Settings → Customize.
+              </p>
+            )
+          ) : route === 'experimental' ? (
             <Experimental admin={user?.role === 'Admin'} />
           ) : route === 'settings' && user?.role !== 'Guest' ? (
             <Settings
@@ -823,6 +845,11 @@ export default function App() {
                           ? 'Add a media directory in Settings, then scan it. Real files will appear here.'
                           : 'Ask your administrator for library access. Rating-restricted accounts cannot see unclassified media.'}
                     </p>
+                    {featureVisible(features, 'movie-requests') && (
+                      <a href="#requests" className="button">
+                        Request a movie
+                      </a>
+                    )}
                     {query || collection ? (
                       <button
                         onClick={() => {

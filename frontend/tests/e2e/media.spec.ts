@@ -13,7 +13,7 @@ test('setup, accounts, collections, diagnostics, stream ranges and persist resum
   page,
   browser,
 }) => {
-  test.setTimeout(120000);
+  test.setTimeout(180000);
   const data = process.env.E2E_DATA!;
   const media = process.env.E2E_MEDIA!;
   expect(
@@ -359,6 +359,61 @@ test('setup, accounts, collections, diagnostics, stream ranges and persist resum
     page.getByRole('heading', { name: 'Media library', exact: true }),
   ).toBeVisible();
   await page.getByRole('heading', { name: 'sample', exact: true }).click();
+  const requestReturnHash = await page.evaluate(() => location.hash);
+  await page.getByRole('link', { name: 'Settings', exact: true }).click();
+  await page.getByText('Server-wide availability', { exact: true }).click();
+  await page
+    .getByRole('button', {
+      name: 'Enable Movie requests for everyone',
+      exact: true,
+    })
+    .click();
+  await page.getByRole('link', { name: 'Movie requests', exact: true }).click();
+  await page
+    .getByLabel('Movie title', { exact: true })
+    .fill('Family future film');
+  await page
+    .getByLabel('Note (optional)', { exact: true })
+    .fill('For our next movie night');
+  await page
+    .getByRole('button', { name: 'Send movie request', exact: true })
+    .click();
+  await expect(
+    page.getByText('Request sent. Your administrator can review it here.'),
+  ).toBeVisible();
+  await page
+    .getByText('Review request: Family future film', { exact: true })
+    .click();
+  await page
+    .getByRole('combobox', { name: 'Status', exact: true })
+    .selectOption('Added');
+  await expect(
+    page.getByRole('combobox', { name: 'Confirm library title', exact: true }),
+  ).toHaveValue('');
+  await page
+    .getByRole('combobox', { name: 'Confirm library title', exact: true })
+    .selectOption({ label: 'sample' });
+  await page
+    .getByLabel('Reply', { exact: true })
+    .fill('Manually confirmed for the synthetic test');
+  await page
+    .getByRole('button', {
+      name: 'Save review for Family future film',
+      exact: true,
+    })
+    .click();
+  await expect(
+    page.getByRole('link', { name: 'View added movie', exact: true }),
+  ).toBeVisible();
+  await accessible(page);
+  await page.screenshot({
+    path: 'test-results/visual/family-requests.png',
+    fullPage: true,
+  });
+  await page.goto('/' + requestReturnHash);
+  await expect(
+    page.getByRole('region', { name: 'Title information' }),
+  ).toBeVisible();
   const titleHash = await page.evaluate(() => location.hash);
   await page.getByRole('link', { name: 'Experimental', exact: true }).click();
   await expect(

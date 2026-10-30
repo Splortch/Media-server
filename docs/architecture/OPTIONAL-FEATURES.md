@@ -57,3 +57,13 @@ and Android core browsing/playback do not depend on this capability endpoint.
 Add a registry entry and enforcement/tests when a future module actually ships.
 Do not gate security checks behind optional flags. Activity/requests/profiles and
 other roadmap items keep their own authorization, privacy and retention rules.
+
+## Movie requests (#54)
+
+`movie-requests` starts **disabled** at the server and remains opt-in. An admin can
+enable it from Customize; members can then personally hide its navigation without
+changing server policy. All request endpoints reject access while disabled and
+records are preserved. See [request permissions and API](MOVIE-REQUESTS.md).
+Registry definitions now state their default explicitly: existing smart
+collections and watch-history navigation retain their prior enabled defaults;
+unknown modules default to unavailable. Guests receive no optional features.
