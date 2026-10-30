@@ -159,7 +159,7 @@ it('settings shortcuts move keyboard focus and respect reduced motion without ch
   await waitFor(() => expect(api).toHaveBeenCalledWith('/libraries'));
   const target = document.getElementById('settings-account')!;
   target.scrollIntoView = scroll;
-  fireEvent.click(screen.getByRole('button', { name: 'Account', exact: true }));
+  fireEvent.click(screen.getByRole('button', { name: 'Account' }));
   expect(target).toHaveFocus();
   expect(scroll).toHaveBeenCalledWith({ behavior: 'auto', block: 'start' });
   expect(location.hash).toBe('#settings');
