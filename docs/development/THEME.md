@@ -36,3 +36,17 @@ Use real-backend browser accessibility checks and captured desktop/mobile images
 for visual review. Android CI builds/lints the APK and runs its actual-backend
 emulator flow. These checks do not replace physical-device, screen-reader,
 high-DPI or hardware decoder validation.
+
+### Playback entrance
+
+Web and desktop Play/Resume expand the selected title tile into the video area over
+650 ms, then crossfade after the browser reports a decoded frame (`playing` on
+older engines). Browsing still opens information without playing. The current API
+does not supply posters: the gradient monogram remains the fallback.
+The transition does not request OS fullscreen; use the existing Fullscreen control.
+
+Reduced-motion users skip the overlay. It never intercepts input, clears on errors
+or autoplay rejection, and disappears after eight seconds if a server stalls.
+There is no artificial playback delay, extra media request, or new dependency.
+Component tests cover frame readiness and error recovery; physical-device and
+visual motion review are still required.

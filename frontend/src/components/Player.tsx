@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import Icon from './Icon';
+import PlaybackEntrance from './PlaybackEntrance';
 import PlaybackSettings, { type PlaybackTransport } from './PlaybackSettings';
 import { api, type Media } from '../services/api';
 export default function Player({
@@ -24,6 +25,7 @@ export default function Player({
   const [source, setSource] = useState(
     streamUrl ?? `/api/media/${item.id}/stream`,
   );
+  const [frameReady, setFrameReady] = useState(false);
   const [caption, setCaption] = useState('');
   const videoRef = useRef<HTMLVideoElement>(null);
   const explicitStart = useRef(startPlaying);
@@ -63,6 +65,7 @@ export default function Player({
         await video.play();
         setError('');
       } catch {
+        setFrameReady(true);
         setError(
           'Playback could not start. Try again or check the playback diagnostics.',
         );
@@ -141,6 +144,7 @@ export default function Player({
           : code === 4
             ? 'unsupported'
             : 'unknown';
+    setFrameReady(true);
     setError(playbackErrorMessage(code));
     setBuffering(false);
     if (onPlaybackError) {
@@ -252,83 +256,97 @@ export default function Player({
             );
         }}
       >
-        <video
-          ref={videoRef}
-          crossOrigin={playbackTransport ? 'anonymous' : undefined}
-          playsInline
-          preload="metadata"
-          aria-label={item.title}
-          src={source.endsWith('.m3u8') ? undefined : source}
-          onLoadedMetadata={(e) => {
-            const v = e.currentTarget;
-            setDuration(Number.isFinite(v.duration) ? v.duration : 0);
-            measure(v);
-            const target = nextPosition.current ?? resume;
-            if (Number.isFinite(v.duration) && target < v.duration - 2)
-              v.currentTime = target;
-            nextPosition.current = undefined;
-            switching.current = false;
-            if (explicitStart.current) {
-              explicitStart.current = false;
-              void v
-                .play()
-                .catch(() =>
+        <div className="player-video-stage">
+          <video
+            ref={videoRef}
+            crossOrigin={playbackTransport ? 'anonymous' : undefined}
+            playsInline
+            preload="metadata"
+            aria-label={item.title}
+            src={source.endsWith('.m3u8') ? undefined : source}
+            onLoadedMetadata={(e) => {
+              const v = e.currentTarget;
+              setDuration(Number.isFinite(v.duration) ? v.duration : 0);
+              measure(v);
+              const target = nextPosition.current ?? resume;
+              if (Number.isFinite(v.duration) && target < v.duration - 2)
+                v.currentTime = target;
+              nextPosition.current = undefined;
+              switching.current = false;
+              if (explicitStart.current) {
+                explicitStart.current = false;
+                void v.play().catch(() => {
+                  setFrameReady(true);
                   setError(
                     'Playback could not start automatically after your selection. Press Play in the player to retry.',
-                  ),
-                );
+                  );
+                });
+              }
+            }}
+            onTimeUpdate={(e) => {
+              setPosition(e.currentTarget.currentTime);
+              void save(e.currentTarget);
+              measure(e.currentTarget);
+            }}
+            onPlay={() => setPaused(false)}
+            onVolumeChange={(e) => {
+              setVolume(e.currentTarget.volume);
+              setMuted(e.currentTarget.muted);
+            }}
+            onDurationChange={(e) =>
+              setDuration(
+                Number.isFinite(e.currentTarget.duration)
+                  ? e.currentTarget.duration
+                  : 0,
+              )
             }
-          }}
-          onTimeUpdate={(e) => {
-            setPosition(e.currentTarget.currentTime);
-            void save(e.currentTarget);
-            measure(e.currentTarget);
-          }}
-          onPlay={() => setPaused(false)}
-          onVolumeChange={(e) => {
-            setVolume(e.currentTarget.volume);
-            setMuted(e.currentTarget.muted);
-          }}
-          onDurationChange={(e) =>
-            setDuration(
-              Number.isFinite(e.currentTarget.duration)
-                ? e.currentTarget.duration
-                : 0,
-            )
-          }
-          onPause={(e) => {
-            setPaused(true);
-            void save(e.currentTarget, true);
-          }}
-          onEnded={(e) => {
-            setPaused(true);
-            void save(e.currentTarget, true, true);
-          }}
-          onProgress={(e) => measure(e.currentTarget)}
-          onWaiting={() => setBuffering(true)}
-          onPlaying={() => setBuffering(false)}
-          onCanPlay={() => setBuffering(false)}
-          onSeeking={() => {
-            sample.current = undefined;
-          }}
-          onSeeked={(e) => {
-            sample.current = undefined;
-            measure(e.currentTarget);
-          }}
-          onError={(e) => {
-            void playbackFailed(e.currentTarget);
-          }}
-        >
-          {caption && (
-            <track
-              key={caption}
-              src={caption}
-              kind="subtitles"
-              label="Selected subtitles"
-              default
+            onPause={(e) => {
+              setPaused(true);
+              void save(e.currentTarget, true);
+            }}
+            onEnded={(e) => {
+              setPaused(true);
+              void save(e.currentTarget, true, true);
+            }}
+            onProgress={(e) => measure(e.currentTarget)}
+            onWaiting={() => setBuffering(true)}
+            onPlaying={() => {
+              setBuffering(false);
+              const video = videoRef.current;
+              if (video?.requestVideoFrameCallback)
+                video.requestVideoFrameCallback(() => setFrameReady(true));
+              else setFrameReady(true);
+            }}
+            onCanPlay={() => setBuffering(false)}
+            onSeeking={() => {
+              sample.current = undefined;
+            }}
+            onSeeked={(e) => {
+              sample.current = undefined;
+              measure(e.currentTarget);
+            }}
+            onError={(e) => {
+              void playbackFailed(e.currentTarget);
+            }}
+          >
+            {caption && (
+              <track
+                key={caption}
+                src={caption}
+                kind="subtitles"
+                label="Selected subtitles"
+                default
+              />
+            )}
+          </video>
+          {startPlaying && (
+            <PlaybackEntrance
+              id={item.id}
+              title={item.title}
+              ready={frameReady}
             />
           )}
-        </video>
+        </div>
         <div className="player-controls">
           <div className="player-timeline">
             <span>{formatPlaybackTime(position)}</span>
