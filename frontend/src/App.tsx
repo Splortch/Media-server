@@ -588,15 +588,17 @@ export default function App() {
           <div className="workspace-heading">
             <span className="workspace-kicker">YOUR SPACE</span>
             <span>
-              {route === 'settings'
-                ? 'Server settings'
-                : route === 'history'
-                  ? 'Watch history'
-                  : route === 'library'
-                    ? 'Media library'
-                    : route.startsWith('media/')
-                      ? 'Now showing'
-                      : 'Home'}
+              {route === 'experimental'
+                ? 'Experimental'
+                : route === 'settings'
+                  ? 'Server settings'
+                  : route === 'history'
+                    ? 'Watch history'
+                    : route === 'library'
+                      ? 'Media library'
+                      : route.startsWith('media/')
+                        ? 'Now showing'
+                        : 'Home'}
             </span>
           </div>
           <span className="alpha">EARLY ALPHA</span>
