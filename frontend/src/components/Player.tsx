@@ -7,6 +7,7 @@ export default function Player({
   item,
   resume,
   startPlaying = false,
+  guest = false,
   progressRevision = 0,
   streamUrl,
   onSaveProgress,
@@ -16,6 +17,7 @@ export default function Player({
   item: Media;
   resume: number;
   startPlaying?: boolean;
+  guest?: boolean;
   progressRevision?: number;
   streamUrl?: string;
   onSaveProgress?: (seconds: number, completed: boolean) => Promise<void>;
@@ -215,7 +217,7 @@ export default function Player({
 
   return (
     <section aria-label="Video player" className="player-wrap">
-      {(!streamUrl || playbackTransport) && (
+      {!guest && (!streamUrl || playbackTransport) && (
         <PlaybackSettings
           transport={playbackTransport}
           id={item.id}
@@ -442,6 +444,11 @@ export default function Player({
           </div>
         </div>
       </div>
+      {guest && (
+        <p className="muted">
+          Guest playback · Progress is not saved. Direct Play only.
+        </p>
+      )}
       {error && (
         <p role="alert" className="error">
           {error}

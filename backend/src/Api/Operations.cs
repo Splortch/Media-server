@@ -96,7 +96,11 @@ public static partial class Operations
             "/users",
             async (MediaDb db) =>
             {
-                var users = await db.Users.OrderBy(x => x.Id).Take(1000).ToListAsync();
+                var users = await db
+                    .Users.Where(x => x.Role != "Guest")
+                    .OrderBy(x => x.Id)
+                    .Take(1000)
+                    .ToListAsync();
                 var result = new List<AccountInfo>();
                 foreach (var user in users)
                     result.Add(await Account(db, user));
@@ -170,7 +174,7 @@ public static partial class Operations
                 try
                 {
                     var user = await db.Users.FindAsync(id);
-                    if (user is null)
+                    if (user is null || user.Role == "Guest")
                         return Results.NotFound();
                     if (!await LibrariesExist(db, input.Libraries))
                         throw new ArgumentException("Unknown library.");
@@ -207,7 +211,7 @@ public static partial class Operations
                     try
                     {
                         var user = await db.Users.FindAsync(id);
-                        if (user is null)
+                        if (user is null || user.Role == "Guest")
                             return Results.NotFound();
                         var hash = await Passwords.Hash(input.Password);
                         await using var transaction = await db.Database.BeginTransactionAsync();

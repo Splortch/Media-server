@@ -22,6 +22,7 @@ import {
   type FeatureState,
 } from './services/features';
 import Settings from './pages/Settings';
+import Experimental from './pages/Experimental';
 import { History, type Collection } from './features/Personal';
 type User = { name: string; role: string };
 export default function App() {
@@ -30,6 +31,7 @@ export default function App() {
   const [phase, setPhase] = useState<
     'loading' | 'setup' | 'login' | 'ready' | 'offline'
   >('loading');
+  const [guestAvailable, setGuestAvailable] = useState(false);
   const [user, setUser] = useState<User>();
   const [features, setFeatures] = useState<FeatureState>(unavailableFeatures);
   const [error, setError] = useState('');
@@ -114,6 +116,35 @@ export default function App() {
       active = false;
     };
   }, []);
+  useEffect(() => {
+    if (phase !== 'login') return;
+    let active = true;
+    api<{ enabled: boolean }>('/auth/guest')
+      .then((value) => {
+        if (active) setGuestAvailable(value.enabled === true);
+      })
+      .catch(() => {
+        if (active) setGuestAvailable(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, [phase]);
+  async function enterGuest() {
+    setBusy(true);
+    setError('');
+    try {
+      const guest = await api<User>('/auth/guest', 'POST');
+      resetCsrf();
+      setUser(guest);
+      location.hash = 'home';
+      setPhase('ready');
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
   const endSession = useCallback(() => {
     requestEpoch.current++;
     resetCsrf();
@@ -258,7 +289,7 @@ export default function App() {
         } else mainRef.current?.focus();
         focusedRoute.current = key;
       }
-      document.title = `${route === 'settings' ? 'Settings' : route === 'history' ? 'Watch history' : item?.title || (route === 'library' ? 'Library' : 'Home')} · Media Server`;
+      document.title = `${route === 'experimental' ? 'Experimental' : route === 'settings' ? 'Settings' : route === 'history' ? 'Watch history' : item?.title || (route === 'library' ? 'Library' : 'Home')} · Media Server`;
     } else if (phase === 'setup' || phase === 'login') {
       if (focusedRoute.current !== key) {
         authHeading.current?.focus();
@@ -451,6 +482,16 @@ export default function App() {
               {error}
             </p>
           )}
+          {phase === 'login' && guestAvailable && (
+            <button
+              type="button"
+              className="secondary"
+              disabled={busy}
+              onClick={() => void enterGuest()}
+            >
+              Continue as guest
+            </button>
+          )}
           <button disabled={busy}>
             {busy
               ? 'Please wait…'
@@ -493,13 +534,25 @@ export default function App() {
           >
             <Icon name="library" /> <span>Library</span>
           </a>
-          <a
-            aria-current={route === 'settings' ? 'page' : undefined}
-            className={route === 'settings' ? 'active' : ''}
-            href="#settings"
-          >
-            <Icon name="settings" /> <span>Settings</span>
-          </a>
+          {user?.role !== 'Guest' && (
+            <a
+              aria-current={route === 'settings' ? 'page' : undefined}
+              className={route === 'settings' ? 'active' : ''}
+              href="#settings"
+            >
+              <Icon name="settings" /> <span>Settings</span>
+            </a>
+          )}
+          {user?.role === 'Admin' && (
+            <a
+              href="#experimental"
+              className={route === 'experimental' ? 'active' : ''}
+              aria-current={route === 'experimental' ? 'page' : undefined}
+            >
+              <Icon name="settings" />
+              <span>Experimental</span>
+            </a>
+          )}
           {featureVisible(features, 'watch-history') && (
             <a
               aria-current={route === 'history' ? 'page' : undefined}
@@ -535,15 +588,17 @@ export default function App() {
           <div className="workspace-heading">
             <span className="workspace-kicker">YOUR SPACE</span>
             <span>
-              {route === 'settings'
-                ? 'Server settings'
-                : route === 'history'
-                  ? 'Watch history'
-                  : route === 'library'
-                    ? 'Media library'
-                    : route.startsWith('media/')
-                      ? 'Now showing'
-                      : 'Home'}
+              {route === 'experimental'
+                ? 'Experimental'
+                : route === 'settings'
+                  ? 'Server settings'
+                  : route === 'history'
+                    ? 'Watch history'
+                    : route === 'library'
+                      ? 'Media library'
+                      : route.startsWith('media/')
+                        ? 'Now showing'
+                        : 'Home'}
             </span>
           </div>
           <span className="alpha">EARLY ALPHA</span>
@@ -560,14 +615,20 @@ export default function App() {
           {loading && !(query && (route === 'home' || route === 'library')) && (
             <p role="status">Loading your collection…</p>
           )}
-          {route === 'settings' ? (
+          {route === 'experimental' ? (
+            <Experimental admin={user?.role === 'Admin'} />
+          ) : route === 'settings' && user?.role !== 'Guest' ? (
             <Settings
               admin={user?.role === 'Admin'}
               features={features}
               onFeaturesChanged={changeFeatures}
             />
           ) : route === 'history' ? (
-            <History />
+            user?.role === 'Guest' ? (
+              <p>Guest sessions do not save watch history.</p>
+            ) : (
+              <History />
+            )
           ) : route.startsWith('media/') ? (
             item && (
               <>
@@ -626,6 +687,10 @@ export default function App() {
                     key={item.id}
                     item={item}
                     startPlaying
+                    guest={user?.role === 'Guest'}
+                    onSaveProgress={
+                      user?.role === 'Guest' ? async () => {} : undefined
+                    }
                     resume={playFrom}
                     progressRevision={
                       progress.find((p) => p.mediaItemId === item.id)

@@ -34,6 +34,8 @@ public static class Features
 
     private static async Task<FeatureState> State(MediaDb db, ClaimsPrincipal user)
     {
+        if (user.IsInRole("Guest"))
+            return new FeatureState([]);
         var uid = Operations.Uid(user);
         var disabled = await db
             .FeaturePolicies.Where(x => !x.Enabled)

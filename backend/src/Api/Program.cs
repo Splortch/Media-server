@@ -391,6 +391,7 @@ app.Use(
         await next();
     }
 );
+app.Use(Experiments.GuestBoundary);
 app.MapGet("/health", () => Results.Ok(new { status = "ok" }));
 MapApi(app.MapGroup("/api"));
 MapApi(app.MapGroup("/api/v1").WithGroupName("client-v1"));
@@ -398,6 +399,7 @@ app.MapClientV1();
 app.MapPlayback();
 app.MapOperations(credentialGate);
 app.MapFeatures();
+app.MapExperiments(credentialGate);
 void MapApi(RouteGroupBuilder root)
 {
     root.MapGet(
@@ -468,9 +470,9 @@ void MapApi(RouteGroupBuilder root)
                     // Derive even for unknown usernames to avoid a cheap account enumeration timing signal.
                     var valid = await Passwords.Verify(
                         input.Password,
-                        user?.PasswordHash ?? dummyHash
+                        user?.Role == "Guest" ? dummyHash : user?.PasswordHash ?? dummyHash
                     );
-                    if (user is null || user.Disabled || !valid)
+                    if (user is null || user.Disabled || user.Role == "Guest" || !valid)
                         return Results.Unauthorized();
                     await db
                         .Sessions.Where(x => x.ExpiresAt <= DateTime.UtcNow)
