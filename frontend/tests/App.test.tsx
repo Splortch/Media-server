@@ -79,7 +79,7 @@ it('ignores a previous account’s delayed page after session expiration and a n
   fireEvent.submit(
     screen.getByRole('button', { name: 'Sign in' }).closest('form')!,
   );
-  await screen.findByText(/Welcome home, Bob/);
+  await screen.findByText(/Welcome back, Bob/);
   expect(screen.queryByText('666')).not.toBeInTheDocument();
   await waitFor(() => expect(state.bobStatus).toBeTypeOf('function'));
   await act(async () =>

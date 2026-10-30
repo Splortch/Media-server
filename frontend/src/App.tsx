@@ -13,6 +13,7 @@ import {
   type Progress,
 } from './services/api';
 import Player from './components/Player';
+import Icon from './components/Icon';
 import Settings from './pages/Settings';
 import { History, type Collection } from './features/Personal';
 type User = { name: string; role: string };
@@ -261,7 +262,7 @@ export default function App() {
               {m.title.slice(0, 1).toUpperCase()}
             </span>
             <span className="play-symbol" aria-hidden="true">
-              ▶
+              <Icon name="play" />
             </span>
             {position(m.id) > 0 && (
               <progress
@@ -404,44 +405,69 @@ export default function App() {
             className={route === 'home' ? 'active' : ''}
             href="#home"
           >
-            <span aria-hidden="true">⌂</span> <span>Home</span>
+            <Icon name="home" /> <span>Home</span>
           </a>
           <a
             aria-current={route === 'library' ? 'page' : undefined}
             className={route === 'library' ? 'active' : ''}
             href="#library"
           >
-            <span aria-hidden="true">▦</span> <span>Library</span>
+            <Icon name="library" /> <span>Library</span>
           </a>
           <a
             aria-current={route === 'settings' ? 'page' : undefined}
             className={route === 'settings' ? 'active' : ''}
             href="#settings"
           >
-            <span aria-hidden="true">⚙</span> <span>Settings</span>
+            <Icon name="settings" /> <span>Settings</span>
           </a>
           <a
             aria-current={route === 'history' ? 'page' : undefined}
             className={route === 'history' ? 'active' : ''}
             href="#history"
           >
-            Watch history
+            <Icon name="history" /> <span>Watch history</span>
           </a>
         </nav>
         <div className="sidebar-bottom">
-          <span className="status-dot" /> Connected locally
-          <p>v{server?.version || '0.1.0-alpha'}</p>
+          <div className="connection-label">
+            <span className="status-dot" /> Server connected
+          </div>
+          <div className="account-summary">
+            <span className="avatar" aria-hidden="true">
+              {user?.name.slice(0, 1).toUpperCase()}
+            </span>
+            <div>
+              <strong>{user?.name}</strong>
+              <p>
+                {user?.role} · v{server?.version || '0.1.0-alpha'}
+              </p>
+            </div>
+          </div>
           <button className="text-button" onClick={() => void logout()}>
-            Sign out · {user?.name}
+            <Icon name="logout" /> Sign out · {user?.name}
           </button>
         </div>
       </aside>
       <div className="workspace">
         <header>
-          <span className="muted">Your private screening room</span>
+          <div className="workspace-heading">
+            <span className="workspace-kicker">YOUR SPACE</span>
+            <span>
+              {route === 'settings'
+                ? 'Server settings'
+                : route === 'history'
+                  ? 'Watch history'
+                  : route === 'library'
+                    ? 'Media library'
+                    : route.startsWith('media/')
+                      ? 'Now showing'
+                      : 'Home'}
+            </span>
+          </div>
           <span className="alpha">EARLY ALPHA</span>
           <button className="mobile-signout" onClick={() => void logout()}>
-            Sign out
+            <Icon name="logout" /> Sign out
           </button>
         </header>
         <main ref={mainRef} id="main-content" tabIndex={-1} aria-busy={loading}>
@@ -459,36 +485,41 @@ export default function App() {
             item && (
               <>
                 <a href="#library" className="back-link">
-                  ← Back to library
+                  <Icon name="back" /> Back to library
                 </a>
-                <p className="eyebrow">FROM YOUR COLLECTION</p>
-                <h1>{item.title}</h1>
-                <p className="muted">
-                  {duration(item.duration)} · {item.videoCodec.toUpperCase()} /{' '}
-                  {item.audioCodec.toUpperCase() || 'No audio'} ·{' '}
-                  {(item.size / 1024 ** 3).toFixed(2)} GB
-                </p>
+                <div className="detail-heading">
+                  <p className="eyebrow">FROM YOUR COLLECTION</p>
+                  <h1>{item.title}</h1>
+                  <p className="muted">
+                    {duration(item.duration)} · {item.videoCodec.toUpperCase()}{' '}
+                    / {item.audioCodec.toUpperCase() || 'No audio'} ·{' '}
+                    {(item.size / 1024 ** 3).toFixed(2)} GB
+                  </p>
+                </div>
                 {user?.role === 'Admin' && (
-                  <label>
-                    Content rating
-                    <select
-                      aria-label="Content rating"
-                      defaultValue={item.contentRating ?? 0}
-                      onChange={(e) => {
-                        void api(`/media/${item.id}/rating`, 'PUT', {
-                          rating: Number(e.target.value),
-                        }).catch((error) => setError(error.message));
-                      }}
-                    >
-                      <option value="0">
-                        Unrated (hidden from restricted accounts)
-                      </option>
-                      <option value="10">General (10)</option>
-                      <option value="13">Teen (13)</option>
-                      <option value="16">Mature (16)</option>
-                      <option value="18">Adult (18)</option>
-                    </select>
-                  </label>
+                  <details className="title-admin">
+                    <summary>Manage content rating</summary>
+                    <label>
+                      Content rating
+                      <select
+                        aria-label="Content rating"
+                        defaultValue={item.contentRating ?? 0}
+                        onChange={(e) => {
+                          void api(`/media/${item.id}/rating`, 'PUT', {
+                            rating: Number(e.target.value),
+                          }).catch((error) => setError(error.message));
+                        }}
+                      >
+                        <option value="0">
+                          Unrated (hidden from restricted accounts)
+                        </option>
+                        <option value="10">General (10)</option>
+                        <option value="13">Teen (13)</option>
+                        <option value="16">Mature (16)</option>
+                        <option value="18">Adult (18)</option>
+                      </select>
+                    </label>
+                  </details>
                 )}
                 <Player
                   item={item}
@@ -504,36 +535,49 @@ export default function App() {
             <>
               {route === 'home' && (
                 <section className="hero">
-                  <p className="eyebrow">ALL YOUR FAVORITES, ONE PLACE</p>
-                  <h1>
-                    Tonight starts
-                    <br />
-                    with your collection.
-                  </h1>
-                  <p>
-                    Less searching. More watching. Welcome home, {user?.name}.
-                  </p>
-                  <a
-                    className="button"
-                    href={
-                      items.length || user?.role !== 'Admin'
-                        ? '#library'
-                        : '#settings'
-                    }
-                  >
-                    {items.length || user?.role !== 'Admin'
-                      ? 'Explore library'
-                      : 'Add your first library'}{' '}
-                    <span aria-hidden="true">↗</span>
-                  </a>
-                  <div className="hero-stats">
-                    <span>
-                      <strong>{server?.mediaCount || 0}</strong> videos
-                    </span>
-                    <span>
-                      <strong>{server?.libraryCount || 0}</strong> libraries
-                    </span>
-                    <span>100% yours</span>
+                  <div className="hero-copy">
+                    <p className="eyebrow">YOUR COLLECTION. YOUR EVENING.</p>
+                    <h1>
+                      Make room for
+                      <br />a good movie night.
+                    </h1>
+                    <p>
+                      Welcome back, {user?.name}. Settle in with something from
+                      your own collection.
+                    </p>
+                    <a
+                      className="button"
+                      href={
+                        items.length || user?.role !== 'Admin'
+                          ? '#library'
+                          : '#settings'
+                      }
+                    >
+                      {items.length || user?.role !== 'Admin'
+                        ? 'Explore library'
+                        : 'Add your first library'}{' '}
+                      <Icon name="arrow" />
+                    </a>
+                    <div className="hero-stats">
+                      <span>
+                        <strong>{server?.mediaCount || 0}</strong> videos
+                      </span>
+                      <span>
+                        <strong>{server?.libraryCount || 0}</strong> libraries
+                      </span>
+                      <span>100% yours</span>
+                    </div>
+                  </div>
+                  <div className="hero-art" aria-hidden="true">
+                    <div className="hero-orbit" />
+                    <div className="cinema-tile">
+                      <Icon name="play" />
+                    </div>
+                    <div className="film-lines">
+                      <span />
+                      <span />
+                      <span />
+                    </div>
                   </div>
                 </section>
               )}
@@ -556,30 +600,33 @@ export default function App() {
                       <h1>Media library</h1>
                     )}
                   </div>
-                  <label>
-                    Smart collection
-                    <select
-                      aria-label="Smart collection"
-                      value={collection}
-                      onChange={(e) => setCollection(e.target.value)}
-                    >
-                      <option value="">All media</option>
-                      {collections.map((c) => (
-                        <option value={c.id} key={c.id}>
-                          {c.name}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                  <label className="search-label">
-                    <span className="sr-only">Search library</span>
-                    <input
-                      type="search"
-                      placeholder="Search title prefix…"
-                      value={query}
-                      onChange={(e) => setQuery(e.target.value)}
-                    />
-                  </label>
+                  <div className="library-toolbar">
+                    <label>
+                      Smart collection
+                      <select
+                        aria-label="Smart collection"
+                        value={collection}
+                        onChange={(e) => setCollection(e.target.value)}
+                      >
+                        <option value="">All media</option>
+                        {collections.map((c) => (
+                          <option value={c.id} key={c.id}>
+                            {c.name}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                    <label className="search-label">
+                      <span className="sr-only">Search library</span>
+                      <Icon name="search" />
+                      <input
+                        type="search"
+                        placeholder="Search your collection…"
+                        value={query}
+                        onChange={(e) => setQuery(e.target.value)}
+                      />
+                    </label>
+                  </div>
                 </div>
                 {query && (
                   <p role="status">
@@ -627,6 +674,7 @@ export default function App() {
                 )}
                 {nextCursor && (
                   <button
+                    className="secondary load-more"
                     disabled={moreBusy || loading}
                     onClick={() => void loadMore()}
                   >

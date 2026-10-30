@@ -1,5 +1,6 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import Accounts from '../features/admin/Accounts';
+import Icon, { type IconName } from '../components/Icon';
 import Monitoring from '../features/admin/Monitoring';
 import LibraryTools from '../features/admin/LibraryTools';
 import { Collections, Sessions } from '../features/Personal';
@@ -109,6 +110,35 @@ export default function Settings({ admin = true }: { admin?: boolean }) {
       setPasswordBusy(false);
     }
   }
+  function jump(id: string) {
+    const target = document.getElementById(id);
+    target?.focus({ preventScroll: true });
+    target?.scrollIntoView?.({
+      behavior: window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
+        ? 'auto'
+        : 'smooth',
+      block: 'start',
+    });
+  }
+  const sections: { id: string; label: string; icon: IconName }[] = [
+    ...(admin
+      ? [
+          {
+            id: 'settings-libraries',
+            label: 'Libraries',
+            icon: 'library' as const,
+          },
+          { id: 'settings-people', label: 'People', icon: 'users' as const },
+          {
+            id: 'settings-activity',
+            label: 'Activity',
+            icon: 'activity' as const,
+          },
+        ]
+      : []),
+    { id: 'settings-account', label: 'Account', icon: 'shield' },
+    { id: 'settings-collections', label: 'Collections', icon: 'library' },
+  ];
   return (
     <>
       <p className="eyebrow">MAKE YOURSELF AT HOME</p>
@@ -117,9 +147,25 @@ export default function Settings({ admin = true }: { admin?: boolean }) {
         Your files stay yours. Scanning reads media and never changes the
         originals.
       </p>
+      <nav className="settings-nav" aria-label="Settings sections">
+        {sections.map((section) => (
+          <button
+            key={section.id}
+            type="button"
+            onClick={() => jump(section.id)}
+          >
+            <Icon name={section.icon} />
+            {section.label}
+          </button>
+        ))}
+      </nav>
       {admin && (
         <>
-          <section className="panel">
+          <section
+            id="settings-libraries"
+            tabIndex={-1}
+            className="panel settings-target"
+          >
             <h2>Add a media directory</h2>
             <p className="muted">
               Use an absolute directory inside the allowed roots configured by
@@ -146,7 +192,7 @@ export default function Settings({ admin = true }: { admin?: boolean }) {
                 />
               </label>
               <button disabled={busy}>
-                {busy ? 'Adding…' : 'Add library'}
+                <Icon name="plus" /> {busy ? 'Adding…' : 'Add library'}
               </button>
             </form>
             {error && (
@@ -164,25 +210,27 @@ export default function Settings({ admin = true }: { admin?: boolean }) {
             )}
             {libraries.map((l) => (
               <div className="library-row" key={l.id}>
-                <div>
+                <div className="library-info">
                   <strong>{l.name}</strong>
                   <p className="muted path">{l.path}</p>
                 </div>
-                <button
-                  className="secondary"
-                  onClick={() => void scan(l.id)}
-                  aria-label={`Scan library ${l.name}`}
-                >
-                  Scan library
-                </button>
-                <button
-                  className="secondary"
-                  disabled={busy}
-                  onClick={() => setRemoving(l.id)}
-                  aria-label={`Remove library ${l.name}`}
-                >
-                  Remove library
-                </button>
+                <div className="library-actions">
+                  <button
+                    className="secondary"
+                    onClick={() => void scan(l.id)}
+                    aria-label={`Scan library ${l.name}`}
+                  >
+                    <Icon name="scan" /> Scan library
+                  </button>
+                  <button
+                    className="danger-ghost"
+                    disabled={busy}
+                    onClick={() => setRemoving(l.id)}
+                    aria-label={`Remove library ${l.name}`}
+                  >
+                    <Icon name="trash" /> Remove library
+                  </button>
+                </div>
                 {removing === l.id && (
                   <div role="group" aria-label={`Confirm removal of ${l.name}`}>
                     <p>
@@ -190,16 +238,22 @@ export default function Settings({ admin = true }: { admin?: boolean }) {
                       watch history and progress will be removed. Original media
                       files stay on disk. Active scans must finish first.
                     </p>
-                    <button disabled={busy} onClick={() => void remove(l.id)}>
-                      Confirm removal
-                    </button>
-                    <button
-                      className="secondary"
-                      disabled={busy}
-                      onClick={() => setRemoving(null)}
-                    >
-                      Cancel
-                    </button>
+                    <div className="action-group">
+                      <button
+                        className="danger"
+                        disabled={busy}
+                        onClick={() => void remove(l.id)}
+                      >
+                        <Icon name="trash" /> Confirm removal
+                      </button>
+                      <button
+                        className="secondary"
+                        disabled={busy}
+                        onClick={() => setRemoving(null)}
+                      >
+                        Cancel
+                      </button>
+                    </div>
                   </div>
                 )}
               </div>
@@ -230,11 +284,19 @@ export default function Settings({ admin = true }: { admin?: boolean }) {
             ))}
           </section>
           <LibraryTools libraries={libraries} />
-          <Accounts />
-          <Monitoring />
+          <div id="settings-people" className="settings-target" tabIndex={-1}>
+            <Accounts />
+          </div>
+          <div id="settings-activity" className="settings-target" tabIndex={-1}>
+            <Monitoring />
+          </div>
         </>
       )}
-      <section className="panel">
+      <section
+        id="settings-account"
+        tabIndex={-1}
+        className="panel settings-target"
+      >
         <h2>Change password</h2>
         <p className="muted">
           Changing your password signs out every device, including this one.
@@ -283,7 +345,9 @@ export default function Settings({ admin = true }: { admin?: boolean }) {
         </form>
       </section>
       <Sessions />
-      <Collections />
+      <div id="settings-collections" tabIndex={-1} className="settings-target">
+        <Collections />
+      </div>
       <section className="panel">
         <h2>Alpha capabilities</h2>
         <p className="muted">

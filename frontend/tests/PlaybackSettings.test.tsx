@@ -21,6 +21,7 @@ vi.mock('../src/features/Personal', () => ({
 afterEach(() => {
   cleanup();
   vi.resetAllMocks();
+  vi.unstubAllGlobals();
 });
 it('labels real tracks, disables bitmap captions and exposes only authorized encoders', async () => {
   vi.mocked(api).mockResolvedValue({
@@ -144,4 +145,22 @@ it('starts an already-ready cached conversion through the native transport', asy
     { audioTrack: null, subtitleTrack: null, encoder: 'libx264' },
   );
   vi.mocked(Hls.isSupported).mockRestore();
+});
+
+it('settings shortcuts move keyboard focus and respect reduced motion without changing routes', async () => {
+  vi.mocked(api).mockResolvedValue([]);
+  const scroll = vi.fn();
+  vi.stubGlobal(
+    'matchMedia',
+    vi.fn(() => ({ matches: true })),
+  );
+  location.hash = '#settings';
+  render(<Settings />);
+  await waitFor(() => expect(api).toHaveBeenCalledWith('/libraries'));
+  const target = document.getElementById('settings-account')!;
+  target.scrollIntoView = scroll;
+  fireEvent.click(screen.getByRole('button', { name: 'Account' }));
+  expect(target).toHaveFocus();
+  expect(scroll).toHaveBeenCalledWith({ behavior: 'auto', block: 'start' });
+  expect(location.hash).toBe('#settings');
 });
