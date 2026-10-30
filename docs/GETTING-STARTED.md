@@ -201,9 +201,13 @@ The client does not install or start a server. Closing the server console stops 
 
 | Route | Stop | Start again |
 | --- | --- | --- |
-| Windows native | Press Ctrl+C in the launcher console; confirm the server exits | Run the same `Start-MediaServer.cmd` |
+| Windows installed server | Open **Media Server Control** from Start, then **Stop server** | Select **Start server** in the same window |
+| Windows portable ZIP | Press Ctrl+C in the launcher console; confirm the server exits | Run the same `Start-MediaServer.cmd` |
 | Linux native | Ctrl+C in the server terminal | Run `./start-media-server.sh` again |
+| macOS native | Control+C in the server Terminal | Open `Start-MediaServer.command` again |
 | Docker | `docker compose stop` | `docker compose up -d` from the same Compose project |
+
+For Docker Desktop, you can also use the **Stop/Start** button on the existing Media Server Compose application in **Containers**. Keep its data volumes. On Windows, closing the Server Control window only hides it in the tray; use **Stop server and exit control** from the tray menu before an update or uninstall.
 
 After restarting, sign in if needed. The library and resume point should remain. If setup reappears unexpectedly, stop and check that you selected the same data directory/Compose project; do not create a new administrator over what you think is your existing installation.
 
