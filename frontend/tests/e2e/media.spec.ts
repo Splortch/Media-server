@@ -308,7 +308,9 @@ test('setup, accounts, collections, diagnostics, stream ranges and persist resum
   await unlink(path.join(media, 'sample.webm'));
   await page.reload();
   await expect(page.locator('video')).toHaveCount(0);
-  await page.getByRole('button', { name: 'Play from beginning', exact: true }).click();
+  await page
+    .getByRole('button', { name: 'Play from beginning', exact: true })
+    .click();
   await expect(page.getByRole('alert')).toContainText(
     'server cannot read this media file',
   );
