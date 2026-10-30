@@ -33,7 +33,11 @@ export default function App() {
   const [item, setItem] = useState<Media>();
   const [playFrom, setPlayFrom] = useState<number>();
   const [playBusy, setPlayBusy] = useState(false);
-  const returnTo = useRef({ route: 'library', mediaId: 0, scroll: 0 });
+  const [returnTo, setReturnTo] = useState({
+    route: 'library',
+    mediaId: 0,
+    scroll: 0,
+  });
   const restoreList = useRef(false);
   const focusedRoute = useRef('');
   const requestEpoch = useRef(0);
@@ -93,7 +97,7 @@ export default function App() {
     setItem(undefined);
     setPlayFrom(undefined);
     setPlayBusy(false);
-    returnTo.current = { route: 'library', mediaId: 0, scroll: 0 };
+    setReturnTo({ route: 'library', mediaId: 0, scroll: 0 });
     restoreList.current = false;
     setWatching([]);
     setCollections([]);
@@ -210,13 +214,13 @@ export default function App() {
     const key = phase + ':' + route;
     if (phase === 'ready' && !loading) {
       if (focusedRoute.current !== key) {
-        if (restoreList.current && route === returnTo.current.route) {
+        if (restoreList.current && route === returnTo.route) {
           const card = document.querySelector<HTMLElement>(
-            `[data-media-id="${returnTo.current.mediaId}"]`,
+            `[data-media-id="${returnTo.mediaId}"]`,
           );
           (card ?? mainRef.current)?.focus({ preventScroll: true });
           window.scrollTo({
-            top: returnTo.current.scroll,
+            top: returnTo.scroll,
             behavior: 'instant',
           });
           restoreList.current = false;
@@ -231,7 +235,7 @@ export default function App() {
       }
       document.title = `${phase === 'setup' ? 'Set up your server' : 'Sign in'} · Media Server`;
     }
-  }, [phase, route, loading, item]);
+  }, [phase, route, loading, item, returnTo]);
   async function authenticate(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     const f = new FormData(e.currentTarget);
@@ -294,7 +298,7 @@ export default function App() {
           href={`#media/${m.id}`}
           data-media-id={m.id}
           onClick={() => {
-            returnTo.current = { route, mediaId: m.id, scroll: window.scrollY };
+            setReturnTo({ route, mediaId: m.id, scroll: window.scrollY });
           }}
           key={m.id}
         >
@@ -529,7 +533,7 @@ export default function App() {
             item && (
               <>
                 <a
-                  href={'#' + returnTo.current.route}
+                  href={'#' + returnTo.route}
                   className="back-link"
                   onClick={() => {
                     document.querySelector('video')?.pause();

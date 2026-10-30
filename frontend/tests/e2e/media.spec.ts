@@ -199,6 +199,8 @@ test('setup, accounts, collections, diagnostics, stream ranges and persist resum
   await page.getByLabel('Playback quality').selectOption('-1');
   await page.getByRole('button', { name: 'Direct Play', exact: true }).click();
   await page.reload();
+  await expect(page.locator('video')).toHaveCount(0);
+  await page.getByRole('button', { name: /^Resume from/ }).click();
   await expect
     .poll(() =>
       page
