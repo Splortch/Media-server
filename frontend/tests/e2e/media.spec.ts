@@ -79,7 +79,9 @@ test('setup, accounts, collections, diagnostics, stream ranges and persist resum
   await page.keyboard.press('Tab');
   await expect(page.getByLabel('Search library')).toBeFocused();
   await page.getByLabel('Search library').fill('does-not-exist');
-  await expect(page.getByRole('status')).toHaveText('0 matching videos');
+  await expect(page.getByRole('status', { name: 'Search results' })).toHaveText(
+    '0 matching videos',
+  );
   await expect(page.getByLabel('Search library')).toBeFocused();
   await page.getByLabel('Search library').fill('');
   await expect(

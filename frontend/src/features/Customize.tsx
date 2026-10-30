@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { api } from '../services/api';
 import {
   loadFeatures,
@@ -15,13 +15,21 @@ export default function Customize({
   admin: boolean;
   onChange: (state: FeatureState) => void;
 }) {
+  const mounted = useRef(true);
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+    };
+  }, []);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   async function save(path: string, method: string, body?: unknown) {
     setBusy(true);
     setError('');
     try {
-      onChange(parseFeatures(await api(path, method, body)));
+      const response = parseFeatures(await api(path, method, body));
+      if (mounted.current) onChange(response);
     } catch (e) {
       setError((e as Error).message);
     } finally {
@@ -54,7 +62,8 @@ export default function Customize({
               setBusy(true);
               setError('');
               try {
-                onChange(await loadFeatures());
+                const response = await loadFeatures();
+                if (mounted.current) onChange(response);
               } catch (e) {
                 setError((e as Error).message);
               } finally {

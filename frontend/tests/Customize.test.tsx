@@ -104,3 +104,23 @@ it('rejects malformed capabilities and ignores unsupported future keys', () => {
   });
   expect(state.features).toHaveLength(2);
 });
+
+it('does not apply a previous account response after the settings view unmounts', async () => {
+  let resolve!: (value: unknown) => void;
+  vi.mocked(api).mockImplementationOnce(
+    () =>
+      new Promise((r) => {
+        resolve = r;
+      }),
+  );
+  const changed = vi.fn();
+  const view = render(
+    <Customize state={initial} admin={false} onChange={changed} />,
+  );
+  fireEvent.click(screen.getByLabelText('Show Smart collections'));
+  view.unmount();
+  resolve(initial);
+  await Promise.resolve();
+  await Promise.resolve();
+  expect(changed).not.toHaveBeenCalled();
+});
