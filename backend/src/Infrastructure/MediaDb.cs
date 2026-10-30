@@ -7,6 +7,8 @@ public class MediaDb(DbContextOptions<MediaDb> options, IUserContext? context = 
     : DbContext(options)
 {
     private int? CurrentUserId => context?.UserId;
+    public DbSet<MovieRequest> MovieRequests => Set<MovieRequest>();
+    public DbSet<RequestSupport> RequestSupport => Set<RequestSupport>();
     public DbSet<FeaturePolicy> FeaturePolicies => Set<FeaturePolicy>();
     public DbSet<FeatureVisibility> FeatureVisibility => Set<FeatureVisibility>();
     public DbSet<LibraryGrant> Grants => Set<LibraryGrant>();
@@ -25,6 +27,16 @@ public class MediaDb(DbContextOptions<MediaDb> options, IUserContext? context = 
 
     protected override void OnModelCreating(ModelBuilder b)
     {
+        b.Entity<MovieRequest>().HasOne<User>().WithMany().HasForeignKey(x => x.UserId);
+        b.Entity<MovieRequest>().HasOne<Library>().WithMany().HasForeignKey(x => x.LibraryId);
+        b.Entity<MovieRequest>().HasIndex(x => new { x.LibraryId, x.SearchTitle });
+        b.Entity<MovieRequest>().Property(x => x.Revision).IsConcurrencyToken();
+        b.Entity<RequestSupport>().HasKey(x => new { x.RequestId, x.UserId });
+        b.Entity<RequestSupport>()
+            .HasOne<MovieRequest>()
+            .WithMany()
+            .HasForeignKey(x => x.RequestId);
+        b.Entity<RequestSupport>().HasOne<User>().WithMany().HasForeignKey(x => x.UserId);
         b.Entity<FeaturePolicy>().HasKey(x => x.Key);
         b.Entity<FeatureVisibility>().HasKey(x => new { x.UserId, x.Key });
         b.Entity<FeatureVisibility>().HasOne<User>().WithMany().HasForeignKey(x => x.UserId);
