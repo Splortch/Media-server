@@ -87,6 +87,7 @@ def run():
                    MediaServer__SecureCookies='true', MediaServer__TrustedProxies__0='127.0.0.1', AllowedHosts='localhost;127.0.0.1',
                    XDG_DATA_HOME=str(root / 'caddy-data'), XDG_CONFIG_HOME=str(root / 'caddy-config'), MEDIA_SERVER_HOST=f'localhost:{proxy_port}', MEDIA_SERVER_UPSTREAM=f'127.0.0.1:{api_port}', MEDIA_SERVER_CERT=str(cert), MEDIA_SERVER_KEY=str(key))
         tls = ssl.create_default_context(cafile=str(cert))
+        tls.minimum_version = ssl.TLSVersion.TLSv1_2
         client = Client(f'https://localhost:{proxy_port}', tls); anonymous = Client(client.origin, tls)
         processes = []
         with (root / 'backend.log').open('w') as backend_log, (root / 'proxy.log').open('w') as proxy_log:
