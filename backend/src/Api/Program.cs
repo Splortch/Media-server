@@ -267,6 +267,19 @@ builder.Services.AddRateLimiter(o =>
             )
     );
     o.AddPolicy(
+        "requests",
+        context =>
+            RateLimitPartition.GetFixedWindowLimiter(
+                context.User.FindFirstValue(ClaimTypes.NameIdentifier) ?? "anonymous",
+                _ => new FixedWindowRateLimiterOptions
+                {
+                    PermitLimit = 10,
+                    Window = TimeSpan.FromMinutes(1),
+                    QueueLimit = 0,
+                }
+            )
+    );
+    o.AddPolicy(
         "playback",
         context =>
             RateLimitPartition.GetFixedWindowLimiter(
@@ -409,6 +422,7 @@ app.MapPlayback();
 app.MapOperations(credentialGate);
 app.MapFeatures();
 remoteAccess.Map(app);
+app.MapMovieRequests();
 app.MapExperiments(credentialGate);
 void MapApi(RouteGroupBuilder root)
 {

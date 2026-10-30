@@ -20,27 +20,35 @@ public record FeatureVisibilityInput(string[]? Hidden);
 
 public static class Features
 {
-    private sealed record Definition(string Key, string Name, bool ServerConfigurable);
+    private sealed record Definition(
+        string Key,
+        string Name,
+        bool ServerConfigurable,
+        bool DefaultEnabled = true
+    );
 
     private static readonly Definition[] Registry =
     [
+        new("movie-requests", "Movie requests", true, false),
         new("smart-collections", "Smart collections", true),
         new("watch-history", "Watch history navigation", false),
     ];
     private static string[] Keys => Registry.Select(x => x.Key).ToArray();
 
     public static async Task<bool> Enabled(MediaDb db, string key) =>
-        !await db.FeaturePolicies.AnyAsync(x => x.Key == key && !x.Enabled);
+        await db
+            .FeaturePolicies.Where(x => x.Key == key)
+            .Select(x => (bool?)x.Enabled)
+            .SingleOrDefaultAsync()
+        ?? Registry.SingleOrDefault(x => x.Key == key)?.DefaultEnabled
+        ?? false;
 
     private static async Task<FeatureState> State(MediaDb db, ClaimsPrincipal user)
     {
         if (user.IsInRole("Guest"))
             return new FeatureState([]);
         var uid = Operations.Uid(user);
-        var disabled = await db
-            .FeaturePolicies.Where(x => !x.Enabled)
-            .Select(x => x.Key)
-            .ToArrayAsync();
+        var policies = await db.FeaturePolicies.ToDictionaryAsync(x => x.Key, x => x.Enabled);
         var hidden = await db
             .FeatureVisibility.Where(x => x.UserId == uid)
             .Select(x => x.Key)
@@ -50,8 +58,9 @@ public static class Features
                 .Select(feature => new FeatureCapability(
                     feature.Key,
                     feature.Name,
-                    !disabled.Contains(feature.Key),
-                    !disabled.Contains(feature.Key) && !hidden.Contains(feature.Key),
+                    policies.GetValueOrDefault(feature.Key, feature.DefaultEnabled),
+                    policies.GetValueOrDefault(feature.Key, feature.DefaultEnabled)
+                        && !hidden.Contains(feature.Key),
                     hidden.Contains(feature.Key),
                     feature.ServerConfigurable
                 ))

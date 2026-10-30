@@ -129,6 +129,12 @@ jobs:
           SERVER_VERSION: ${{ needs.plan.outputs.server }}
         shell: bash
         run: dotnet publish backend/src/Api -c Release -r "$RID" --self-contained true -p:Version="$SERVER_VERSION" -p:RestoreLockedMode=true -o artifacts/server
+      - name: Inventory locked server and browser dependencies
+        env:
+          SOURCE_SHA: ${{ needs.plan.outputs.sha }}
+          RID: ${{ matrix.rid }}
+        shell: bash
+        run: python scripts/release-inventory.py --assets backend/src/Api/obj/project.assets.json --lockfile frontend/package-lock.json --node-modules frontend/node_modules --output artifacts/server/inventory --commit "$SOURCE_SHA" --runtime "$RID"
       - name: Validate Windows launcher syntax
         if: runner.os == 'Windows'
         shell: pwsh
