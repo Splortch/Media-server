@@ -43,6 +43,47 @@ public sealed class FeatureTests
     [Theory]
     [InlineData("/api")]
     [InlineData("/api/v1")]
+    public async Task FeatureMutationsRetainAntiforgeryProtection(string prefix)
+    {
+        using var server = new Server();
+        using var admin = await server.Admin();
+        using var viewer = await Viewer(server, admin);
+        viewer.DefaultRequestHeaders.Remove("X-CSRF-TOKEN");
+        Assert.Equal(
+            HttpStatusCode.BadRequest,
+            (
+                await viewer.PutAsJsonAsync(
+                    prefix + "/preferences/features",
+                    new { hidden = new[] { "watch-history" } }
+                )
+            ).StatusCode
+        );
+        Assert.Equal(
+            HttpStatusCode.BadRequest,
+            (await viewer.DeleteAsync(prefix + "/preferences/features")).StatusCode
+        );
+        admin.DefaultRequestHeaders.Remove("X-CSRF-TOKEN");
+        Assert.Equal(
+            HttpStatusCode.BadRequest,
+            (
+                await admin.PutAsJsonAsync(
+                    prefix + "/features/smart-collections",
+                    new { enabled = false }
+                )
+            ).StatusCode
+        );
+        var unchanged = await admin.GetFromJsonAsync<JsonElement>(prefix + "/features");
+        Assert.True(Find(unchanged, "smart-collections").GetProperty("enabled").GetBoolean());
+        Assert.False(
+            Find(await viewer.GetFromJsonAsync<JsonElement>(prefix + "/features"), "watch-history")
+                .GetProperty("hidden")
+                .GetBoolean()
+        );
+    }
+
+    [Theory]
+    [InlineData("/api")]
+    [InlineData("/api/v1")]
     public async Task VisibilityIsPrivateValidatedAndDoesNotOverrideAdminPolicy(string prefix)
     {
         using var server = new Server();
