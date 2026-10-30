@@ -15,6 +15,7 @@ The [client ecosystem](docs/clients/README.md) adds a shared Tauri desktop clien
 | First-run setup and login | Implemented | One local administrator; Argon2id, password change/local recovery, session revocation, consumed setup token, CSRF |
 | Libraries and scanning | Implemented | Explicit allowed roots, background jobs, FFprobe metadata, idempotent updates, admin-only scan failure references |
 | Media browsing | Implemented | Responsive React UI, search, technical details, honest empty states |
+| Title information before playback | Implemented alpha | Web/desktop cards open details without a player or stream request; explicit Play/Resume; rich movie/series metadata remains planned |
 | Direct Play | Implemented | Authenticated byte ranges through validated handles on Windows/Linux/macOS; controls, resume and playback diagnostics |
 | Continue Watching | Implemented | Per-user persisted position; completed titles excluded |
 | SQLite schema migrations | Implemented | Versioned EF Core migration, applied at startup |

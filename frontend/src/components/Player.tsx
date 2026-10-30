@@ -5,6 +5,7 @@ import { api, type Media } from '../services/api';
 export default function Player({
   item,
   resume,
+  startPlaying = false,
   progressRevision = 0,
   streamUrl,
   onSaveProgress,
@@ -13,6 +14,7 @@ export default function Player({
 }: {
   item: Media;
   resume: number;
+  startPlaying?: boolean;
   progressRevision?: number;
   streamUrl?: string;
   onSaveProgress?: (seconds: number, completed: boolean) => Promise<void>;
@@ -24,6 +26,7 @@ export default function Player({
   );
   const [caption, setCaption] = useState('');
   const videoRef = useRef<HTMLVideoElement>(null);
+  const explicitStart = useRef(startPlaying);
   const nextPosition = useRef<number | undefined>(undefined);
   const switching = useRef(false);
   const changeSource = useCallback(
@@ -36,6 +39,9 @@ export default function Player({
     [source],
   );
   const surfaceRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (startPlaying) surfaceRef.current?.focus();
+  }, [startPlaying]);
   const [paused, setPaused] = useState(true);
   const [position, setPosition] = useState(0);
   const [duration, setDuration] = useState(0);
@@ -262,6 +268,16 @@ export default function Player({
               v.currentTime = target;
             nextPosition.current = undefined;
             switching.current = false;
+            if (explicitStart.current) {
+              explicitStart.current = false;
+              void v
+                .play()
+                .catch(() =>
+                  setError(
+                    'Playback could not start automatically after your selection. Press Play in the player to retry.',
+                  ),
+                );
+            }
           }}
           onTimeUpdate={(e) => {
             setPosition(e.currentTarget.currentTime);

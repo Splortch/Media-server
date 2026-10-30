@@ -1371,3 +1371,45 @@ details[open] > summary {
     border: 1px solid ButtonText;
   }
 }
+
+.title-overview {
+  display: grid;
+  grid-template-columns: minmax(140px, 220px) minmax(0, 1fr);
+  gap: 36px;
+  align-items: start;
+  margin: 24px 0 36px;
+}
+.title-art {
+  width: 100%;
+  aspect-ratio: 2 / 3;
+  min-height: 0;
+}
+.title-copy h1 {
+  overflow-wrap: anywhere;
+}
+.title-actions {
+  margin: 24px 0;
+}
+.title-facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 18px 30px;
+  font-size: 13px;
+}
+.title-facts dt {
+  color: var(--muted);
+  font-size: 11px;
+  margin-bottom: 5px;
+}
+.title-facts dd {
+  margin: 0;
+}
+@media (max-width: 600px) {
+  .title-overview {
+    grid-template-columns: 1fr;
+    gap: 24px;
+  }
+  .title-art {
+    width: 140px;
+  }
+}

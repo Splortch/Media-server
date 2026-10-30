@@ -19,6 +19,10 @@ vi.mock('../src/bridge', () => ({
     media: vi.fn().mockResolvedValue([]),
     continuing: vi.fn().mockResolvedValue([]),
     me: vi.fn(),
+    detail: vi.fn(),
+    progress: vi.fn(),
+    tracks: vi.fn(),
+    transport: { streamUrl: vi.fn() },
     capabilities: vi.fn().mockResolvedValue(undefined),
   },
 }));
@@ -68,4 +72,72 @@ it('keeps passwords out of persistent browser storage', async () => {
   expect(screen.getByLabelText('Password')).toHaveValue('');
   expect(persisted).not.toHaveBeenCalled();
   persisted.mockRestore();
+});
+
+it('opens title details before requesting a playback URL and resumes only after an explicit action', async () => {
+  const media = {
+    id: 7,
+    libraryId: 1,
+    title: 'Own video',
+    duration: 100,
+    size: 100,
+    container: 'webm',
+    videoCodec: 'vp9',
+    audioCodec: 'opus',
+  };
+  vi.mocked(bridge.connect).mockResolvedValueOnce({
+    name: 'Fixture',
+    serverVersion: 'fixture',
+    apiVersion: 1,
+    minimumClientApiVersion: 1,
+    setupRequired: false,
+    features: [],
+  });
+  vi.mocked(bridge.login).mockResolvedValueOnce({
+    name: 'Alice',
+    role: 'Viewer',
+  });
+  vi.mocked(bridge.api.media).mockResolvedValue([media]);
+  vi.mocked(bridge.api.detail).mockResolvedValue({
+    ...media,
+    contentRating: 0,
+    playback: { mode: 'direct', mimeType: 'video/webm', warning: null },
+  });
+  vi.mocked(bridge.api.progress).mockResolvedValue({
+    mediaItemId: 7,
+    seconds: 32,
+    revision: 3,
+    completed: false,
+    updatedAt: null,
+  });
+  vi.mocked(bridge.api.tracks).mockResolvedValue({
+    tracks: [],
+    canSelectAudio: false,
+    canSelectSubtitles: false,
+  });
+  vi.mocked(bridge.api.transport.streamUrl).mockResolvedValue(
+    'http://127.0.0.1:1234/media/7',
+  );
+  render(<App />);
+  fireEvent.change(screen.getByLabelText('Server address'), {
+    target: { value: 'https://fixture.example' },
+  });
+  fireEvent.click(screen.getByRole('button', { name: 'Connect' }));
+  await screen.findByLabelText('Password');
+  fireEvent.change(screen.getByLabelText('Username'), {
+    target: { value: 'Alice' },
+  });
+  fireEvent.change(screen.getByLabelText('Password'), {
+    target: { value: 'fixture-password' },
+  });
+  fireEvent.click(screen.getByRole('button', { name: 'Sign in' }));
+  fireEvent.click(await screen.findByRole('heading', { name: 'Own video' }));
+  await screen.findByRole('region', { name: 'Title information' });
+  expect(document.querySelector('video')).toBeNull();
+  expect(bridge.api.transport.streamUrl).not.toHaveBeenCalled();
+  expect(screen.getByRole('heading', { name: 'Own video' })).toHaveFocus();
+  fireEvent.click(screen.getByRole('button', { name: 'Resume from 32 sec' }));
+  await screen.findByLabelText('Own video');
+  expect(bridge.api.transport.streamUrl).toHaveBeenCalledExactlyOnceWith(7);
+  expect(bridge.api.progress).toHaveBeenCalledTimes(2);
 });
