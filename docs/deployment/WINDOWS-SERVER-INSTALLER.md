@@ -7,7 +7,7 @@ For Windows x64 releases built after this change, choose **`MediaServer-v0.2.0-a
 1. Download the server setup.exe and optionally compare its SHA-256 with that release's `SHA256SUMS`. Builds are unsigned early alphas; investigate unexpected security warnings instead of disabling Windows protection.
 2. Run setup using your ordinary Windows account. It requests no administrator elevation, creates no service and opens no firewall/router ports.
 3. Read the license and component choices. **Start automatically when I sign in** is optional and unchecked by default. It starts only after this user signs in; it is not a system service.
-4. Finish with **Start Media Server and open first-time setup** selected. Later, use **Start → Media Server → Media Server**.
+4. Finish with **Start Media Server and open first-time setup** selected. Later, use **Start → Media Server → Media Server Control**. The original Media Server shortcut remains available too.
 5. Select a real media subfolder outside the application/data directories. If FFprobe is missing, choose whether to download the pinned, checksum-verified GyanD tools. This separate download needs internet access and retains its upstream GPL/LGPL licenses. Offline users can install FFprobe on PATH beforehand. No video is uploaded.
 6. A local setup-token window and browser open. Copy the token into **http://127.0.0.1:5050**, create a local administrator (12–256 character password), then sign in. The token is private and is removed after successful setup.
 7. In browser **Settings**, add the selected folder as a library and select **Scan library**. Folder selection grants allowed-root access; it does not automatically create or scan the library.
@@ -15,9 +15,16 @@ For Windows x64 releases built after this change, choose **`MediaServer-v0.2.0-a
 
 ## Day-to-day use
 
-The server runs with a **notification-area/tray icon**, possibly under Windows' hidden-icons arrow. No console needs to remain open. Double-click it, or use **Open Media Server**, to open the bundled browser UI. Its menu also shows the first-run token when applicable, opens private data/logs, toggles sign-in startup and provides **Stop server and exit**. Closing a browser tab does not stop the server. Signing out of Windows stops the per-user session; always-on hosting needs a future service design.
+1. Open **Start → Media Server → Media Server Control**. It shows whether this local server is running or stopped. Opening the launcher for the first time starts the server as before.
+2. Choose **Stop server** to turn hosting off. The controller stays open, and all connected devices lose access until you start it again.
+3. Choose **Start server** to turn hosting back on, or **Restart server** to stop and start it. Saved accounts, libraries and playback progress remain in the same data directory.
+4. Choose **Open in browser** to use the server. This button is disabled while stopped.
+5. Closing the control window hides it; it does **not** stop hosting. Double-click the tray icon (possibly under the hidden-icons arrow), or open the Start-menu shortcut again, to bring it back.
+6. To quit completely, choose **Stop server and exit control** from the tray menu. Use this before an upgrade or uninstall, which also needs the controller's lock to be released.
 
-Starting the shortcut again while the tray host is already running opens the browser. It does not start another server. A running portable instance using the same data directory must be stopped first. Port conflicts and unavailable media/tools are startup errors rather than reasons to expose a new network listener.
+The tray menu also offers Start, Stop and Restart, private logs, the first-run token, and opt-in **Start when I sign in**. Closing the browser does not stop the server. Signing out of Windows ends the per-user session; this is not a Windows service. Controls apply only to the server process owned by this launcher, not a remote server or a separately started portable instance. Stopping interrupts active streams; a client may not yet have saved its latest few seconds of playback.
+
+Opening a second shortcut reopens the existing control window instead of starting another backend. A portable instance using the same data directory must be stopped first. Port conflicts and unavailable media/tools remain startup errors; no remote shutdown endpoint or new network listener is introduced.
 
 ## Data, upgrades and uninstall
 
@@ -36,7 +43,7 @@ The tray writes backend output to `server.log` and `server-error.log` in the pri
 
 The normal release workflow publishes a self-contained Windows backend and web UI, stages the portable ZIP, then compiles `release-resources/installer/server.nsi` using NSIS 3 and `scripts/build-server-installer.py`. It adds the actual setup.exe to the existing Windows **server** release with checksums, alongside its portable ZIP; Linux, Docker and Windows-client releases remain separate.
 
-Windows CI tests the actual installer in silent mode on a disposable runner: installation/shortcut registration, real tray/backend startup, generated-video scanning through FFprobe, cookie/CSRF login, authenticated ranges, progress persistence, rejection of running upgrades/uninstall, reinstall with an unchanged database, and uninstall retaining data/media/unknown files. The fixture also exercises cooperative tray stop. Linux policy tests cover the bounded uninstall manifest and release completeness. Passing automation does not establish physical installer interaction, screen-reader behavior, SmartScreen reputation or every codec/GPU path.
+Windows CI tests the actual installer in silent mode on a disposable runner: installation/shortcut registration, real tray/backend startup, generated-video scanning through FFprobe, cookie/CSRF login, authenticated ranges, progress persistence, rejection of running upgrades/uninstall, reinstall with an unchanged database, and uninstall retaining data/media/unknown files. The fixture also clicks the actual Start/Stop/Restart button handlers through local control signals, verifies that stopping leaves the controller alive, checks that restart replaces the backend process, and rechecks persisted account/library/progress after startup. Linux policy tests cover the bounded uninstall manifest and release completeness. Passing automation does not establish physical installer interaction, screen-reader behavior, SmartScreen reputation or every codec/GPU path.
 
 For local Windows build development, first stage the real `win-x64` release using the release workflow's publish/package steps, set `SERVER_VERSION`, install NSIS 3 (or set `MAKENSIS`), then run:
 
