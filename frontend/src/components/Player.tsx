@@ -15,9 +15,11 @@ export default function Player({
   onPlaybackError,
   playbackTransport,
   bookmarkRequest,
+  bookmarkStart,
 }: {
   item: Media;
   bookmarkRequest?: BookmarkRequest;
+  bookmarkStart?: number;
   resume: number;
   startPlaying?: boolean;
   guest?: boolean;
@@ -39,7 +41,13 @@ export default function Player({
   const changeSource = useCallback(
     (value: string) => {
       if (value === source) return;
-      nextPosition.current = videoRef.current?.currentTime ?? 0;
+      nextPosition.current = videoRef.current
+        ? Math.max(
+            0,
+            videoRef.current.currentTime -
+              bookmarkTimelineOrigin(videoRef.current),
+          )
+        : 0;
       switching.current = true;
       setSource(value);
     },
@@ -273,7 +281,12 @@ export default function Player({
               const v = e.currentTarget;
               setDuration(Number.isFinite(v.duration) ? v.duration : 0);
               measure(v);
-              const target = nextPosition.current ?? resume;
+              const target =
+                nextPosition.current !== undefined
+                  ? bookmarkStreamTime(v, nextPosition.current)
+                  : bookmarkStart === undefined
+                    ? resume
+                    : bookmarkStreamTime(v, bookmarkStart);
               if (
                 Number.isFinite(v.duration) &&
                 v.duration > 0 &&
@@ -281,7 +294,12 @@ export default function Player({
               )
                 v.currentTime = Math.max(
                   0,
-                  Math.min(v.duration - 0.001, target),
+                  Math.min(
+                    (v.seekable.length
+                      ? v.seekable.end(v.seekable.length - 1)
+                      : v.duration) - 0.001,
+                    target,
+                  ),
                 );
               nextPosition.current = undefined;
               switching.current = false;
@@ -505,8 +523,22 @@ export default function Player({
           key={item.id}
           id={item.id}
           duration={item.duration}
-          onSeek={seek}
-          currentPosition={() => videoRef.current?.currentTime ?? 0}
+          onSeek={(seconds) => {
+            const video = videoRef.current;
+            if (video && video.readyState > 0) {
+              video.currentTime = bookmarkStreamTime(video, seconds);
+              setPosition(video.currentTime);
+            }
+          }}
+          currentPosition={() =>
+            videoRef.current
+              ? Math.max(
+                  0,
+                  videoRef.current.currentTime -
+                    bookmarkTimelineOrigin(videoRef.current),
+                )
+              : 0
+          }
           request={bookmarkRequest}
         />
       )}
@@ -539,4 +571,17 @@ export function formatPlaybackTime(seconds: number) {
   const hours = Math.floor(total / 3600);
   const minutes = Math.floor((total % 3600) / 60);
   return `${hours ? `${hours}:${String(minutes).padStart(2, '0')}` : minutes}:${String(total % 60).padStart(2, '0')}`;
+}
+
+export function bookmarkTimelineOrigin(video: HTMLVideoElement) {
+  return video.seekable.length ? Math.max(0, video.seekable.start(0)) : 0;
+}
+export function bookmarkStreamTime(video: HTMLVideoElement, seconds: number) {
+  const origin = bookmarkTimelineOrigin(video);
+  const end = video.seekable.length
+    ? video.seekable.end(video.seekable.length - 1)
+    : video.duration;
+  if (!Number.isFinite(seconds) || !Number.isFinite(end) || end <= origin)
+    return origin;
+  return Math.max(origin, Math.min(end - 0.001, origin + seconds));
 }

@@ -2,7 +2,7 @@
 
 Issue #46 adds bookmarks in the web and shared desktop UI. On a title's details page or below playback controls, expand **Private bookmarks and notes**. Enter a name, timestamp in seconds and optional private note. In playback, **Use current position** copies the browser's current media time. Use zero for a general title note. **Edit**, **Save bookmark**, **Delete** and named jump buttons work with keyboard controls and native labels. Notes render as literal text, not HTML or subtitle markup.
 
-Selecting a bookmark from details explicitly opens playback at that time; viewing or managing notes never loads media bytes. During playback it seeks the current stream. Positions are HTML media timeline seconds, the same convention as progress; do not add FFprobe/container start timestamps. Browser demuxers normalize presentation timestamps. Direct/HLS source switches retain this timeline. Unknown duration is rejected, and initial seeking clamps to the current stream duration. Changing editions/cuts is not a timeline conversion: import requires the exact content hash.
+Selecting a bookmark from details explicitly opens playback at that time; viewing or managing notes never loads media bytes. During playback it seeks the current stream. Bookmark positions are elapsed seconds from the current finite stream's first seekable position. The player subtracts that position when capturing a bookmark and adds the current stream origin when jumping or starting from details. It does not add raw FFprobe/container timestamps. This also handles a nonzero browser timeline; tests cover a stream spanning 100–130 seconds with a bookmark 10 seconds into the content. Existing playback progress remains separate. Live/sliding playlists are not supported. Unknown duration is rejected, and initial seeking clamps to the current stream duration. Changing editions/cuts is not a timeline conversion: import requires the exact content hash.
 
 ## Privacy and storage
 
@@ -12,7 +12,7 @@ Names are bounded to 80 characters, notes to 500, with 15 bookmarks per title an
 
 ## Portable transfer
 
-1. Ask an administrator to enable **Compute hashes** for the library and rescan if it has no fingerprint. Existing scanner hashing reads the complete file using its validated file handle. Rescan after editing/replacing a source; hashes describe the last scanned bytes.
+1. Ask an administrator to enable **Hash LIBRARY files** in the library options and rescan if it has no fingerprint. Existing scanner hashing reads the complete file using its validated file handle. Rescan after editing/replacing a source; hashes describe the last scanned bytes.
 2. Expand **Portable export and import**, then **Export bookmarks**. Copy the JSON to a file you control. It contains private notes; treat it as personal data.
 3. On the target server, scan the exact same file with full content hashing enabled. Open its details and paste the JSON into **Portable bookmark JSON**, then **Import bookmarks**.
 

@@ -42,6 +42,7 @@ export default function App() {
   const [progress, setProgress] = useState<Progress[]>([]);
   const [item, setItem] = useState<Media>();
   const [playFrom, setPlayFrom] = useState<number>();
+  const [bookmarkFrom, setBookmarkFrom] = useState<number>();
   const [playBusy, setPlayBusy] = useState(false);
   const [returnTo, setReturnTo] = useState({
     route: 'library',
@@ -344,6 +345,7 @@ export default function App() {
       if (epoch !== requestEpoch.current) return;
       const current = fresh.find((p) => p.mediaItemId === id);
       setProgress(fresh);
+      setBookmarkFrom(bookmark);
       setPlayFrom(
         bookmark ??
           (resume && !current?.completed ? (current?.seconds ?? 0) : 0),
@@ -719,6 +721,7 @@ export default function App() {
                       user?.role === 'Guest' ? async () => {} : undefined
                     }
                     resume={playFrom}
+                    bookmarkStart={bookmarkFrom}
                     progressRevision={
                       progress.find((p) => p.mediaItemId === item.id)
                         ?.revision ?? 0

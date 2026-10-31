@@ -37,6 +37,7 @@ type Selection = {
   progress: ProgressState;
   url?: string;
   startAt?: number;
+  bookmarkStart?: number;
   tracks: Tracks;
   writer: ProgressWriter;
 };
@@ -364,6 +365,7 @@ export default function App() {
         ...selection,
         url,
         progress,
+        bookmarkStart: bookmark,
         startAt:
           bookmark ?? (resume && !progress.completed ? progress.seconds : 0),
         writer: new ProgressWriter(api, id, progress.revision),
@@ -708,6 +710,7 @@ export default function App() {
                   key={selection.item.id}
                   item={selection.item}
                   resume={selection.startAt ?? 0}
+                  bookmarkStart={selection.bookmarkStart}
                   progressRevision={selection.progress.revision}
                   streamUrl={selection.url}
                   playbackTransport={{
