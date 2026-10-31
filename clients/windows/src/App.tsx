@@ -481,8 +481,8 @@ export default function App() {
                       setBusy(true);
                       try {
                         await forgetSavedSession(server.address);
+                        await savePreferences('', theme);
                         if (address === server.address) {
-                          await savePreferences('', theme);
                           setAddress('https://');
                           setServerName('');
                         }

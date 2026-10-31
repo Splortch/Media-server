@@ -78,14 +78,13 @@ class MediaViewModel(app: Application) : AndroidViewModel(app) {
 
     internal fun forgetServer(address: String) = action {
         val remaining = savedConnections.value.filter { it.address != address }
-        require(prefs.edit().putString("servers", SavedServers.encode(remaining)).commit()) {
-            "Could not remove the saved server."
-        }
+        val lastOrigin = prefs.getString("origin", null) == address
+        if (lastOrigin) vault.clear()
+        val edit = prefs.edit().putString("servers", SavedServers.encode(remaining))
+        if (lastOrigin) edit.remove("origin")
+        require(edit.commit()) { "Could not remove the saved server." }
         savedConnections.value = remaining
-        if (prefs.getString("origin", null) == address) {
-            vault.clear()
-            prefs.edit { remove("origin") }
-        }
+        mutable.update { if (it.address == address) it.copy(address = "") else it }
     }
 
     private val mutable = MutableStateFlow(Screen(address = prefs.getString("origin", "") ?: ""))
