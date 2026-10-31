@@ -1566,3 +1566,8 @@ textarea {
 .theme-picker {
   max-width: 32rem;
 }
+
+/* Playback controls deliberately retain dark surfaces in both app themes. */
+.player-controls :focus-visible {
+  outline-color: var(--lime);
+}
