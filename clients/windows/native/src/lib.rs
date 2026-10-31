@@ -494,6 +494,16 @@ fn allowed_request(method: &str, path: &str) -> bool {
         return matches!(method, "GET" | "DELETE");
     }
     if parts.len() >= 2 && parts[0] == "media" && parts[1].parse::<u64>().is_ok_and(|n| n > 0) {
+        if parts.get(2) == Some(&"bookmarks") {
+            return match (method, parts.len()) {
+                ("GET" | "POST", 3) => true,
+                ("GET", 4) => parts[3] == "export",
+                ("POST", 4) => parts[3] == "import",
+                ("PUT", 4) => valid_session(parts[3]),
+                ("DELETE", 5) => valid_session(parts[3]) && parts[4].parse::<u64>().is_ok(),
+                _ => false,
+            };
+        }
         return matches!(
             (method, parts.len(), parts.get(2).copied()),
             ("GET", 2, _)
@@ -794,6 +804,10 @@ mod tests {
         for (method, path) in [
             ("GET", "/api/v1/media?search=test"),
             ("PUT", "/api/v1/media/4/progress-sync"),
+            ("GET", "/api/v1/media/4/bookmarks"),
+            ("POST", "/api/v1/media/4/bookmarks/import"),
+            ("PUT", "/api/v1/media/4/bookmarks/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"),
+            ("DELETE", "/api/v1/media/4/bookmarks/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/1"),
         ] {
             assert!(allowed_request(method, path));
         }
@@ -803,6 +817,9 @@ mod tests {
             ("GET", "/api/v1/media/../../auth/csrf"),
             ("GET", "/api/v1/media/4/stream"),
             ("GET", "/api/v1/media#x"),
+            ("PUT", "/api/v1/media/4/bookmarks/../../users"),
+            ("DELETE", "/api/v1/media/4/bookmarks/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/bad"),
+            ("GET", "/api/v1/media/4/bookmarks/not-a-route"),
         ] {
             assert!(!allowed_request(method, path));
         }

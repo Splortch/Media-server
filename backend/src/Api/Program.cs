@@ -423,6 +423,7 @@ app.MapOperations(credentialGate);
 app.MapFeatures();
 remoteAccess.Map(app);
 app.MapMovieRequests();
+app.MapBookmarks();
 app.MapExperiments(credentialGate);
 void MapApi(RouteGroupBuilder root)
 {

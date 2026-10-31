@@ -333,7 +333,7 @@ export default function App() {
       setError((e as Error).message);
     }
   }
-  async function beginPlayback(resume: boolean) {
+  async function beginPlayback(resume: boolean, bookmark?: number) {
     if (!item || playBusy) return;
     const epoch = requestEpoch.current;
     const id = item.id;
@@ -344,7 +344,10 @@ export default function App() {
       if (epoch !== requestEpoch.current) return;
       const current = fresh.find((p) => p.mediaItemId === id);
       setProgress(fresh);
-      setPlayFrom(resume && !current?.completed ? (current?.seconds ?? 0) : 0);
+      setPlayFrom(
+        bookmark ??
+          (resume && !current?.completed ? (current?.seconds ?? 0) : 0),
+      );
     } catch (e) {
       if (epoch === requestEpoch.current) setError((e as Error).message);
     } finally {
@@ -667,6 +670,8 @@ export default function App() {
                 {playFrom === undefined ? (
                   <TitleDetails
                     item={item}
+                    bookmarks={user?.role !== 'Guest'}
+                    onBookmark={(seconds) => void beginPlayback(false, seconds)}
                     resume={
                       progress.find((p) => p.mediaItemId === item.id)?.completed
                         ? 0

@@ -216,3 +216,25 @@ it('shows rejected play requests and disables seeking before metadata', async ()
     ),
   );
 });
+it('uses browser timeline positions for near-end bookmarks without adding container offsets', () => {
+  render(
+    <Player
+      item={{
+        id: 91,
+        title: 'Offset fixture',
+        duration: 100,
+        size: 1,
+        container: 'mp4',
+        videoCodec: 'h264',
+        audioCodec: 'aac',
+      }}
+      resume={99}
+      guest
+    />,
+  );
+  const video = screen.getByLabelText('Offset fixture') as HTMLVideoElement;
+  Object.defineProperty(video, 'duration', { value: 100, configurable: true });
+  // A presentation start offset is not added again to HTMLMediaElement.currentTime.
+  fireEvent.loadedMetadata(video);
+  expect(video.currentTime).toBe(99);
+});

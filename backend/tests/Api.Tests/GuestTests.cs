@@ -114,6 +114,10 @@ public sealed class GuestTests
         var request = new HttpRequestMessage(HttpMethod.Get, prefix + $"/media/{publicId}/stream");
         request.Headers.Range = new System.Net.Http.Headers.RangeHeaderValue(0, 9);
         Assert.Equal(HttpStatusCode.PartialContent, (await guest.SendAsync(request)).StatusCode);
+        Assert.Equal(
+            HttpStatusCode.Forbidden,
+            (await guest.GetAsync(prefix + $"/media/{publicId}/bookmarks")).StatusCode
+        );
         Assert.Empty(
             (await guest.GetFromJsonAsync<JsonElement>(prefix + "/progress")).EnumerateArray()
         );

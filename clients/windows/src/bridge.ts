@@ -67,3 +67,11 @@ export async function playbackRequest<T>(
 }
 export const playbackFileUrl = (session: string, file: string) =>
   invoke<string>('playback_url', { session, file });
+
+export function bookmarkRequest<T>(
+  path: string,
+  method = 'GET',
+  body?: unknown,
+): Promise<T> {
+  return transport.request<T>(method, '/api/v1' + path, body);
+}

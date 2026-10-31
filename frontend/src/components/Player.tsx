@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import Icon from './Icon';
+import Bookmarks, { type BookmarkRequest } from './Bookmarks';
 import PlaybackEntrance from './PlaybackEntrance';
 import PlaybackSettings, { type PlaybackTransport } from './PlaybackSettings';
 import { api, type Media } from '../services/api';
@@ -13,8 +14,10 @@ export default function Player({
   onSaveProgress,
   onPlaybackError,
   playbackTransport,
+  bookmarkRequest,
 }: {
   item: Media;
+  bookmarkRequest?: BookmarkRequest;
   resume: number;
   startPlaying?: boolean;
   guest?: boolean;
@@ -271,8 +274,15 @@ export default function Player({
               setDuration(Number.isFinite(v.duration) ? v.duration : 0);
               measure(v);
               const target = nextPosition.current ?? resume;
-              if (Number.isFinite(v.duration) && target < v.duration - 2)
-                v.currentTime = target;
+              if (
+                Number.isFinite(v.duration) &&
+                v.duration > 0 &&
+                Number.isFinite(target)
+              )
+                v.currentTime = Math.max(
+                  0,
+                  Math.min(v.duration - 0.001, target),
+                );
               nextPosition.current = undefined;
               switching.current = false;
               if (explicitStart.current) {
@@ -490,6 +500,16 @@ export default function Player({
           </dd>
         </dl>
       </details>
+      {!guest && (!streamUrl || bookmarkRequest) && (
+        <Bookmarks
+          key={item.id}
+          id={item.id}
+          duration={item.duration}
+          onSeek={seek}
+          currentPosition={() => videoRef.current?.currentTime ?? 0}
+          request={bookmarkRequest}
+        />
+      )}
       {saveError && (
         <p role="status" className="error">
           {saveError}

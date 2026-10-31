@@ -1524,3 +1524,22 @@ textarea {
   min-height: 100px;
   resize: vertical;
 }
+
+.bookmarks {
+  grid-column: 1 / -1;
+  min-width: 0;
+}
+.bookmarks form {
+  display: grid;
+  gap: 0.8rem;
+  margin-block: 1rem;
+}
+.bookmarks textarea {
+  width: 100%;
+  min-height: 5rem;
+  resize: vertical;
+}
+.bookmarks li {
+  padding-block: 0.75rem;
+  overflow-wrap: anywhere;
+}
