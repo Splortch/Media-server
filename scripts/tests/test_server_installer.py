@@ -47,7 +47,7 @@ class InstallerManifestTests(unittest.TestCase):
     def test_external_servers_are_observed_never_adopted(self):
         script = (Path(__file__).resolve().parents[2] / 'release-resources/windows/MediaServer.Tray.ps1').read_text()
         self.assertIn('function Test-SharingViolation', script)
-        self.assertIn('if (-not $externalMode) { Start-OwnedServer }', script)
+        self.assertIn('if (-not $externalMode) {\n        # A disconnected adapter', script)
         self.assertIn('$stopButton.Enabled = -not $externalMode', script)
         self.assertIn('$restartButton.Enabled = -not $externalMode', script)
         self.assertNotIn('Get-Process Api', script)

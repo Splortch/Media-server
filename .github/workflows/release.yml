@@ -11,6 +11,7 @@ on:
       - '.github/workflows/desktop-clients.yml'
       - 'scripts/*unix*installer*'
       - 'scripts/*desktop*'
+      - 'scripts/build-macos-client.py'
       - 'scripts/tests/test_unix_installers.py'
       - 'scripts/*release*'
       - 'scripts/stamp-windows-version.cjs'

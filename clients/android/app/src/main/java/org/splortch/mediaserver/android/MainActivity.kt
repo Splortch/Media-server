@@ -35,6 +35,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.ui.PlayerView
 import org.splortch.mediaserver.core.MediaSummary
+import org.splortch.mediaserver.core.SavedServer
 
 @UnstableApi
 class MainActivity : ComponentActivity() {
@@ -46,6 +47,7 @@ class MainActivity : ComponentActivity() {
         setContent {
             val screen by model.screen.collectAsStateWithLifecycle()
             val player by model.player.collectAsStateWithLifecycle()
+            val savedServers by model.savedServers.collectAsStateWithLifecycle()
             LaunchedEffect(screen.fullscreen, player) {
                 val controller = WindowCompat.getInsetsController(window, window.decorView)
                 controller.systemBarsBehavior =
@@ -98,7 +100,13 @@ class MainActivity : ComponentActivity() {
                             }
                             if (screen.phase == "connect")
                                 item {
-                                    ConnectionScreen(screen.address, screen.busy, model::connect)
+                                    ConnectionScreen(
+                                        screen.address,
+                                        screen.busy,
+                                        savedServers,
+                                        model::forgetServer,
+                                        model::connect,
+                                    )
                                 }
                             if (screen.phase == "login")
                                 item { LoginScreen(screen.address, screen.busy, model::login) }
@@ -114,7 +122,7 @@ class MainActivity : ComponentActivity() {
                                             onClick = model::logout,
                                             enabled = !screen.busy,
                                         ) {
-                                            Text("Sign out")
+                                            Text("Change server / sign out")
                                         }
                                     }
                                 }
@@ -350,12 +358,52 @@ private fun VideoView(player: androidx.media3.exoplayer.ExoPlayer, modifier: Mod
 }
 
 @Composable
-private fun ConnectionScreen(saved: String, busy: Boolean, connect: (String, Boolean) -> Unit) {
+private fun ConnectionScreen(
+    saved: String,
+    busy: Boolean,
+    servers: List<SavedServer>,
+    forget: (String) -> Unit,
+    connect: (String, Boolean, String) -> Unit,
+) {
     var address by remember(saved) { mutableStateOf(saved) }
     var rememberSession by remember { mutableStateOf(true) }
+    var serverName by remember { mutableStateOf("") }
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Text(
             "Connect to your own Media Server. Complete first-time server setup in a browser first."
+        )
+        if (servers.isNotEmpty()) {
+            Text("Saved servers", style = MaterialTheme.typography.titleMedium)
+            servers.forEach { server ->
+                OutlinedCard(Modifier.fillMaxWidth()) {
+                    Column(Modifier.padding(12.dp)) {
+                        Text(server.name, style = MaterialTheme.typography.titleSmall)
+                        Text(server.address, style = MaterialTheme.typography.bodySmall)
+                        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                            TextButton(
+                                onClick = {
+                                    address = server.address
+                                    serverName = server.name
+                                },
+                                enabled = !busy,
+                            ) {
+                                Text("Use ${server.name}")
+                            }
+                            TextButton(onClick = { forget(server.address) }, enabled = !busy) {
+                                Text("Forget ${server.name}")
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        OutlinedTextField(
+            value = serverName,
+            onValueChange = { serverName = it.take(80) },
+            label = { Text("Server name (optional)") },
+            singleLine = true,
+            enabled = !busy,
+            modifier = Modifier.fillMaxWidth(),
         )
         OutlinedTextField(
             value = address,
@@ -369,9 +417,15 @@ private fun ConnectionScreen(saved: String, busy: Boolean, connect: (String, Boo
             Checkbox(rememberSession, { rememberSession = it })
             Text("Remember this session on this device", Modifier.padding(top = 12.dp))
         }
-        GradientButton(onClick = { connect(address, rememberSession) }, enabled = !busy) {
+        GradientButton(
+            onClick = { connect(address, rememberSession, serverName) },
+            enabled = !busy,
+        ) {
             Text("Connect")
         }
+        Text(
+            "Successful connections save only the server name and address on this device. Passwords are never saved."
+        )
         Text(
             "Use https://your-server.example. For private USB testing: adb reverse tcp:5050 tcp:5050, then http://127.0.0.1:5050. LAN HTTP is blocked.",
             style = MaterialTheme.typography.bodySmall,
@@ -428,7 +482,9 @@ private fun SearchScreen(screen: Screen, model: MediaViewModel) {
             singleLine = true,
             modifier = Modifier.fillMaxWidth(),
         )
-        GradientButton(onClick = { model.search(prefix) }, enabled = !screen.busy) { Text("Search") }
+        GradientButton(onClick = { model.search(prefix) }, enabled = !screen.busy) {
+            Text("Search")
+        }
         Row(
             Modifier.horizontalScroll(rememberScrollState()),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -468,9 +524,7 @@ private fun MediaCard(media: MediaSummary, enabled: Boolean, open: () -> Unit) {
             Box(
                 Modifier.size(width = 52.dp, height = 68.dp)
                     .clip(RoundedCornerShape(10.dp))
-                    .background(
-                        Brush.linearGradient(MediaColors.Gradient)
-                    )
+                    .background(Brush.linearGradient(MediaColors.Gradient))
                     .clearAndSetSemantics {},
                 contentAlignment = Alignment.Center,
             ) {

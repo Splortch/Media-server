@@ -417,6 +417,10 @@ impl DesktopClient {
         *active = Some(replacement);
         deletion
     }
+    pub fn forget_saved_session(&self, address: &str) -> Result<()> {
+        let base = validate_server(address)?;
+        self.vault.delete(base.as_str())
+    }
     pub async fn logout(&self) -> Result<Value> {
         let c = self.current().await?;
         let result = c.json(Method::POST, "/api/v1/auth/logout", None).await;

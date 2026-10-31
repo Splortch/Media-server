@@ -76,3 +76,7 @@ server or browser: reopen Media Server Control afterward. Interactive setup keep
 the existing Finish-page startup choice. A rejected downgrade is checked before
 any shutdown. Backups are still required before migrations; this does not claim
 transactional rollback or automatic backup.
+
+## Home-network access and a fixed address
+
+Server Control now includes **Network settings**. See the [home-network setup guide](HOME-NETWORK.md) for local/home/specific-IP modes, a narrowly scoped firewall rule, and router DHCP reservation steps. Stop the server before saving; then start it to apply the change. Old installations remain localhost-only until opted in.

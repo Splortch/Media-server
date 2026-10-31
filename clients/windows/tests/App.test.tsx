@@ -1,5 +1,5 @@
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
-import { vi, it, expect } from 'vitest';
+import { vi, it, expect, beforeEach } from 'vitest';
 import App from '../src/App';
 import * as bridge from '../src/bridge';
 vi.mock('../src/bridge', () => ({
@@ -13,6 +13,7 @@ vi.mock('../src/bridge', () => ({
   connect: vi.fn(),
   login: vi.fn(),
   logout: vi.fn(),
+  forgetSavedSession: vi.fn().mockResolvedValue(undefined),
   errorMessage: (e: { message?: string }) => e.message || 'Connection failed',
   expired: () => false,
   api: {
@@ -26,6 +27,13 @@ vi.mock('../src/bridge', () => ({
     capabilities: vi.fn().mockResolvedValue(undefined),
   },
 }));
+beforeEach(() => {
+  localStorage.clear();
+  vi.clearAllMocks();
+  vi.mocked(bridge.connect).mockReset();
+  vi.mocked(bridge.login).mockReset();
+});
+
 it('shows rejected server connections without presenting a fake library', async () => {
   vi.mocked(bridge.connect).mockRejectedValueOnce({
     message: 'Remote servers require HTTPS.',
@@ -70,7 +78,12 @@ it('keeps passwords out of persistent browser storage', async () => {
     expect(screen.getByRole('alert')).toHaveTextContent('Sign-in rejected'),
   );
   expect(screen.getByLabelText('Password')).toHaveValue('');
-  expect(persisted).not.toHaveBeenCalled();
+  expect(JSON.stringify(persisted.mock.calls)).not.toContain(
+    'test-only-password',
+  );
+  expect(
+    JSON.parse(localStorage.getItem('media-server.saved-servers.v1')!),
+  ).toEqual([{ name: 'fixture.example', address: 'https://fixture.example' }]);
   persisted.mockRestore();
 });
 
@@ -135,9 +148,78 @@ it('opens title details before requesting a playback URL and resumes only after 
   await screen.findByRole('region', { name: 'Title information' });
   expect(document.querySelector('video')).toBeNull();
   expect(bridge.api.transport.streamUrl).not.toHaveBeenCalled();
-  expect(screen.getByRole('heading', { name: 'Own video' })).toHaveFocus();
+  await waitFor(() =>
+    expect(screen.getByRole('heading', { name: 'Own video' })).toHaveFocus(),
+  );
   fireEvent.click(screen.getByRole('button', { name: 'Resume from 32 sec' }));
   await screen.findByLabelText('Own video');
   expect(bridge.api.transport.streamUrl).toHaveBeenCalledExactlyOnceWith(7);
   expect(bridge.api.progress).toHaveBeenCalledTimes(2);
+});
+
+it('saves named servers, clears a connection when switching and removes saved addresses', async () => {
+  vi.mocked(bridge.logout).mockResolvedValue(undefined);
+  vi.mocked(bridge.connect).mockResolvedValue({
+    name: 'Fixture',
+    serverVersion: 'fixture',
+    apiVersion: 1,
+    minimumClientApiVersion: 1,
+    setupRequired: false,
+    features: [],
+  });
+  render(<App />);
+  fireEvent.change(screen.getByLabelText('Server name (optional)'), {
+    target: { value: 'Home' },
+  });
+  fireEvent.change(screen.getByLabelText('Server address'), {
+    target: { value: 'https://home.example' },
+  });
+  fireEvent.click(screen.getByRole('button', { name: 'Connect' }));
+  await screen.findByLabelText('Password');
+  fireEvent.click(screen.getByRole('button', { name: 'Change server' }));
+  await screen.findByRole('button', { name: 'Use Home' });
+  expect(bridge.logout).toHaveBeenCalled();
+  expect(screen.queryByLabelText('Password')).not.toBeInTheDocument();
+  fireEvent.change(screen.getByLabelText('Server name (optional)'), {
+    target: { value: 'Family' },
+  });
+  fireEvent.change(screen.getByLabelText('Server address'), {
+    target: { value: 'https://family.example' },
+  });
+  fireEvent.click(screen.getByRole('button', { name: 'Connect' }));
+  await screen.findByLabelText('Password');
+  fireEvent.click(screen.getByRole('button', { name: 'Change server' }));
+  await screen.findByRole('button', { name: 'Use Family' });
+  fireEvent.click(screen.getByRole('button', { name: 'Use Home' }));
+  expect(screen.getByLabelText('Server address')).toHaveValue(
+    'https://home.example',
+  );
+  fireEvent.click(screen.getByRole('button', { name: 'Forget Family' }));
+  await waitFor(() =>
+    expect(
+      screen.queryByRole('button', { name: 'Use Family' }),
+    ).not.toBeInTheDocument(),
+  );
+  expect(bridge.forgetSavedSession).toHaveBeenCalledWith(
+    'https://family.example',
+  );
+  expect(localStorage.getItem('media-server.saved-servers.v1')).not.toContain(
+    'family.example',
+  );
+});
+
+it('keeps the saved address when the secure store cannot clear its credentials', async () => {
+  localStorage.setItem(
+    'media-server.saved-servers.v1',
+    JSON.stringify([{ name: 'Home', address: 'https://home.example' }]),
+  );
+  vi.mocked(bridge.forgetSavedSession).mockRejectedValueOnce(
+    new Error('Vault unavailable'),
+  );
+  render(<App />);
+  fireEvent.click(screen.getByRole('button', { name: 'Forget Home' }));
+  await expect(screen.findByRole('alert')).resolves.toHaveTextContent(
+    'local credentials',
+  );
+  expect(screen.getByRole('button', { name: 'Use Home' })).toBeInTheDocument();
 });

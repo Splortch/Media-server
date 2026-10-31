@@ -61,3 +61,9 @@ No allowed roots means no media scanning or streaming. Add roots via process env
 - **Private host name rejected:** configure a precise `AllowedHosts` list; do not use wildcard hosts as a shortcut.
 - **Database busy/errors:** use one server process per database and a local disk, not a network filesystem. Do not delete the DB to resolve migration failures.
 - **No UI on backend port:** use Vite during development, or build the frontend and copy `frontend/dist` to backend `wwwroot` before publishing.
+
+The web and desktop package manifests temporarily override `minimatch` to `11.0.1`
+for upstream advisory [GHSA-g3hv-75wg-m249](https://github.com/isaacs/minimatch/security/advisories/GHSA-g3hv-75wg-m249).
+ESLint's current dependency ranges still select the affected major version. Keep the
+normal dependency audits enabled. Remove the override only after upstream ranges
+resolve a patched version and both clients pass lint, tests, builds and audits.

@@ -20,6 +20,9 @@ jobs:
       - uses: actions/setup-node@v7
         with:
           node-version: '24'
+      - name: Validate server network configuration
+        shell: pwsh
+        run: ./scripts/test-server-network.ps1
       - run: node --test scripts/tests/issue-to-pr.test.cjs scripts/tests/release-plan.test.cjs
       - run: python -m unittest discover -s scripts/tests -p 'test_*.py'
   required:

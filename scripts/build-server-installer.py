@@ -31,7 +31,7 @@ def build():
     if not re.fullmatch(r'0\.2\.0-alpha\.[1-9][0-9]{0,4}', version) or int(version.rsplit('.', 1)[1]) > 65535:
         raise ValueError('Invalid server version')
     payload = ROOT / 'artifacts/staging' / f'MediaServer-v{version}-win-x64'
-    for name in ('Api.exe', 'coreclr.dll', 'System.Private.CoreLib.dll', 'wwwroot/index.html', 'MediaServer.Tray.ps1', 'LICENSE'):
+    for name in ('Api.exe', 'coreclr.dll', 'System.Private.CoreLib.dll', 'wwwroot/index.html', 'MediaServer.Tray.ps1', 'MediaServer.Network.ps1', 'LICENSE'):
         if not (payload / name).is_file():
             raise RuntimeError(f'Missing real runnable payload: {name}')
     compiler = os.environ.get('MAKENSIS') or shutil.which('makensis')
