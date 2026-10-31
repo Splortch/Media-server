@@ -29,6 +29,7 @@ public static class Features
 
     private static readonly Definition[] Registry =
     [
+        new("downloads", "Download center", false, false),
         new("movie-requests", "Movie requests", true, false),
         new("smart-collections", "Smart collections", true),
         new("watch-history", "Watch history navigation", false),
@@ -55,6 +56,7 @@ public static class Features
             .ToArrayAsync();
         return new FeatureState(
             Registry
+                .Where(x => x.Key != "downloads" || user.IsInRole("Admin"))
                 .Select(feature => new FeatureCapability(
                     feature.Key,
                     feature.Name,

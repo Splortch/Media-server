@@ -34,6 +34,18 @@ public sealed class PathPolicy(string[] allowedRoots)
     public FileStream OpenRead(string root, string relative) =>
         SafeMediaFile.Open(Resolve(root, relative));
 
+    public FileStream OpenWrite(string root, string relative, bool create)
+    {
+        ValidateDirectory(root);
+        if (Path.IsPathFullyQualified(relative))
+            throw new ArgumentException("Relative path required.");
+        var path = Path.GetFullPath(Path.Combine(root, relative));
+        if (!Within(root, path))
+            throw new ArgumentException("Path escapes staging.");
+        RejectLinks(File.Exists(path) ? path : Path.GetDirectoryName(path)!);
+        return SafeMediaFile.OpenWrite(path, create);
+    }
+
     public static bool Within(string root, string candidate)
     {
         var fullRoot = Path.TrimEndingDirectorySeparator(Path.GetFullPath(root));

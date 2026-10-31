@@ -98,6 +98,9 @@ jobs:
         run: cc -std=c11 tests/security/darwin-media-abi.c -o "$RUNNER_TEMP/media-abi" && "$RUNNER_TEMP/media-abi"
       - if: steps.changes.outputs.changed == 'true'
         run: dotnet build MediaServer.sln && python3 scripts/test-native-client.py
+      - name: Verify download staging handles on macOS
+        if: steps.changes.outputs.changed == 'true' && runner.os == 'macOS'
+        run: dotnet test backend/tests/Api.Tests/Api.Tests.csproj --no-build --filter FullyQualifiedName~DownloadStorageTests
       - name: Generate macOS icon from the existing project icon
         if: steps.changes.outputs.changed == 'true' && runner.os == 'macOS'
         working-directory: clients/windows

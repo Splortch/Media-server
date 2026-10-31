@@ -141,3 +141,5 @@ Build inputs, immutable Docker bases and unsigned-alpha limitations: [build prov
 Private playback notes and timestamp bookmarks are available in web/desktop details and playback. See [bookmarks and portable transfer](docs/architecture/BOOKMARKS.md) for privacy, hashing requirements and client coverage.
 
 Web, desktop and Android support saved dark/light appearance. Dark is the default; see [themes](docs/clients/THEMES.md) for selection and extension guidance.
+
+Administrators can opt into the authorized-URL download manager. See the [download center guide](docs/architecture/DOWNLOADS.md) for setup, security limits, staging behavior and the remaining integration roadmap.

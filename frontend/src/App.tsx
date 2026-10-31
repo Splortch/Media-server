@@ -1,3 +1,4 @@
+import Downloads from './features/downloads/Downloads';
 import {
   useEffect,
   useRef,
@@ -571,6 +572,16 @@ export default function App() {
               <span>Movie requests</span>
             </a>
           )}
+          {user?.role === 'Admin' && featureVisible(features, 'downloads') && (
+            <a
+              href="#downloads"
+              className={route === 'downloads' ? 'active' : ''}
+              aria-current={route === 'downloads' ? 'page' : undefined}
+            >
+              <Icon name="library" />
+              <span>Downloads</span>
+            </a>
+          )}
           {featureVisible(features, 'watch-history') && (
             <a
               aria-current={route === 'history' ? 'page' : undefined}
@@ -606,19 +617,21 @@ export default function App() {
           <div className="workspace-heading">
             <span className="workspace-kicker">YOUR SPACE</span>
             <span>
-              {route === 'requests'
-                ? 'Movie requests'
-                : route === 'experimental'
-                  ? 'Experimental'
-                  : route === 'settings'
-                    ? 'Server settings'
-                    : route === 'history'
-                      ? 'Watch history'
-                      : route === 'library'
-                        ? 'Media library'
-                        : route.startsWith('media/')
-                          ? 'Now showing'
-                          : 'Home'}
+              {route === 'downloads'
+                ? 'Download center'
+                : route === 'requests'
+                  ? 'Movie requests'
+                  : route === 'experimental'
+                    ? 'Experimental'
+                    : route === 'settings'
+                      ? 'Server settings'
+                      : route === 'history'
+                        ? 'Watch history'
+                        : route === 'library'
+                          ? 'Media library'
+                          : route.startsWith('media/')
+                            ? 'Now showing'
+                            : 'Home'}
             </span>
           </div>
           <span className="alpha">EARLY ALPHA</span>
@@ -635,7 +648,16 @@ export default function App() {
           {loading && !(query && (route === 'home' || route === 'library')) && (
             <p role="status">Loading your collection…</p>
           )}
-          {route === 'requests' ? (
+          {route === 'downloads' ? (
+            user?.role === 'Admin' && featureVisible(features, 'downloads') ? (
+              <Downloads />
+            ) : (
+              <p>
+                Downloads are disabled or hidden. Administrators can enable them
+                in Settings → Download center.
+              </p>
+            )
+          ) : route === 'requests' ? (
             featureVisible(features, 'movie-requests') ? (
               <Requests admin={user?.role === 'Admin'} initialTitle={query} />
             ) : (

@@ -4,7 +4,7 @@ export type Feature = Omit<
   components['schemas']['FeatureCapability'],
   'key'
 > & {
-  key: 'smart-collections' | 'watch-history' | 'movie-requests';
+  key: 'smart-collections' | 'watch-history' | 'movie-requests' | 'downloads';
 };
 export type FeatureState = { features: Feature[]; available: boolean };
 export const unavailableFeatures: FeatureState = {
@@ -27,9 +27,12 @@ export function parseFeatures(value: unknown): FeatureState {
   const features: Feature[] = value.features.filter(
     (f): f is Feature =>
       f &&
-      ['smart-collections', 'watch-history', 'movie-requests'].includes(
-        f.key,
-      ) &&
+      [
+        'smart-collections',
+        'watch-history',
+        'movie-requests',
+        'downloads',
+      ].includes(f.key) &&
       typeof f.name === 'string' &&
       f.name.length <= 100 &&
       ['enabled', 'visible', 'hidden', 'serverConfigurable'].every(

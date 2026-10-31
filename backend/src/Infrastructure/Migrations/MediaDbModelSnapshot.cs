@@ -17,6 +17,94 @@ namespace Infrastructure.Migrations
 #pragma warning disable 612, 618
             modelBuilder.HasAnnotation("ProductVersion", "10.0.14");
 
+            modelBuilder.Entity("MediaServer.Core.DownloadJob", b =>
+                {
+                    b.Property<string>("Id")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("ContentHash")
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Desired")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("ETag")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Error")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("ExpectedHash")
+                        .HasColumnType("TEXT");
+
+                    b.Property<long>("MaxBytes")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("Priority")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("ProtectedUrl")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<long>("ReceivedBytes")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<long>("Revision")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("SourceHost")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("SourceIdentity")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("State")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<long?>("TotalBytes")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("UserId")
+                        .HasColumnType("INTEGER");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("UserId");
+
+                    b.HasIndex("State", "Priority", "CreatedAt");
+
+                    b.ToTable("Downloads");
+                });
+
+            modelBuilder.Entity("MediaServer.Core.DownloadPolicy", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("HostsJson")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("DownloadPolicies");
+                });
+
             modelBuilder.Entity("MediaServer.Core.FeaturePolicy", b =>
                 {
                     b.Property<string>("Key")
@@ -497,6 +585,15 @@ namespace Infrastructure.Migrations
                     b.HasIndex("MediaItemId");
 
                     b.ToTable("History");
+                });
+
+            modelBuilder.Entity("MediaServer.Core.DownloadJob", b =>
+                {
+                    b.HasOne("MediaServer.Core.User", null)
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("MediaServer.Core.FeatureVisibility", b =>

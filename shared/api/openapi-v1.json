@@ -1791,6 +1791,193 @@
         }
       }
     },
+    "/api/v1/downloads/settings": {
+      "get": {
+        "tags": [
+          "DownloadEndpoints"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DownloadSettingsView"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "Api"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DownloadSettingsInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DownloadSettingsView"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/downloads": {
+      "get": {
+        "tags": [
+          "Api"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/DownloadView"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Api"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DownloadInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DownloadView"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/downloads/{id}": {
+      "put": {
+        "tags": [
+          "Api"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DownloadAction"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DownloadView"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/downloads/{id}/{revision}": {
+      "delete": {
+        "tags": [
+          "Api"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "revision",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/v1/downloads/{id}/file": {
+      "get": {
+        "tags": [
+          "Api"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
     "/api/v1/media/{id}/bookmarks": {
       "get": {
         "tags": [
@@ -2485,6 +2672,196 @@
           },
           "manifest": {
             "type": "string"
+          }
+        }
+      },
+      "DownloadAction": {
+        "required": [
+          "action",
+          "expectedRevision"
+        ],
+        "type": "object",
+        "properties": {
+          "action": {
+            "type": "string"
+          },
+          "expectedRevision": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "priority": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int32"
+          }
+        }
+      },
+      "DownloadInput": {
+        "required": [
+          "name",
+          "url",
+          "budgetBytes",
+          "sha256"
+        ],
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "url": {
+            "type": "string"
+          },
+          "budgetBytes": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "sha256": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "priority": {
+            "type": "integer",
+            "format": "int32",
+            "default": 0
+          }
+        }
+      },
+      "DownloadSettingsInput": {
+        "required": [
+          "enabled",
+          "hosts"
+        ],
+        "type": "object",
+        "properties": {
+          "enabled": {
+            "type": [
+              "null",
+              "boolean"
+            ]
+          },
+          "hosts": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "DownloadSettingsView": {
+        "required": [
+          "enabled",
+          "hosts",
+          "availableBytes",
+          "reservedBytes",
+          "safetyMarginBytes",
+          "stagingLimitBytes"
+        ],
+        "type": "object",
+        "properties": {
+          "enabled": {
+            "type": "boolean"
+          },
+          "hosts": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "availableBytes": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "reservedBytes": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "safetyMarginBytes": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "stagingLimitBytes": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
+      "DownloadView": {
+        "required": [
+          "id",
+          "name",
+          "sourceHost",
+          "state",
+          "desired",
+          "priority",
+          "receivedBytes",
+          "totalBytes",
+          "budgetBytes",
+          "contentHash",
+          "error",
+          "revision",
+          "canResume"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "sourceHost": {
+            "type": "string"
+          },
+          "state": {
+            "type": "string"
+          },
+          "desired": {
+            "type": "string"
+          },
+          "priority": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "receivedBytes": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "totalBytes": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int64"
+          },
+          "budgetBytes": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "contentHash": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "error": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "revision": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "canResume": {
+            "type": "boolean"
           }
         }
       },
@@ -3564,6 +3941,9 @@
     },
     {
       "name": "RemoteAccess"
+    },
+    {
+      "name": "DownloadEndpoints"
     }
   ]
 }

@@ -6,6 +6,8 @@
 #include <stddef.h>
 #include <dlfcn.h>
 #include <stdio.h>
+_Static_assert(offsetof(struct stat, st_nlink) == 6, "Darwin link-count offset changed");
+_Static_assert(O_RDWR == 2 && O_CREAT == 0x200 && O_EXCL == 0x800, "Darwin write flags changed");
 _Static_assert(sizeof(struct stat) == 144, "Darwin stat size changed");
 _Static_assert(offsetof(struct stat, st_mode) == 4, "Darwin mode offset changed");
 _Static_assert(sizeof(((struct stat *)0)->st_mode) == 2, "Darwin mode width changed");
