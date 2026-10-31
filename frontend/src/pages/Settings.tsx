@@ -1,3 +1,4 @@
+import { DownloadSettings } from '../features/downloads/Downloads';
 import { useEffect, useState, type FormEvent } from 'react';
 import Accounts from '../features/admin/Accounts';
 import Customize from '../features/Customize';
@@ -157,6 +158,15 @@ export default function Settings({
           },
         ]
       : []),
+    ...(admin
+      ? [
+          {
+            id: 'settings-downloads',
+            label: 'Downloads',
+            icon: 'settings' as const,
+          },
+        ]
+      : []),
     { id: 'settings-appearance', label: 'Appearance', icon: 'settings' },
     { id: 'settings-account', label: 'Account', icon: 'shield' },
     { id: 'settings-customize', label: 'Customize', icon: 'settings' },
@@ -198,6 +208,7 @@ export default function Settings({
         <h2>Appearance</h2>
         <ThemePicker />
       </section>
+      {admin && <DownloadSettings onChange={onFeaturesChanged} />}
       {admin && (
         <>
           <section

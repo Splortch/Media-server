@@ -23,7 +23,26 @@ internal static class SafeMediaFile
         throw new IOException("Secure media handles are unsupported on this platform.");
     }
 
-    private static FileStream OpenUnix(string path, bool mac)
+    public static FileStream OpenWrite(string path, bool create)
+    {
+        if (OperatingSystem.IsLinux())
+            return OpenUnix(path, false, true, create);
+        if (
+            OperatingSystem.IsMacOS()
+            && RuntimeInformation.ProcessArchitecture is Architecture.X64 or Architecture.Arm64
+        )
+            return OpenUnix(path, true, true, create);
+        if (OperatingSystem.IsWindows())
+            return OpenWindows(path, true, create);
+        throw new IOException("Secure download handles are unsupported on this platform.");
+    }
+
+    private static FileStream OpenUnix(
+        string path,
+        bool mac,
+        bool writable = false,
+        bool create = false
+    )
     {
         // Darwin constants differ from Linux. Both walk from an opened root and
         // forbid following links at every component; never reopen the pathname.
@@ -54,20 +73,31 @@ internal static class SafeMediaFile
                 parent = next;
             }
             var file = Handle(
-                OpenAt(
+                OpenLeaf(
+                    mac,
+                    create,
                     parent.DangerousGetHandle().ToInt32(),
                     parts[^1],
-                    noFollow | closeOnExec | nonBlock,
-                    0
+                    noFollow
+                        | closeOnExec
+                        | nonBlock
+                        | (writable ? 2 : 0)
+                        | (create ? (mac ? 0xa00 : 0xc0) : 0),
+                    create ? 0x180 : 0
                 )
             );
             try
             {
                 // Query the opened inode, not the path. Nonblocking open prevents
                 // a FIFO from hanging validation; devices/directories are rejected.
-                if (!IsRegularFile(file, mac))
+                if (!IsRegularFile(file, mac) || (writable && LinkCount(file, mac) != 1))
                     throw new IOException("Media must be a regular file.");
-                return new FileStream(file, FileAccess.Read, 65536, false);
+                return new FileStream(
+                    file,
+                    writable ? FileAccess.ReadWrite : FileAccess.Read,
+                    65536,
+                    false
+                );
             }
             catch
             {
@@ -81,6 +111,21 @@ internal static class SafeMediaFile
                 parent.Dispose();
         }
     }
+
+    private static int OpenLeaf(
+        bool mac,
+        bool create,
+        int parent,
+        string name,
+        int flags,
+        int mode
+    ) =>
+        mac && create ? OpenAtDarwin(parent, name, flags, mode) : OpenAt(parent, name, flags, mode);
+
+    // libSystem openat is variadic; use a fixed C bridge for file creation on Darwin.
+    // https://github.com/dotnet/runtime/issues/48752
+    [DllImport("MediaNative", EntryPoint = "MediaServerOpenAt", SetLastError = true)]
+    private static extern int OpenAtDarwin(int parent, string name, int flags, int mode);
 
     private static bool IsRegularFile(SafeFileHandle file, bool mac)
     {
@@ -96,9 +141,30 @@ internal static class SafeMediaFile
         return result == 0 && (stat.Mode & 0xf000) == 0x8000;
     }
 
-    private static FileStream OpenWindows(string path)
+    private static uint LinkCount(SafeFileHandle file, bool mac)
     {
-        using var opened = CreateFile(path, 0x80000000, 1, IntPtr.Zero, 3, 0x00200000, IntPtr.Zero);
+        var fd = file.DangerousGetHandle().ToInt32();
+        if (!mac)
+            return Statx(fd, "", 0x1000, 4, out var stat) == 0 ? stat.Links : 0u;
+        DarwinStat darwin;
+        var result =
+            RuntimeInformation.ProcessArchitecture == Architecture.X64
+                ? FStatDarwinInode64(fd, out darwin)
+                : FStatDarwin(fd, out darwin);
+        return result == 0 ? darwin.Links : 0u;
+    }
+
+    private static FileStream OpenWindows(string path, bool writable = false, bool create = false)
+    {
+        using var opened = CreateFile(
+            path,
+            writable ? 0xc0000000u : 0x80000000u,
+            writable ? 0u : 1u,
+            IntPtr.Zero,
+            create ? 1u : 3u,
+            0x00200000,
+            IntPtr.Zero
+        );
         if (opened.IsInvalid)
             throw Failure();
         if (
@@ -107,6 +173,8 @@ internal static class SafeMediaFile
             || GetFileType(opened) != 1
         )
             throw new IOException("Media must be a regular file without reparse points.");
+        if (writable && (!GetStandard(opened, 1, out var standard, 24) || standard.Links != 1))
+            throw new IOException("Download file must have one link.");
         var buffer = new StringBuilder(32768);
         var length = GetFinalPath(opened, buffer, (uint)buffer.Capacity, 0);
         if (length == 0 || length >= buffer.Capacity)
@@ -123,7 +191,12 @@ internal static class SafeMediaFile
         opened.SetHandleAsInvalid();
         try
         {
-            return new FileStream(owned, FileAccess.Read, 65536, false);
+            return new FileStream(
+                owned,
+                writable ? FileAccess.ReadWrite : FileAccess.Read,
+                65536,
+                false
+            );
         }
         catch
         {
@@ -141,6 +214,9 @@ internal static class SafeMediaFile
     [StructLayout(LayoutKind.Explicit, Size = 256)]
     private struct Stat
     {
+        [FieldOffset(16)]
+        public uint Links;
+
         [FieldOffset(28)]
         public ushort Mode;
     }
@@ -150,6 +226,9 @@ internal static class SafeMediaFile
     [StructLayout(LayoutKind.Explicit, Size = 144)]
     private struct DarwinStat
     {
+        [FieldOffset(6)]
+        public ushort Links;
+
         [FieldOffset(4)]
         public ushort Mode;
     }
@@ -208,6 +287,22 @@ internal static class SafeMediaFile
         SafeFileHandle file,
         int infoClass,
         out Attributes attributes,
+        uint size
+    );
+
+    [StructLayout(LayoutKind.Explicit, Size = 24)]
+    private struct StandardInfo
+    {
+        [FieldOffset(16)]
+        public uint Links;
+    }
+
+    [DllImport("kernel32.dll", EntryPoint = "GetFileInformationByHandleEx", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool GetStandard(
+        SafeFileHandle file,
+        int infoClass,
+        out StandardInfo standard,
         uint size
     );
 

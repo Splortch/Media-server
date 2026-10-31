@@ -1571,3 +1571,33 @@ textarea {
 .player-controls :focus-visible {
   outline-color: var(--lime);
 }
+
+.download-form {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 18rem), 1fr));
+}
+.download-form p {
+  grid-column: 1 / -1;
+}
+.download-queue {
+  display: grid;
+  gap: 1rem;
+}
+.download-job progress {
+  width: 100%;
+  accent-color: var(--accent);
+}
+.download-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  align-items: end;
+  margin-top: 1rem;
+}
+.download-actions input {
+  max-width: 6rem;
+}
+.download-hash {
+  overflow-wrap: anywhere;
+}

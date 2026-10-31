@@ -263,3 +263,7 @@ Desktop and Android clients now keep named server addresses. See [saved servers 
 ### Choose dark or light appearance
 
 Dark is the default. Use **Theme** on setup/connection screens, **Settings → Appearance** on web/desktop, or the theme chips in Android. Your preference is saved on this device. See [appearance themes](clients/THEMES.md).
+
+### Optional authorized downloads
+
+The download center is disabled by default. Administrators can approve public source hosts in **Settings → Download center**, enable the module, and open **Downloads**. See the [step-by-step guide](architecture/DOWNLOADS.md). This increment stages authorized URL downloads; automatic library organization and family approval are planned separately.

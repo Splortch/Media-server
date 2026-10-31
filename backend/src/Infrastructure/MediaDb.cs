@@ -7,6 +7,8 @@ public class MediaDb(DbContextOptions<MediaDb> options, IUserContext? context = 
     : DbContext(options)
 {
     private int? CurrentUserId => context?.UserId;
+    public DbSet<DownloadJob> Downloads => Set<DownloadJob>();
+    public DbSet<DownloadPolicy> DownloadPolicies => Set<DownloadPolicy>();
     public DbSet<PlaybackBookmark> Bookmarks => Set<PlaybackBookmark>();
     public DbSet<MovieRequest> MovieRequests => Set<MovieRequest>();
     public DbSet<RequestSupport> RequestSupport => Set<RequestSupport>();
@@ -28,6 +30,14 @@ public class MediaDb(DbContextOptions<MediaDb> options, IUserContext? context = 
 
     protected override void OnModelCreating(ModelBuilder b)
     {
+        b.Entity<DownloadJob>().HasOne<User>().WithMany().HasForeignKey(x => x.UserId);
+        b.Entity<DownloadJob>()
+            .HasIndex(x => new
+            {
+                x.State,
+                x.Priority,
+                x.CreatedAt,
+            });
         b.Entity<PlaybackBookmark>().HasKey(x => new { x.UserId, x.Id });
         b.Entity<PlaybackBookmark>().HasOne<User>().WithMany().HasForeignKey(x => x.UserId);
         b.Entity<PlaybackBookmark>()

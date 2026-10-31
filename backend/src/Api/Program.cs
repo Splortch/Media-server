@@ -4,6 +4,7 @@ using System.Security.Cryptography;
 using System.Text.Json;
 using System.Threading.RateLimiting;
 using MediaServer.Core;
+using MediaServer.Downloads;
 using MediaServer.Infrastructure;
 using MediaServer.Media;
 using MediaServer.Services;
@@ -143,6 +144,14 @@ builder
     .Services.AddDataProtection()
     .PersistKeysToFileSystem(new DirectoryInfo(Path.Combine(data, "keys")));
 builder.Services.AddHttpContextAccessor();
+builder.Services.AddSingleton<DownloadControl>();
+builder.Services.AddSingleton<IDownloadSpace, DownloadSpace>();
+builder.Services.AddSingleton(sp => new DownloadStorage(
+    data,
+    sp.GetRequiredService<IDownloadSpace>()
+));
+builder.Services.AddSingleton<IDownloadTransport, DownloadNetwork>();
+builder.Services.AddHostedService<DownloadWorker>();
 builder.Services.AddScoped<IUserContext, RequestUser>();
 builder.Services.AddDbContext<MediaDb>(o =>
     o.UseSqlite(
@@ -423,6 +432,7 @@ app.MapOperations(credentialGate);
 app.MapFeatures();
 remoteAccess.Map(app);
 app.MapMovieRequests();
+app.MapDownloads();
 app.MapBookmarks();
 app.MapExperiments(credentialGate);
 void MapApi(RouteGroupBuilder root)

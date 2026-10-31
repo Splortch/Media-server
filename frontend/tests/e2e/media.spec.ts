@@ -1,6 +1,7 @@
 import { test, expect } from '@playwright/test';
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
+import { createHash } from 'node:crypto';
 import AxeBuilder from '@axe-core/playwright';
 import type { Page } from '@playwright/test';
 async function accessible(page: Page) {
@@ -66,6 +67,60 @@ test('setup, accounts, collections, diagnostics, stream ranges and persist resum
   await page
     .getByRole('combobox', { name: 'Theme', exact: true })
     .selectOption('dark');
+  // Use this project's public Apache license to test the production HTTPS transport.
+  await page.getByLabel('Enable download center').check();
+  await page
+    .getByLabel('Approved source hosts')
+    .fill('raw.githubusercontent.com');
+  await page.getByRole('button', { name: 'Save download settings' }).click();
+  await page.getByRole('link', { name: 'Downloads', exact: true }).click();
+  await expect(
+    page.getByRole('heading', { name: 'Download center', exact: true }),
+  ).toBeVisible();
+  await page
+    .getByLabel('Download name', { exact: true })
+    .fill('Apache license fixture');
+  await page
+    .getByLabel('HTTPS source URL')
+    .fill(
+      'https://raw.githubusercontent.com/Splortch/Media-server/721a610c3b4eec3194fbfa3f35d5ad29a376cad8/LICENSE',
+    );
+  await page.getByLabel('Maximum size (MiB)').fill('1');
+  const license = await readFile(path.resolve('../LICENSE'));
+  await page
+    .getByLabel('SHA-256 checksum (optional)')
+    .fill(createHash('sha256').update(license).digest('hex'));
+  await page.getByRole('button', { name: 'Add download', exact: true }).click();
+  const saveDownload = page.getByRole('link', {
+    name: 'Save Apache license fixture',
+    exact: true,
+  });
+  await expect(saveDownload).toBeVisible({ timeout: 45000 });
+  const staged = await page.request.get(
+    (await saveDownload.getAttribute('href'))!,
+  );
+  expect(staged.ok()).toBeTruthy();
+  expect(await staged.body()).toEqual(license);
+  await accessible(page);
+  await page.screenshot({
+    path: 'test-results/visual/download-center.png',
+    fullPage: true,
+  });
+  await page
+    .getByRole('button', {
+      name: 'Remove Apache license fixture & staged file',
+      exact: true,
+    })
+    .click();
+  await expect(
+    page.getByText('No downloads yet.', { exact: true }),
+  ).toBeVisible();
+  await page.getByRole('link', { name: 'Settings', exact: true }).click();
+  await page.getByLabel('Enable download center').uncheck();
+  await page.getByRole('button', { name: 'Save download settings' }).click();
+  await expect(
+    page.getByRole('link', { name: 'Downloads', exact: true }),
+  ).toHaveCount(0);
   await page.getByLabel('Library name').fill('Test collection');
   await page.getByLabel('Directory on the server').fill(media);
   await page.getByRole('button', { name: 'Add library', exact: true }).click();

@@ -23,9 +23,15 @@ public sealed class Server : WebApplicationFactory<Program>
 
     private readonly string[]? hardware;
     private readonly bool realProbe;
+    private readonly Action<IServiceCollection>? configure;
 
-    public Server(string[]? hardware = null, bool realProbe = false)
+    public Server(
+        string[]? hardware = null,
+        bool realProbe = false,
+        Action<IServiceCollection>? configure = null
+    )
     {
+        this.configure = configure;
         this.hardware = hardware;
         this.realProbe = realProbe;
         Directory.CreateDirectory(MediaPath);
@@ -49,6 +55,7 @@ public sealed class Server : WebApplicationFactory<Program>
                         new TranscodeSettings(new[] { "libx264" }.Concat(hardware).ToArray())
                     )
                 );
+            configure?.Invoke(services);
         });
     }
 
