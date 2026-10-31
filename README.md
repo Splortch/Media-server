@@ -137,3 +137,5 @@ See [HLS conversion, hardware opt-in, HDR, subtitles and library removal](docs/a
 Playback pipeline validation and GPU configuration: [development guide](docs/development/PLAYBACK-VALIDATION.md).
 
 Build inputs, immutable Docker bases and unsigned-alpha limitations: [build provenance](docs/deployment/BUILD-PROVENANCE.md).
+
+Private playback notes and timestamp bookmarks are available in web/desktop details and playback. See [bookmarks and portable transfer](docs/architecture/BOOKMARKS.md) for privacy, hashing requirements and client coverage.

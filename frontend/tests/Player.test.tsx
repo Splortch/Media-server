@@ -1,6 +1,9 @@
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { vi, expect, it, afterEach } from 'vitest';
-import Player from '../src/components/Player';
+import Player, {
+  bookmarkStreamTime,
+  bookmarkTimelineOrigin,
+} from '../src/components/Player';
 afterEach(() => vi.restoreAllMocks());
 it('uses the authenticated stream endpoint and reports unsupported playback', () => {
   render(
@@ -215,4 +218,105 @@ it('shows rejected play requests and disables seeking before metadata', async ()
       'Playback could not start',
     ),
   );
+});
+it('uses browser timeline positions for near-end bookmarks without adding container offsets', () => {
+  render(
+    <Player
+      item={{
+        id: 91,
+        title: 'Offset fixture',
+        duration: 100,
+        size: 1,
+        container: 'mp4',
+        videoCodec: 'h264',
+        audioCodec: 'aac',
+      }}
+      resume={99}
+      guest
+    />,
+  );
+  const video = screen.getByLabelText('Offset fixture') as HTMLVideoElement;
+  Object.defineProperty(video, 'duration', { value: 100, configurable: true });
+  // A presentation start offset is not added again to HTMLMediaElement.currentTime.
+  fireEvent.loadedMetadata(video);
+  expect(video.currentTime).toBe(99);
+});
+
+it('maps source-relative bookmarks onto a nonzero finite stream timeline and clamps safely', () => {
+  const video = document.createElement('video');
+  Object.defineProperty(video, 'duration', { value: 130 });
+  Object.defineProperty(video, 'seekable', {
+    value: { length: 1, start: () => 100, end: () => 130 },
+  });
+  expect(bookmarkTimelineOrigin(video)).toBe(100);
+  expect(bookmarkStreamTime(video, 10)).toBe(110);
+  expect(bookmarkStreamTime(video, -20)).toBe(100);
+  expect(bookmarkStreamTime(video, 99)).toBeCloseTo(129.999);
+});
+it('starts an explicitly selected bookmark on the current stream timeline', () => {
+  render(
+    <Player
+      item={{
+        id: 92,
+        title: 'Nonzero timeline',
+        duration: 30,
+        size: 1,
+        container: 'mp4',
+        videoCodec: 'h264',
+        audioCodec: 'aac',
+      }}
+      resume={0}
+      bookmarkStart={10}
+      guest
+    />,
+  );
+  const video = screen.getByLabelText('Nonzero timeline') as HTMLVideoElement;
+  Object.defineProperty(video, 'duration', { value: 130 });
+  Object.defineProperty(video, 'seekable', {
+    value: { length: 1, start: () => 100, end: () => 130 },
+  });
+  fireEvent.loadedMetadata(video);
+  expect(video.currentTime).toBe(110);
+});
+it('captures and jumps to bookmarks relative to a nonzero current stream origin', async () => {
+  const request = async <T,>() =>
+    [
+      {
+        id: 'b'.repeat(32),
+        seconds: 10,
+        name: 'Offset scene',
+        note: '',
+        revision: 1,
+      },
+    ] as T;
+  render(
+    <Player
+      item={{
+        id: 93,
+        title: 'Offset controls',
+        duration: 30,
+        size: 1,
+        container: 'mp4',
+        videoCodec: 'h264',
+        audioCodec: 'aac',
+      }}
+      resume={0}
+      bookmarkRequest={request}
+    />,
+  );
+  const video = screen.getByLabelText('Offset controls') as HTMLVideoElement;
+  Object.defineProperty(video, 'duration', { value: 130 });
+  Object.defineProperty(video, 'readyState', { value: 1 });
+  Object.defineProperty(video, 'seekable', {
+    value: { length: 1, start: () => 100, end: () => 130 },
+  });
+  video.currentTime = 115;
+  fireEvent.click(screen.getByText('Private bookmarks and notes'));
+  const jump = await screen.findByRole('button', {
+    name: 'Jump to Offset scene at 10 seconds',
+  });
+  fireEvent.click(screen.getByRole('button', { name: 'Use current position' }));
+  expect(screen.getByLabelText('Timestamp in seconds')).toHaveValue(15);
+  fireEvent.click(jump);
+  expect(video.currentTime).toBe(110);
 });

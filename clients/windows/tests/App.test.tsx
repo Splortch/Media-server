@@ -5,6 +5,7 @@ import * as bridge from '../src/bridge';
 vi.mock('../src/bridge', () => ({
   preferences: vi.fn().mockResolvedValue({}),
   playbackRequest: vi.fn(),
+  bookmarkRequest: vi.fn().mockResolvedValue([]),
   playbackFileUrl: vi.fn(),
   desktopCapabilities: vi
     .fn()

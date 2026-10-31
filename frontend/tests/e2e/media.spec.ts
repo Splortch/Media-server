@@ -137,6 +137,21 @@ test('setup, accounts, collections, diagnostics, stream ranges and persist resum
     fullPage: true,
   });
   expect(earlyStreams).toHaveLength(0);
+  await page.getByText('Private bookmarks and notes', { exact: true }).focus();
+  await page.keyboard.press('Enter');
+  await page
+    .getByLabel('Bookmark name', { exact: true })
+    .fill('Scene to revisit');
+  await page.getByLabel('Timestamp in seconds', { exact: true }).fill('3');
+  await page
+    .getByLabel('Private note', { exact: true })
+    .fill('Private scene note');
+  await page.getByRole('button', { name: 'Add bookmark', exact: true }).click();
+  await expect(
+    page.getByRole('button', { name: 'Jump to Scene to revisit at 3 seconds' }),
+  ).toBeVisible();
+  await accessible(page);
+  expect(earlyStreams).toHaveLength(0);
   await page
     .getByRole('button', { name: 'Play from beginning', exact: true })
     .click();
@@ -150,6 +165,30 @@ test('setup, accounts, collections, diagnostics, stream ranges and persist resum
     .poll(() => video.evaluate((v: HTMLVideoElement) => v.readyState))
     .toBeGreaterThanOrEqual(1);
   await expect(video).not.toHaveAttribute('controls');
+  await video.evaluate((v: HTMLVideoElement) => v.pause());
+  await page.getByText('Private bookmarks and notes', { exact: true }).click();
+  const bookmarkJump = page.getByRole('button', {
+    name: 'Jump to Scene to revisit at 3 seconds',
+  });
+  await bookmarkJump.focus();
+  await page.keyboard.press('Enter');
+  await expect
+    .poll(() => video.evaluate((v: HTMLVideoElement) => v.currentTime))
+    .toBeGreaterThanOrEqual(2.9);
+  await page.getByRole('button', { name: 'Edit Scene to revisit' }).click();
+  await expect(page.getByLabel('Bookmark name', { exact: true })).toBeFocused();
+  await page.getByLabel('Bookmark name', { exact: true }).fill('Renamed scene');
+  await page
+    .getByRole('button', { name: 'Save bookmark', exact: true })
+    .click();
+  await expect(
+    page.getByRole('button', { name: 'Delete Renamed scene' }),
+  ).toBeVisible();
+  await accessible(page);
+  await page.getByRole('button', { name: 'Delete Renamed scene' }).click();
+  await expect(
+    page.getByRole('button', { name: 'Delete Renamed scene' }),
+  ).toHaveCount(0);
   await video.evaluate((v: HTMLVideoElement) => v.pause());
   await expect(
     page.getByRole('button', { name: 'Play', exact: true }),

@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type FormEvent } from 'react';
 import {
   api,
   playbackRequest,
+  bookmarkRequest,
   playbackFileUrl,
   connect,
   login,
@@ -36,6 +37,7 @@ type Selection = {
   progress: ProgressState;
   url?: string;
   startAt?: number;
+  bookmarkStart?: number;
   tracks: Tracks;
   writer: ProgressWriter;
 };
@@ -347,7 +349,7 @@ export default function App() {
       if (requestVersion === loadVersion.current) setBusy(false);
     }
   }
-  async function beginPlayback(resume: boolean) {
+  async function beginPlayback(resume: boolean, bookmark?: number) {
     if (!selection || busy) return;
     const requestVersion = loadVersion.current;
     const id = selection.item.id;
@@ -363,7 +365,9 @@ export default function App() {
         ...selection,
         url,
         progress,
-        startAt: resume && !progress.completed ? progress.seconds : 0,
+        bookmarkStart: bookmark,
+        startAt:
+          bookmark ?? (resume && !progress.completed ? progress.seconds : 0),
         writer: new ProgressWriter(api, id, progress.revision),
       });
     } catch (e) {
@@ -685,6 +689,9 @@ export default function App() {
               {!selection.url && (
                 <TitleDetails
                   item={selection.item}
+                  bookmarks
+                  bookmarkRequest={bookmarkRequest}
+                  onBookmark={(seconds) => void beginPlayback(false, seconds)}
                   headingRef={detailHeading}
                   resume={
                     selection.progress.completed
@@ -699,9 +706,11 @@ export default function App() {
               {selection.url && (
                 <Player
                   startPlaying
+                  bookmarkRequest={bookmarkRequest}
                   key={selection.item.id}
                   item={selection.item}
                   resume={selection.startAt ?? 0}
+                  bookmarkStart={selection.bookmarkStart}
                   progressRevision={selection.progress.revision}
                   streamUrl={selection.url}
                   playbackTransport={{

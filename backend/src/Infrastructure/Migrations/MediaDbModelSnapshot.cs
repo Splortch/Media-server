@@ -216,6 +216,40 @@ namespace Infrastructure.Migrations
                     b.ToTable("MovieRequests");
                 });
 
+            modelBuilder.Entity("MediaServer.Core.PlaybackBookmark", b =>
+                {
+                    b.Property<int>("UserId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Id")
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("MediaItemId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Note")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<long>("Revision")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<double>("Seconds")
+                        .HasColumnType("REAL");
+
+                    b.HasKey("UserId", "Id");
+
+                    b.HasIndex("MediaItemId");
+
+                    b.HasIndex("UserId", "MediaItemId");
+
+                    b.ToTable("Bookmarks");
+                });
+
             modelBuilder.Entity("MediaServer.Core.PlaybackProgress", b =>
                 {
                     b.Property<int>("UserId")
@@ -503,6 +537,21 @@ namespace Infrastructure.Migrations
                     b.HasOne("MediaServer.Core.Library", null)
                         .WithMany()
                         .HasForeignKey("LibraryId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("MediaServer.Core.User", null)
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("MediaServer.Core.PlaybackBookmark", b =>
+                {
+                    b.HasOne("MediaServer.Core.MediaItem", null)
+                        .WithMany()
+                        .HasForeignKey("MediaItemId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 

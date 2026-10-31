@@ -42,6 +42,7 @@ export default function App() {
   const [progress, setProgress] = useState<Progress[]>([]);
   const [item, setItem] = useState<Media>();
   const [playFrom, setPlayFrom] = useState<number>();
+  const [bookmarkFrom, setBookmarkFrom] = useState<number>();
   const [playBusy, setPlayBusy] = useState(false);
   const [returnTo, setReturnTo] = useState({
     route: 'library',
@@ -333,7 +334,7 @@ export default function App() {
       setError((e as Error).message);
     }
   }
-  async function beginPlayback(resume: boolean) {
+  async function beginPlayback(resume: boolean, bookmark?: number) {
     if (!item || playBusy) return;
     const epoch = requestEpoch.current;
     const id = item.id;
@@ -344,7 +345,11 @@ export default function App() {
       if (epoch !== requestEpoch.current) return;
       const current = fresh.find((p) => p.mediaItemId === id);
       setProgress(fresh);
-      setPlayFrom(resume && !current?.completed ? (current?.seconds ?? 0) : 0);
+      setBookmarkFrom(bookmark);
+      setPlayFrom(
+        bookmark ??
+          (resume && !current?.completed ? (current?.seconds ?? 0) : 0),
+      );
     } catch (e) {
       if (epoch === requestEpoch.current) setError((e as Error).message);
     } finally {
@@ -667,6 +672,8 @@ export default function App() {
                 {playFrom === undefined ? (
                   <TitleDetails
                     item={item}
+                    bookmarks={user?.role !== 'Guest'}
+                    onBookmark={(seconds) => void beginPlayback(false, seconds)}
                     resume={
                       progress.find((p) => p.mediaItemId === item.id)?.completed
                         ? 0
@@ -714,6 +721,7 @@ export default function App() {
                       user?.role === 'Guest' ? async () => {} : undefined
                     }
                     resume={playFrom}
+                    bookmarkStart={bookmarkFrom}
                     progressRevision={
                       progress.find((p) => p.mediaItemId === item.id)
                         ?.revision ?? 0

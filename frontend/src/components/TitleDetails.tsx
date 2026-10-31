@@ -2,6 +2,7 @@ import { useRef, type Ref } from 'react';
 import type { Media } from '../services/api';
 import { duration } from '../services/api';
 import Icon from './Icon';
+import Bookmarks, { type BookmarkRequest } from './Bookmarks';
 import { rememberPlaybackArtwork } from './PlaybackEntrance';
 
 export default function TitleDetails({
@@ -11,8 +12,14 @@ export default function TitleDetails({
   onPlay,
   onResume,
   headingRef,
+  bookmarks = false,
+  onBookmark,
+  bookmarkRequest,
 }: {
   item: Media;
+  bookmarks?: boolean;
+  onBookmark?: (seconds: number) => void;
+  bookmarkRequest?: BookmarkRequest;
   resume: number;
   busy?: boolean;
   headingRef?: Ref<HTMLHeadingElement>;
@@ -71,6 +78,15 @@ export default function TitleDetails({
           </div>
         </dl>
       </div>
+      {bookmarks && onBookmark && (
+        <Bookmarks
+          key={item.id}
+          id={item.id}
+          duration={item.duration}
+          onSeek={onBookmark}
+          request={bookmarkRequest}
+        />
+      )}
     </section>
   );
 }
