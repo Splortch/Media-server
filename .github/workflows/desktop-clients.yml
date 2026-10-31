@@ -110,7 +110,7 @@ jobs:
           BUNDLES: ${{ matrix.bundles }}
         run: |
           if [ "$RUNNER_OS" = macOS ]; then
-            npm run tauri -- build --bundles "$BUNDLES" --config '{"bundle":{"icon":["generated-icons/icon.icns"]}}' -- --locked
+            python3 ../../scripts/build-macos-client.py "$BUNDLES"
           else
             npm run tauri -- build --bundles "$BUNDLES" -- --locked
           fi
