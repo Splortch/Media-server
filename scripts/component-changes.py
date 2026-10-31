@@ -11,7 +11,7 @@ COMMON = (
     '.editorconfig', '.gitattributes', 'scripts/component-changes.py',
 )
 PREFIXES = {
-    'backend': ('backend/', 'scripts/audit.py', 'scripts/test-credential-recovery.py', 'scripts/update-server.py', 'scripts/test-native-update.py', '.github/workflows/backend-server.yml'),
+    'backend': ('backend/', 'docker/remote/', 'scripts/test-remote-proxy.py', 'scripts/audit.py', 'scripts/test-credential-recovery.py', 'scripts/update-server.py', 'scripts/test-native-update.py', '.github/workflows/backend-server.yml'),
     'web': ('frontend/', 'shared/api/', '.github/workflows/web-client.yml'),
     'desktop': ('clients/windows/', 'shared/api/', 'backend/', 'frontend/', 'scripts/test-native-client.py', 'scripts/collect-desktop-client.py', 'scripts/test-desktop-installer.py', '.github/workflows/desktop-clients.yml'),
     'windows': (

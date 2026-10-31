@@ -1,6 +1,7 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import Accounts from '../features/admin/Accounts';
 import Customize from '../features/Customize';
+import RemoteAccessStatus from '../features/admin/RemoteAccessStatus';
 import {
   featureVisible,
   unavailableFeatures,
@@ -143,6 +144,11 @@ export default function Settings({
             icon: 'library' as const,
           },
           { id: 'settings-people', label: 'People', icon: 'users' as const },
+          {
+            id: 'settings-remote',
+            label: 'Remote access',
+            icon: 'shield' as const,
+          },
           {
             id: 'settings-activity',
             label: 'Activity',
@@ -378,6 +384,11 @@ export default function Settings({
           <Collections />
         </div>
       )}
+      {admin && (
+        <div id="settings-remote" tabIndex={-1} className="settings-target">
+          <RemoteAccessStatus />
+        </div>
+      )}
       <section className="panel">
         <h2>Alpha capabilities</h2>
         <p className="muted">
@@ -385,7 +396,8 @@ export default function Settings({
         </p>
         <p className="muted">
           Bounded HLS conversion is available in the web player. Metadata
-          artwork and remote access are planned.
+          artwork is planned. Remote HTTPS configuration is opt-in; use a
+          private VPN.
         </p>
       </section>
     </>

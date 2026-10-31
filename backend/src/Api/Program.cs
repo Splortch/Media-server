@@ -37,6 +37,10 @@ var filtered = args.Where(
 var builder = WebApplication.CreateBuilder(filtered);
 builder.WebHost.ConfigureKestrel(o => o.Limits.MaxRequestBodySize = 64 * 1024);
 builder.WebHost.UseUrls(builder.Configuration["Urls"] ?? "http://127.0.0.1:5050");
+var remoteAccess = new RemoteAccess(builder.Configuration);
+builder.Services.Configure<Microsoft.AspNetCore.Builder.ForwardedHeadersOptions>(
+    remoteAccess.Configure
+);
 builder.Services.ConfigureHttpJsonOptions(o =>
     o.SerializerOptions.NumberHandling = System.Text.Json.Serialization.JsonNumberHandling.Strict
 );
@@ -388,6 +392,11 @@ app.Use(
         }
     }
 );
+
+// Never register forwarded-header processing with an empty trust list.
+// An empty KnownProxies/KnownIPNetworks list would otherwise trust everyone.
+if (remoteAccess.Proxies.Length > 0)
+    app.UseForwardedHeaders();
 app.UseAuthentication();
 app.UseRateLimiter();
 app.UseAuthorization();
@@ -412,6 +421,7 @@ app.MapClientV1();
 app.MapPlayback();
 app.MapOperations(credentialGate);
 app.MapFeatures();
+remoteAccess.Map(app);
 app.MapMovieRequests();
 app.MapExperiments(credentialGate);
 void MapApi(RouteGroupBuilder root)

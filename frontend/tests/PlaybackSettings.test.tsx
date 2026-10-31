@@ -11,6 +11,9 @@ import PlaybackSettings from '../src/components/PlaybackSettings';
 import Settings from '../src/pages/Settings';
 import { api } from '../src/services/api';
 vi.mock('../src/services/api', () => ({ api: vi.fn() }));
+vi.mock('../src/features/admin/RemoteAccessStatus', () => ({
+  default: () => null,
+}));
 vi.mock('../src/features/admin/Accounts', () => ({ default: () => null }));
 vi.mock('../src/features/admin/Monitoring', () => ({ default: () => null }));
 vi.mock('../src/features/admin/LibraryTools', () => ({ default: () => null }));
