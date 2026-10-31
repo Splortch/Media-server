@@ -131,3 +131,5 @@ Hosted install/process/API tests are not physical desktop testing. In particular
 Finder/Gatekeeper prompts, touch/keyboard UX and codec playback on real Macs/Linux
 machines still need manual checks. See PR CI for actual results; configuration alone
 is not evidence that a platform works.
+
+macOS CI retries `hdiutil: create failed - Resource busy` at most twice with short backoff. Compiler errors and other packaging failures fail immediately. Successful packaging must still pass the existing installer inspection and application smoke tests; a retry does not replace those checks.
