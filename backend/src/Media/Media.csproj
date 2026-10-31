@@ -4,17 +4,34 @@
   </ItemGroup>
   <PropertyGroup>
     <MediaNativeDirectory>$(BaseIntermediateOutputPath)media-native/$(Configuration)/$(RuntimeIdentifier)</MediaNativeDirectory>
-    <MediaNativeArchitecture Condition="'$(RuntimeIdentifier)' == 'osx-arm64'">-arch arm64</MediaNativeArchitecture>
-    <MediaNativeArchitecture Condition="'$(RuntimeIdentifier)' == 'osx-x64'">-arch x86_64</MediaNativeArchitecture>
+    <MediaNativeArchitecture Condition="'$(RuntimeIdentifier)' == 'osx-arm64'"
+      >-arch arm64</MediaNativeArchitecture>
+    <MediaNativeArchitecture Condition="'$(RuntimeIdentifier)' == 'osx-x64'"
+      >-arch x86_64</MediaNativeArchitecture>
   </PropertyGroup>
   <ItemGroup Condition="$([MSBuild]::IsOSPlatform('OSX'))">
-    <None Include="$(MediaNativeDirectory)/libMediaNative.dylib" Link="libMediaNative.dylib" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <None
+      Include="$(MediaNativeDirectory)/libMediaNative.dylib"
+      Link="libMediaNative.dylib"
+      CopyToOutputDirectory="PreserveNewest"
+      CopyToPublishDirectory="PreserveNewest"
+    />
   </ItemGroup>
-  <Target Name="BuildMediaNative" BeforeTargets="PrepareForBuild" Condition="$([MSBuild]::IsOSPlatform('OSX'))" Inputs="$(MSBuildProjectDirectory)/native/media-native.c" Outputs="$(MediaNativeDirectory)/libMediaNative.dylib">
+  <Target
+    Name="BuildMediaNative"
+    BeforeTargets="PrepareForBuild"
+    Condition="$([MSBuild]::IsOSPlatform('OSX'))"
+    Inputs="$(MSBuildProjectDirectory)/native/media-native.c"
+    Outputs="$(MediaNativeDirectory)/libMediaNative.dylib"
+  >
     <MakeDir Directories="$(MediaNativeDirectory)" />
     <Exec Command="cc $(MediaNativeArchitecture) -dynamiclib -O2 -fvisibility=hidden -Wall -Wextra -Werror -Wl,-install_name,@rpath/libMediaNative.dylib &quot;$(MSBuildProjectDirectory)/native/media-native.c&quot; -o &quot;$(MediaNativeDirectory)/libMediaNative.dylib&quot;" />
   </Target>
-  <Target Name="RequireMacBuildHost" BeforeTargets="PrepareForBuild" Condition="$(RuntimeIdentifier.StartsWith('osx-')) And !$([MSBuild]::IsOSPlatform('OSX'))">
+  <Target
+    Name="RequireMacBuildHost"
+    BeforeTargets="PrepareForBuild"
+    Condition="$(RuntimeIdentifier.StartsWith('osx-')) And !$([MSBuild]::IsOSPlatform('OSX'))"
+  >
     <Error Text="macOS server builds require a macOS host with Xcode Command Line Tools for the secure file bridge." />
   </Target>
 </Project>
