@@ -51,3 +51,18 @@ class InstallerManifestTests(unittest.TestCase):
         self.assertIn('$stopButton.Enabled = -not $externalMode', script)
         self.assertIn('$restartButton.Enabled = -not $externalMode', script)
         self.assertNotIn('Get-Process Api', script)
+
+    def test_update_requires_consent_and_waits_for_both_leases(self):
+        script = (Path(__file__).resolve().parents[2] / 'release-resources/installer/server.nsi').read_text()
+        self.assertIn('${GetOptions} $0 "/CLOSESERVER" $1', script)
+        self.assertIn('IfSilent decline_running_update', script)
+        self.assertIn('MB_YESNO|MB_ICONQUESTION', script)
+        self.assertIn('Call ProbeUpdateLocks', script)
+        self.assertIn('!insertmacro ProbeUpdateLease ".server.lock"', script)
+        self.assertIn('!insertmacro ProbeUpdateLease "tray-host.lock"', script)
+        self.assertIn('$CloseAttempts >= 100', script)
+        self.assertIn('-Stop -NonInteractive', script)
+        self.assertNotIn('taskkill', script.lower())
+        init = script[script.index('Function .onInit'):script.index('Section "Server and browser')]
+        self.assertLess(init.index('$0 > ${BUILD}'), init.index('Call PrepareRunningUpdate'))
+        self.assertLess(init.index('Call PrepareRunningUpdate'), init.index('!insertmacro CheckLease'))

@@ -7,7 +7,7 @@ For Windows x64 releases built after this change, choose **`MediaServer-v0.2.0-a
 1. Download the server setup.exe and optionally compare its SHA-256 with that release's `SHA256SUMS`. Builds are unsigned early alphas; investigate unexpected security warnings instead of disabling Windows protection.
 2. Run setup using your ordinary Windows account. It requests no administrator elevation, creates no service and opens no firewall/router ports.
 3. Read the license and component choices. **Start automatically when I sign in** is optional and unchecked by default. It starts only after this user signs in; it is not a system service.
-4. Finish with **Start Media Server and open first-time setup** selected. Later, use **Start → Media Server → Media Server Control**. The original Media Server shortcut remains available too. You can also press the Windows key and search **Media Server Control** after installation. Windows may take a moment to index a new Start-menu entry.
+4. Finish with **Start Media Server** selected. First-time account setup opens only for a new server. Later, use **Start → Media Server → Media Server Control**. The original Media Server shortcut remains available too. You can also press the Windows key and search **Media Server Control** after installation. Windows may take a moment to index a new Start-menu entry.
 5. Select a real media subfolder outside the application/data directories. If FFprobe is missing, choose whether to download the pinned, checksum-verified GyanD tools. This separate download needs internet access and retains its upstream GPL/LGPL licenses. Offline users can install FFprobe on PATH beforehand. No video is uploaded.
 6. A local setup-token window and browser open. Copy the token into **http://127.0.0.1:5050**, create a local administrator (12–256 character password), then sign in. The token is private and is removed after successful setup.
 7. In browser **Settings**, add the selected folder as a library and select **Scan library**. Folder selection grants allowed-root access; it does not automatically create or scan the library.
@@ -20,7 +20,7 @@ For Windows x64 releases built after this change, choose **`MediaServer-v0.2.0-a
 3. Choose **Start server** to turn hosting back on, or **Restart server** to stop and start it. Saved accounts, libraries and playback progress remain in the same data directory.
 4. Choose **Open in browser** to use the server. This button is disabled while stopped.
 5. Closing the control window hides it; it does **not** stop hosting. Double-click the tray icon (possibly under the hidden-icons arrow), or open the Start-menu shortcut again, to bring it back.
-6. To quit completely, choose **Stop server and exit control** from the tray menu. Use this before an upgrade or uninstall, which also needs the controller's lock to be released.
+6. To quit completely, choose **Stop server and exit control** from the tray menu. Use this before uninstall. New setup.exe updates can offer to close the server and controller for you.
 
 The tray menu also offers Start, Stop and Restart, private logs, the first-run token, and opt-in **Start when I sign in**. Closing the browser does not stop the server. Signing out of Windows ends the per-user session; this is not a Windows service. Controls apply only to the server process owned by this launcher, not a remote server or a separately started portable instance. Stopping interrupts active streams; a client may not yet have saved its latest few seconds of playback.
 
@@ -33,9 +33,9 @@ Opening a second shortcut reopens the existing control window instead of startin
 - Media stays in the folder you selected. Never store media or personal files inside the application directory.
 - Start menu and optional Startup shortcuts, and the Apps uninstall entry, belong to the current user only.
 
-Before updating, stop the tray server, back up its complete data directory privately and keep the previous build with the matching backup. Run the newer setup.exe. Installation does not migrate the database itself; the newly launched backend applies its normal migrations. The installer refuses an older installed alpha release number. This is not transactional migration rollback, a signed auto-updater or a substitute for a backup.
+Before updating, back up the complete server data directory privately and keep the previous build with its matching backup. Run the newer setup.exe. If the server or control window is still open, choose **Yes** when setup offers to close it; playback is interrupted. Setup waits for both locks to release before copying files. On Finish, leave **Start Media Server** selected to start the updated server with the same accounts and libraries. You no longer have to find and exit the hidden tray controller yourself. Installation does not migrate the database itself; the newly launched backend applies its normal migrations. The installer refuses an older installed alpha release number. This is not transactional migration rollback, a signed auto-updater or a substitute for a backup.
 
-Use **Settings → Apps → Media Server (server) → Uninstall** after stopping the server. Updates/uninstall refuse to proceed while the data or tray-host lease is held. Uninstall removes only known application files, registration and its shortcuts. It deliberately preserves server data, downloaded tools, media and unknown files; it may leave an application directory containing unknown/older-version files. No recursive deletion of user-selected folders is performed. Reinstalling will find the retained account/library; it does not reset setup.
+Use **Settings → Apps → Media Server (server) → Uninstall** after stopping the server. Uninstall still requires a manual complete exit. Updates request shutdown only after your consent and refuse to replace files if either lease remains held. A separately launched server must be stopped from its own terminal/app; setup never kills processes by name. Uninstall removes only known application files, registration and its shortcuts. It deliberately preserves server data, downloaded tools, media and unknown files; it may leave an application directory containing unknown/older-version files. No recursive deletion of user-selected folders is performed. Reinstalling will find the retained account/library; it does not reset setup.
 
 The tray writes backend output to `server.log` and `server-error.log` in the private data folder, preserving one previous pair on restart. Review disk usage for long-running instances and sanitize logs before sharing. The launcher uses a **process-only** PowerShell execution-policy override, as the portable launcher does; it changes no machine policy and never disables TLS certificate verification.
 
@@ -43,7 +43,7 @@ The tray writes backend output to `server.log` and `server-error.log` in the pri
 
 The normal release workflow publishes a self-contained Windows backend and web UI, stages the portable ZIP, then compiles `release-resources/installer/server.nsi` using NSIS 3 and `scripts/build-server-installer.py`. It adds the actual setup.exe to the existing Windows **server** release with checksums, alongside its portable ZIP; Linux, Docker and Windows-client releases remain separate.
 
-Windows CI tests the actual installer in silent mode on a disposable runner: installation/shortcut registration, real tray/backend startup, generated-video scanning through FFprobe, cookie/CSRF login, authenticated ranges, progress persistence, rejection of running upgrades/uninstall, reinstall with an unchanged database, and uninstall retaining data/media/unknown files. The fixture also clicks the actual Start/Stop/Restart button handlers through local control signals, verifies that stopping leaves the controller alive, checks that restart replaces the backend process, and rechecks persisted account/library/progress after startup. Linux policy tests cover the bounded uninstall manifest and release completeness. Passing automation does not establish physical installer interaction, screen-reader behavior, SmartScreen reputation or every codec/GPU path.
+Windows CI tests the actual installer in silent mode on a disposable runner: installation/shortcut registration, real tray/backend startup, generated-video scanning through FFprobe, cookie/CSRF login, authenticated ranges, progress persistence, running-update consent, backend/controller shutdown, persistence after update, rejection without consent, external-server protection, and running uninstall refusal, reinstall with an unchanged database, and uninstall retaining data/media/unknown files. The fixture also clicks the actual Start/Stop/Restart button handlers through local control signals, verifies that stopping leaves the controller alive, checks that restart replaces the backend process, and rechecks persisted account/library/progress after startup. Linux policy tests cover the bounded uninstall manifest and release completeness. Passing automation does not establish physical installer interaction, screen-reader behavior, SmartScreen reputation or every codec/GPU path.
 
 For local Windows build development, first stage the real `win-x64` release using the release workflow's publish/package steps, set `SERVER_VERSION`, install NSIS 3 (or set `MAKENSIS`), then run:
 
@@ -64,3 +64,15 @@ controller instead of starting a duplicate server. Silent installation can opt i
 with `/S /DESKTOP`. Uninstall removes the generated shortcut and preserves data.
 A portable extraction does not register a Start-menu entry; use setup.exe for
 Windows Search integration.
+
+## Unattended updates
+
+`setup.exe /S` remains non-disruptive and returns exit code 2 if the server/control
+is running. An operator can explicitly permit shutdown with
+`setup.exe /S /CLOSESERVER`. It uses the bundled per-user control signal, waits up
+to 30 seconds for both locks, then holds them through file replacement. It does
+not stop an external/portable process. Silent installation does not auto-start a
+server or browser: reopen Media Server Control afterward. Interactive setup keeps
+the existing Finish-page startup choice. A rejected downgrade is checked before
+any shutdown. Backups are still required before migrations; this does not claim
+transactional rollback or automatic backup.
