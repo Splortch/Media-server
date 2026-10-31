@@ -48,6 +48,12 @@ Staging filenames are generated UUIDs under `data/downloads`; no request supplie
 
 Resume follows [RFC 9110](https://www.rfc-editor.org/rfc/rfc9110.html): strong If-Range validator, exact byte offset and total, unchanged final URI, unchanged ETag, and 206 response. A 200 response is never appended. TLS uses the platform trust store; never disable certificate validation to make a source work.
 
+## Build note for macOS
+
+macOS server builds require Xcode Command Line Tools (`xcode-select --install`). The Media project compiles a small fixed-signature C bridge to Darwin's variadic `openat` API and copies `libMediaNative.dylib` into build/test/publish output. This avoids the different Apple Silicon variadic argument ABI. Build macOS artifacts on a macOS host; existing release jobs already do so. Linux and Windows do not use this library. CI exercises actual creation/reopening, 0600 permissions and hard-link refusal on Intel and Apple Silicon.
+
+A staged SHA-256 is always calculated; it verifies publisher content only when you provide a trusted expected checksum.
+
 ## Validation
 
 Backend integration tests run the real API, database, worker, protected URL persistence and file staging against a controlled HTTP source. They cover authentication, CSRF, default-off behavior, pause/resume/cancel, source changes/ignored ranges, priority, restart recovery, unknown length, budget/space failures, disconnection, range retrieval and cleanup. Filesystem tests exercise secure writes and hard-link refusal on CI platforms; macOS additionally checks the SDK ABI. Browser CI downloads this repository's Apache license over real public HTTPS, verifies its digest/content, checks the queue UI with axe, and removes the staged file. Build success is not physical-device validation.

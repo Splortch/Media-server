@@ -73,7 +73,9 @@ internal static class SafeMediaFile
                 parent = next;
             }
             var file = Handle(
-                OpenAt(
+                OpenLeaf(
+                    mac,
+                    create,
                     parent.DangerousGetHandle().ToInt32(),
                     parts[^1],
                     noFollow
@@ -109,6 +111,21 @@ internal static class SafeMediaFile
                 parent.Dispose();
         }
     }
+
+    private static int OpenLeaf(
+        bool mac,
+        bool create,
+        int parent,
+        string name,
+        int flags,
+        int mode
+    ) =>
+        mac && create ? OpenAtDarwin(parent, name, flags, mode) : OpenAt(parent, name, flags, mode);
+
+    // libSystem openat is variadic; use a fixed C bridge for file creation on Darwin.
+    // https://github.com/dotnet/runtime/issues/48752
+    [DllImport("MediaNative", EntryPoint = "MediaServerOpenAt", SetLastError = true)]
+    private static extern int OpenAtDarwin(int parent, string name, int flags, int mode);
 
     private static bool IsRegularFile(SafeFileHandle file, bool mac)
     {

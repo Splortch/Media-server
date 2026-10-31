@@ -305,7 +305,7 @@ export default function Downloads() {
               )}
               {job.contentHash && (
                 <details>
-                  <summary>Verified SHA-256</summary>
+                  <summary>Staged SHA-256</summary>
                   <code className="download-hash">{job.contentHash}</code>
                 </details>
               )}

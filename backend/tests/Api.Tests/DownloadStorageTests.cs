@@ -27,6 +27,11 @@ public sealed class DownloadStorageTests : IDisposable
         var policy = new PathPolicy([root]);
         using (var f = policy.OpenWrite(root, "test.part", true))
             f.Write([1, 2, 3]);
+        if (!OperatingSystem.IsWindows())
+            Assert.Equal(
+                UnixFileMode.UserRead | UnixFileMode.UserWrite,
+                File.GetUnixFileMode(Path.Combine(root, "test.part"))
+            );
         using (var f = policy.OpenWrite(root, "test.part", false))
         {
             Assert.Equal(3, f.Length);
@@ -73,6 +78,40 @@ public sealed class DownloadStorageTests : IDisposable
         Directory.CreateSymbolicLink(Path.Combine(root, "alias"), actual);
         Assert.Throws<ArgumentException>(() => policy.OpenWrite(root, "alias/file", true));
         Assert.Empty(Directory.GetFiles(actual));
+    }
+
+    [Fact]
+    public void ReservationsIncludeOtherJobsAndCompletedBytes()
+    {
+        var storage = new DownloadStorage(root, new Space());
+        Assert.Throws<DownloadFault>(() =>
+            storage.Admit([
+                new MediaServer.Core.DownloadJob
+                {
+                    State = "completed",
+                    ReceivedBytes = 80L * 1024 * 1024 * 1024,
+                },
+                new MediaServer.Core.DownloadJob
+                {
+                    State = "queued",
+                    MaxBytes = 30L * 1024 * 1024 * 1024,
+                },
+            ])
+        );
+        Assert.Throws<DownloadFault>(() =>
+            storage.Admit([
+                new MediaServer.Core.DownloadJob
+                {
+                    State = "queued",
+                    MaxBytes = 60L * 1024 * 1024 * 1024,
+                },
+                new MediaServer.Core.DownloadJob
+                {
+                    State = "paused",
+                    MaxBytes = 60L * 1024 * 1024 * 1024,
+                },
+            ])
+        );
     }
 
     [DllImport("libc", EntryPoint = "link", SetLastError = true)]

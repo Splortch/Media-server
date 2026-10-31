@@ -449,6 +449,41 @@ public sealed class DownloadTests
     }
 
     [Fact]
+    public async Task SpaceExhaustionDuringTransferStopsBeforeCompletionAndCanRetrySafely()
+    {
+        var source = new Source { Slow = true };
+        var space = new Space();
+        using var server = Create(source, space);
+        using var client = await server.Admin();
+        await Enable(client);
+        var job = await Add(client);
+        await Wait(client, job.Id, x => x.ReceivedBytes > 0);
+        space.Free = DownloadStorage.Margin;
+        job = await Wait(client, job.Id, x => x.State == "failed");
+        Assert.Equal("insufficient-storage", job.Error);
+        Assert.InRange(job.ReceivedBytes, 1, source.Bytes.Length - 1);
+        space.Free = DownloadStorage.TotalLimit * 2;
+        source.Slow = false;
+        await Act(client, job, "resume");
+        job = await Wait(client, job.Id, x => x.State is "completed" or "failed");
+        Assert.Equal("completed", job.State);
+        Assert.Equal(
+            Convert.ToHexString(SHA256.HashData(source.Bytes)).ToLowerInvariant(),
+            job.ContentHash
+        );
+    }
+
+    [Fact]
+    public async Task ProductionTransportRejectsLoopbackBeforeOpeningASourceConnection()
+    {
+        using var client = new DownloadNetwork().Create(["127.0.0.1"]);
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+        await Assert.ThrowsAsync<HttpRequestException>(() =>
+            client.GetAsync("https://127.0.0.1/file", timeout.Token)
+        );
+    }
+
+    [Fact]
     public async Task RestartRecoversInterruptedQueueWithoutFetching()
     {
         var source = new Source();
