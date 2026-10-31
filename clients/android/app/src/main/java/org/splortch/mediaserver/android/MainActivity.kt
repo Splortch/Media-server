@@ -34,6 +34,7 @@ import androidx.core.view.WindowInsetsControllerCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.ui.PlayerView
+import org.splortch.mediaserver.core.AppTheme
 import org.splortch.mediaserver.core.MediaSummary
 import org.splortch.mediaserver.core.SavedServer
 
@@ -45,11 +46,19 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         setContent {
+            val appearance = remember { getSharedPreferences("appearance", MODE_PRIVATE) }
+            var theme by remember {
+                mutableStateOf(AppTheme.parse(appearance.getString("theme", null)))
+            }
             val screen by model.screen.collectAsStateWithLifecycle()
             val player by model.player.collectAsStateWithLifecycle()
             val savedServers by model.savedServers.collectAsStateWithLifecycle()
-            LaunchedEffect(screen.fullscreen, player) {
+            LaunchedEffect(screen.fullscreen, player, theme) {
                 val controller = WindowCompat.getInsetsController(window, window.decorView)
+                controller.isAppearanceLightStatusBars =
+                    theme == AppTheme.Light && !screen.fullscreen
+                controller.isAppearanceLightNavigationBars =
+                    theme == AppTheme.Light && !screen.fullscreen
                 controller.systemBarsBehavior =
                     WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
                 if (screen.fullscreen) controller.hide(WindowInsetsCompat.Type.systemBars())
@@ -58,7 +67,7 @@ class MainActivity : ComponentActivity() {
                 else window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
             }
             BackHandler(screen.detail != null) { model.back() }
-            MediaTheme {
+            MediaTheme(theme) {
                 Surface(Modifier.fillMaxSize()) {
                     if (screen.fullscreen && player != null) {
                         Box(Modifier.fillMaxSize()) {
@@ -92,6 +101,27 @@ class MainActivity : ComponentActivity() {
                                         "Welcome${if (screen.user.isNotEmpty()) ", ${screen.user}" else ""}",
                                     style = MaterialTheme.typography.headlineMedium,
                                 )
+                            }
+                            item {
+                                Row(
+                                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                ) {
+                                    Text("Theme", style = MaterialTheme.typography.labelLarge)
+                                    AppTheme.entries.forEach { choice ->
+                                        FilterChip(
+                                            selected = theme == choice,
+                                            onClick = {
+                                                theme = choice
+                                                appearance
+                                                    .edit()
+                                                    .putString("theme", choice.key)
+                                                    .apply()
+                                            },
+                                            label = { Text(choice.label) },
+                                        )
+                                    }
+                                }
                             }
                             if (screen.busy)
                                 item { LinearProgressIndicator(Modifier.fillMaxWidth()) }

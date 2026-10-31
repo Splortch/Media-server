@@ -139,3 +139,5 @@ Playback pipeline validation and GPU configuration: [development guide](docs/dev
 Build inputs, immutable Docker bases and unsigned-alpha limitations: [build provenance](docs/deployment/BUILD-PROVENANCE.md).
 
 Private playback notes and timestamp bookmarks are available in web/desktop details and playback. See [bookmarks and portable transfer](docs/architecture/BOOKMARKS.md) for privacy, hashing requirements and client coverage.
+
+Web, desktop and Android support saved dark/light appearance. Dark is the default; see [themes](docs/clients/THEMES.md) for selection and extension guidance.

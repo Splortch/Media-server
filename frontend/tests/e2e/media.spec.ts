@@ -21,7 +21,9 @@ test('setup, accounts, collections, diagnostics, stream ranges and persist resum
     'E2E_DATA must point to a fresh server data directory',
   ).toBeTruthy();
   expect(media).toBeTruthy();
+  await page.emulateMedia({ colorScheme: 'light' });
   await page.goto('/');
+  await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
   await expect(
     page.getByRole('heading', { name: 'Set up your server' }),
   ).toBeVisible();
@@ -48,6 +50,22 @@ test('setup, accounts, collections, diagnostics, stream ranges and persist resum
     page.getByRole('heading', { name: 'Server settings' }),
   ).toBeVisible();
   await accessible(page);
+  await page
+    .getByRole('combobox', { name: 'Theme', exact: true })
+    .selectOption('light');
+  await expect(page.locator('html')).toHaveAttribute('data-theme', 'light');
+  await page.reload();
+  await expect(
+    page.getByRole('combobox', { name: 'Theme', exact: true }),
+  ).toHaveValue('light');
+  await accessible(page);
+  await page.screenshot({
+    path: 'test-results/visual/theme-settings-light.png',
+    fullPage: true,
+  });
+  await page
+    .getByRole('combobox', { name: 'Theme', exact: true })
+    .selectOption('dark');
   await page.getByLabel('Library name').fill('Test collection');
   await page.getByLabel('Directory on the server').fill(media);
   await page.getByRole('button', { name: 'Add library', exact: true }).click();
@@ -125,6 +143,16 @@ test('setup, accounts, collections, diagnostics, stream ranges and persist resum
   page.on('request', (request) => {
     if (/\/media\/\d+\/stream|\/playback-sessions/.test(request.url()))
       earlyStreams.push(request.url());
+  });
+  await page.getByRole('link', { name: 'Settings', exact: true }).click();
+  await page
+    .getByRole('combobox', { name: 'Theme', exact: true })
+    .selectOption('light');
+  await page.getByRole('link', { name: 'Library', exact: true }).click();
+  await accessible(page);
+  await page.screenshot({
+    path: 'test-results/visual/theme-library-light.png',
+    fullPage: true,
   });
   await page.getByRole('heading', { name: 'sample', exact: true }).click();
   await expect(
