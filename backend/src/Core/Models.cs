@@ -97,6 +97,10 @@ public record ProbeResult(
 public interface IMediaProbe
 {
     Task<ProbeResult> ProbeAsync(string path, CancellationToken ct);
+
+    // Alternative probes must explicitly support the stricter untrusted-import policy.
+    Task<ProbeResult> ProbeImportAsync(string path, CancellationToken ct) =>
+        throw new MediaProbeException("import_probe_unavailable");
 }
 
 public record PlaybackPlan(string Mode, string MimeType, string? Warning);

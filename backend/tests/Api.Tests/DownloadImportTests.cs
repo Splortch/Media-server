@@ -53,6 +53,13 @@ public sealed class DownloadImportTests
                 new(TaskCreationOptions.RunContinuationsAsynchronously),
             Release = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
+        public async Task<ProbeResult> ProbeImportAsync(string path, CancellationToken ct)
+        {
+            Started.TrySetResult();
+            await Release.Task.WaitAsync(ct);
+            return await new Ffprobe("ffprobe").ProbeImportAsync(path, ct);
+        }
+
         public async Task<ProbeResult> ProbeAsync(string path, CancellationToken ct)
         {
             if (path.EndsWith(".ingesting", StringComparison.Ordinal))
@@ -409,6 +416,86 @@ public sealed class DownloadImportTests
                 )
             ).StatusCode
         );
+    }
+
+    [Fact]
+    public async Task ReferencingPlaylistsAreRejectedBeforeLibraryScan()
+    {
+        var source = new Source();
+        using var server = Create(source);
+        using var admin = await server.Admin();
+        await Setup(server, admin, source);
+        source.Bytes = System.Text.Encoding.UTF8.GetBytes(
+            "#EXTM3U\n#EXT-X-VERSION:3\n#EXT-X-TARGETDURATION:1\n#EXTINF:1,\n"
+                + Path.Combine(server.Root, "synthetic.webm")
+                + "\n#EXT-X-ENDLIST\n"
+        );
+        var response = await admin.PostAsJsonAsync("/api/downloads", Approval(source).Source);
+        var job = (await response.Content.ReadFromJsonAsync<DownloadView>())!;
+        job = await Wait(admin, job.Id, x => x.State == "completed");
+        await admin.PutAsJsonAsync(
+            $"/api/downloads/{job.Id}/import-plan",
+            new DownloadMatchInput(job.Revision, Plan())
+        );
+        job = await Wait(admin, job.Id, x => x.Import?.State == "held");
+        Assert.NotNull(job.Import!.Error);
+        Assert.Empty((await admin.GetFromJsonAsync<JsonElement[]>("/api/media"))!);
+        Assert.Empty(Directory.GetFiles(server.MediaPath, "*.webm", SearchOption.AllDirectories));
+    }
+
+    [Fact]
+    public async Task LinkedManagedParentIsRejectedBeforeCreatingFoldersOrFetching()
+    {
+        if (OperatingSystem.IsWindows())
+            return;
+        var source = new Source();
+        using var server = Create(source);
+        using var admin = await server.Admin();
+        await Setup(server, admin, source);
+        using var member = await Member(server, admin);
+        var request = await Request(member);
+        var outside = Path.Combine(server.Root, "outside");
+        Directory.CreateDirectory(outside);
+        Directory.CreateSymbolicLink(
+            Path.Combine(server.MediaPath, "MediaServer Imports"),
+            outside
+        );
+        Assert.Equal(
+            HttpStatusCode.BadRequest,
+            (
+                await admin.PostAsJsonAsync($"/api/requests/{request}/download", Approval(source))
+            ).StatusCode
+        );
+        Assert.Equal(0, source.Calls);
+        Assert.Empty(Directory.EnumerateFileSystemEntries(outside));
+    }
+
+    [Fact]
+    public async Task WindowsDeviceNamesAreSanitizedBeforeCreatingMedia()
+    {
+        var source = new Source();
+        using var server = Create(source);
+        using var admin = await server.Admin();
+        await Setup(server, admin, source);
+        var response = await admin.PostAsJsonAsync("/api/downloads", Approval(source).Source);
+        var job = (await response.Content.ReadFromJsonAsync<DownloadView>())!;
+        job = await Wait(admin, job.Id, x => x.State == "completed");
+        Assert.Equal(
+            HttpStatusCode.OK,
+            (
+                await admin.PutAsJsonAsync(
+                    $"/api/downloads/{job.Id}/import-plan",
+                    new DownloadMatchInput(job.Revision, Plan() with { Title = "CON", Year = null })
+                )
+            ).StatusCode
+        );
+        job = await Wait(admin, job.Id, x => x.Import?.State is "imported" or "held");
+        Assert.True(job.Import!.State == "imported", JsonSerializer.Serialize(job));
+        using var scope = server.Services.CreateScope();
+        var row = await scope
+            .ServiceProvider.GetRequiredService<MediaDb>()
+            .Downloads.SingleAsync(x => x.Id == job.Id);
+        Assert.Contains("CON-title", row.ImportRelativePath!);
     }
 
     [Fact]

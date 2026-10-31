@@ -14,22 +14,37 @@ export default function Requests({
   downloadsEnabled?: boolean;
   initialTitle?: string;
 }) {
+  const [items, setItems] = useState<Request[]>([]);
   const [downloadStatus, setDownloadStatus] = useState<
     { requestId: number; state: string }[]
   >([]);
   useEffect(() => {
     let active = true;
+    const known = new Map<number, string>();
     const refresh = () =>
       void api<{ requestId: number; state: string }[]>(
         '/requests/download-status',
       )
         .then((rows) => {
-          if (active)
-            setDownloadStatus(
-              Array.isArray(rows)
-                ? rows.filter((x) => typeof x.requestId === 'number')
-                : [],
-            );
+          if (!active) return;
+          const clean = Array.isArray(rows)
+            ? rows.filter((x) => typeof x.requestId === 'number')
+            : [];
+          setDownloadStatus(clean);
+          for (const status of clean)
+            if (known.get(status.requestId) !== status.state) {
+              known.set(status.requestId, status.state);
+              void api<Request>(`/requests/${status.requestId}`)
+                .then((fresh) => {
+                  if (active)
+                    setItems((current) =>
+                      current.map((item) =>
+                        item.id === fresh.id ? fresh : item,
+                      ),
+                    );
+                })
+                .catch(() => known.delete(status.requestId));
+            }
         })
         .catch(() => {});
     refresh();
@@ -39,7 +54,6 @@ export default function Requests({
       window.clearInterval(timer);
     };
   }, []);
-  const [items, setItems] = useState<Request[]>([]);
   const [libraries, setLibraries] = useState<Library[]>([]);
   const [title, setTitle] = useState(initialTitle);
   const [query, setQuery] = useState(initialTitle);

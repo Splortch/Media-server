@@ -131,6 +131,7 @@ public sealed class DownloadWorker(
                 var code = ex switch
                 {
                     DownloadFault fault => fault.Code,
+                    MediaProbeException probe => probe.Code,
                     OperationCanceledException => "interrupted",
                     CryptographicException => "source-secret-unavailable",
                     IOException => "storage-or-connection-error",

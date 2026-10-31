@@ -44,6 +44,55 @@ public sealed class DownloadImporter(
         return full;
     }
 
+    public static string ManagedFolder(PathPolicy paths, DownloadJob job, bool create)
+    {
+        paths.ValidateDirectory(job.TargetRoot!);
+        if (
+            !Guid.TryParseExact(job.Id, "N", out _)
+            || job.ImportRelativePath == null
+            || Path.IsPathFullyQualified(job.ImportRelativePath)
+            || !job.ImportRelativePath.StartsWith(
+                "MediaServer Imports" + Path.DirectorySeparatorChar,
+                StringComparison.Ordinal
+            )
+        )
+            throw new ArgumentException("Invalid managed import layout.");
+        var full = Path.GetFullPath(Path.Combine(job.TargetRoot!, Folder(job)));
+        if (!PathPolicy.Within(job.TargetRoot!, full))
+            throw new ArgumentException("Import folder escapes its library.");
+        var current = job.TargetRoot!;
+        foreach (
+            var segment in Path.GetRelativePath(job.TargetRoot!, full)
+                .Split(Path.DirectorySeparatorChar)
+        )
+        {
+            current = Path.Combine(current, segment);
+            var exists = true;
+            try
+            {
+                var attributes = File.GetAttributes(current);
+                if ((attributes & FileAttributes.ReparsePoint) != 0)
+                    throw new ArgumentException("Linked import directories are not allowed.");
+                if ((attributes & FileAttributes.Directory) == 0)
+                    throw new IOException("Import folder collides with an existing file.");
+            }
+            catch (FileNotFoundException)
+            {
+                exists = false;
+            }
+            catch (DirectoryNotFoundException)
+            {
+                exists = false;
+            }
+            if (!exists && create)
+            {
+                Directory.CreateDirectory(current);
+                PathPolicy.RejectLinks(current);
+            }
+        }
+        return full;
+    }
+
     private static bool Owns(PathPolicy paths, DownloadJob job)
     {
         var marker = Location(paths, job, Marker(job));
@@ -120,11 +169,10 @@ public sealed class DownloadImporter(
             throw new DownloadFault("import-match-required");
         paths.ValidateDirectory(job.TargetRoot);
         await Check(db, job, job.ImportCopiedBytes, ct);
-        var folder = Path.Combine(job.TargetRoot, Folder(job));
+        var folder = ManagedFolder(paths, job, false);
         if (!Directory.Exists(folder))
         {
-            Directory.CreateDirectory(folder);
-            PathPolicy.RejectLinks(folder);
+            ManagedFolder(paths, job, true);
             using var marker = paths.OpenWrite(job.TargetRoot, Marker(job), true);
             marker.Write(Encoding.UTF8.GetBytes(Proof(job)));
             marker.Flush(true);
@@ -180,7 +228,7 @@ public sealed class DownloadImporter(
             // Probe before exposing even the final filename to the normal scanner.
             var probe = await scope
                 .ServiceProvider.GetRequiredService<IMediaProbe>()
-                .ProbeAsync(temp, ct);
+                .ProbeImportAsync(temp, ct);
             if (
                 !double.IsFinite(probe.Duration)
                 || probe.Duration <= 0

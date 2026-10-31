@@ -87,6 +87,15 @@ public static class DownloadApprovals
         result = string.Join('-', result.Split(' ', StringSplitOptions.RemoveEmptyEntries));
         if (result.Length > 60)
             result = result[..60];
+        if (
+            System.Text.RegularExpressions.Regex.IsMatch(
+                result,
+                @"^(CON|PRN|AUX|NUL|COM[0-9]|LPT[0-9])$",
+                System.Text.RegularExpressions.RegexOptions.IgnoreCase
+                    | System.Text.RegularExpressions.RegexOptions.CultureInvariant
+            )
+        )
+            result += "-title";
         return string.IsNullOrWhiteSpace(result) ? "Title" : result;
     }
 
@@ -183,6 +192,8 @@ public static class DownloadApprovals
         job.ImportState = matched ? (job.State == "completed" ? "queued" : "waiting") : "inbox";
         job.ImportError = null;
         job.ImportCopiedBytes = 0;
+        if (job.ImportRelativePath != null)
+            DownloadImporter.ManagedFolder(paths, job, false);
         if (
             job.ImportRelativePath != null
             && Directory.Exists(
@@ -321,6 +332,7 @@ public static class DownloadApprovals
                     ) =>
                     {
                         DownloadEndpoints.Validate(input.Source);
+                        ArgumentNullException.ThrowIfNull(input.Plan);
                         await control.Gate.WaitAsync(ct);
                         try
                         {
@@ -492,6 +504,7 @@ public static class DownloadApprovals
                         CancellationToken ct
                     ) =>
                     {
+                        ArgumentNullException.ThrowIfNull(input.Plan);
                         await control.Gate.WaitAsync(ct);
                         try
                         {
