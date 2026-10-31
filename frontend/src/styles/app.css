@@ -49,6 +49,25 @@
   --radius: 18px;
   --ease: cubic-bezier(0.2, 0.7, 0.2, 1);
 }
+:root[data-theme='light'] {
+  color-scheme: light;
+  --bg: #f0f8fc;
+  --sidebar: #f7fcff;
+  --surface: #ffffff;
+  --surface-raised: #e6f2f7;
+  --field: #f8fcff;
+  --text: #092632;
+  --muted: #46616f;
+  --border: #bfd5e0;
+  --accent: #00665e;
+  --accent-hover: #005b64;
+  --accent-ink: #061a23;
+  --nav-gradient: linear-gradient(110deg, #00b8ff22, #2be0a029 58%, #c6ff3d24);
+  --accent-tint: #d8f3ef;
+  --danger: #a42342;
+  --danger-bg: #fff0f1;
+}
+
 * {
   box-sizing: border-box;
 }
@@ -1542,4 +1561,8 @@ textarea {
 .bookmarks li {
   padding-block: 0.75rem;
   overflow-wrap: anywhere;
+}
+
+.theme-picker {
+  max-width: 32rem;
 }

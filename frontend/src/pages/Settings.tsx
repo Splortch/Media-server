@@ -1,6 +1,7 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import Accounts from '../features/admin/Accounts';
 import Customize from '../features/Customize';
+import ThemePicker from '../components/ThemePicker';
 import RemoteAccessStatus from '../features/admin/RemoteAccessStatus';
 import {
   featureVisible,
@@ -156,6 +157,7 @@ export default function Settings({
           },
         ]
       : []),
+    { id: 'settings-appearance', label: 'Appearance', icon: 'settings' },
     { id: 'settings-account', label: 'Account', icon: 'shield' },
     { id: 'settings-customize', label: 'Customize', icon: 'settings' },
     ...(featureVisible(features, 'smart-collections')
@@ -188,6 +190,14 @@ export default function Settings({
           </button>
         ))}
       </nav>
+      <section
+        id="settings-appearance"
+        tabIndex={-1}
+        className="panel settings-target"
+      >
+        <h2>Appearance</h2>
+        <ThemePicker />
+      </section>
       {admin && (
         <>
           <section

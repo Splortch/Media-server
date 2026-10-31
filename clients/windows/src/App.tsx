@@ -28,6 +28,13 @@ import {
   writeSavedServers,
   serverOrigin,
 } from './savedServers';
+import ThemePicker from '../../../frontend/src/components/ThemePicker';
+import {
+  chooseTheme,
+  normalizeTheme,
+  storedTheme,
+  useTheme,
+} from '../../../frontend/src/theme/themes';
 import Player from '../../../frontend/src/components/Player';
 import Icon from '../../../frontend/src/components/Icon';
 import TitleDetails from '../../../frontend/src/components/TitleDetails';
@@ -98,7 +105,7 @@ export default function App() {
       })
       .catch(() => {});
   }, []);
-  const [theme, setTheme] = useState('system');
+  const theme = useTheme();
   const [connected, setConnected] = useState(false);
   const [version, setVersion] = useState('');
   const [user, setUser] = useState<{ name: string; role: string }>();
@@ -140,16 +147,13 @@ export default function App() {
       .then((p) => {
         if (!mounted.current) return;
         if (typeof p.address === 'string') setAddress(p.address);
-        if (p.theme) setTheme(p.theme);
+        if (!storedTheme() && p.theme) chooseTheme(normalizeTheme(p.theme));
       })
       .catch(() => {});
     return () => {
       mounted.current = false;
     };
   }, []);
-  useEffect(() => {
-    document.documentElement.dataset.theme = theme;
-  }, [theme]);
   useEffect(() => {
     const onExpired = () => {
       setUser(undefined);
@@ -453,6 +457,7 @@ export default function App() {
             Connect to the same server from Windows, Linux or another host. The
             desktop application does not host your media.
           </p>
+          <ThemePicker />
           {savedServers.length > 0 && (
             <section aria-label="Saved servers">
               <h2>Saved servers</h2>
@@ -750,22 +755,11 @@ export default function App() {
               <h1>Application settings</h1>
               <section className="panel">
                 <h2>Appearance</h2>
-                <label>
-                  Theme
-                  <select
-                    value={theme}
-                    onChange={(e) => {
-                      setTheme(e.target.value);
-                      void savePreferences(address, e.target.value).catch(
-                        failure,
-                      );
-                    }}
-                  >
-                    <option value="system">System</option>
-                    <option value="dark">Dark</option>
-                    <option value="light">Light</option>
-                  </select>
-                </label>
+                <ThemePicker
+                  onChange={(next) => {
+                    void savePreferences(address, next).catch(failure);
+                  }}
+                />
                 <p className="muted">
                   Server: {address}. Passwords are never saved. Remembered
                   sessions use Windows Credential Manager. Linux/macOS sessions

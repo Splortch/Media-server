@@ -259,3 +259,7 @@ See [desktop installers for Windows, Linux and macOS](deployment/DESKTOP-INSTALL
 ### Save and switch between servers
 
 Desktop and Android clients now keep named server addresses. See [saved servers and switching](clients/SAVED-SERVERS.md) for connection, renaming, removal and session behavior.
+
+### Choose dark or light appearance
+
+Dark is the default. Use **Theme** on setup/connection screens, **Settings → Appearance** on web/desktop, or the theme chips in Android. Your preference is saved on this device. See [appearance themes](clients/THEMES.md).

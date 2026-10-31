@@ -21,6 +21,12 @@ class RealServerTest {
 
     @Test
     fun realBackendPlaybackAndRevocation() {
+        compose.onNodeWithText("Dark").assertIsSelected()
+        compose.onNodeWithText("Light").performClick()
+        compose.onNodeWithText("Light").assertIsSelected()
+        compose.activityRule.scenario.recreate()
+        compose.onNodeWithText("Light").assertIsSelected()
+        compose.onNodeWithText("Dark").performClick()
         compose.onNodeWithText("Server address").performTextInput("http://127.0.0.1:5050")
         compose.onNodeWithText("Connect", useUnmergedTree = true).performScrollTo().performClick()
         compose.waitUntil(30000) {

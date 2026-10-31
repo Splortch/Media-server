@@ -13,6 +13,7 @@ import {
   type Progress,
 } from './services/api';
 import Player from './components/Player';
+import ThemePicker from './components/ThemePicker';
 import Icon from './components/Icon';
 import TitleDetails from './components/TitleDetails';
 import {
@@ -427,6 +428,7 @@ export default function App() {
             to movie night.
           </h1>
           <p className="muted">Your own media. A private place to enjoy it.</p>
+          <ThemePicker />
         </div>
         <form
           className="panel auth-form"
