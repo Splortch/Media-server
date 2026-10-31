@@ -255,3 +255,7 @@ Known review findings and the limits of automated validation are in [PROJECT-REV
 
 
 See [desktop installers for Windows, Linux and macOS](deployment/DESKTOP-INSTALLERS.md) for server/client package selection and step-by-step setup.
+
+### Save and switch between servers
+
+Desktop and Android clients now keep named server addresses. See [saved servers and switching](clients/SAVED-SERVERS.md) for connection, renaming, removal and session behavior.

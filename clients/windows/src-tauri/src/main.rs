@@ -24,6 +24,13 @@ async fn logout(client: tauri::State<'_, DesktopClient>) -> Result<Value, Client
     client.logout().await
 }
 #[tauri::command]
+fn forget_saved_session(
+    address: String,
+    client: tauri::State<'_, DesktopClient>,
+) -> Result<(), ClientError> {
+    client.forget_saved_session(&address)
+}
+#[tauri::command]
 async fn api_request(
     method: String,
     path: String,
@@ -109,6 +116,7 @@ fn main() {
             connect,
             login,
             logout,
+            forget_saved_session,
             api_request,
             stream_url,
             playback_url,

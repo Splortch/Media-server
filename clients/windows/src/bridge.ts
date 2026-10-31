@@ -20,6 +20,9 @@ export async function login(name: string, password: string) {
 export async function logout() {
   return invoke('logout');
 }
+export function forgetSavedSession(address: string) {
+  return invoke('forget_saved_session', { address });
+}
 export type Preferences = {
   address?: string;
   theme?: 'system' | 'dark' | 'light';
