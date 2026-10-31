@@ -22,6 +22,7 @@ import javax.net.ssl.SSLException
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -58,6 +59,35 @@ internal data class Screen(
 class MediaViewModel(app: Application) : AndroidViewModel(app) {
     private val prefs = app.getSharedPreferences("connection", 0)
     private val vault = KeystoreVault(app)
+    private val savedConnections =
+        MutableStateFlow(
+            SavedServers.read(prefs.getString("servers", null), BuildConfig.DEBUG).ifEmpty {
+                try {
+                    SavedServers.remember(
+                        emptyList(),
+                        prefs.getString("origin", "") ?: "",
+                        "",
+                        BuildConfig.DEBUG,
+                    )
+                } catch (_: IllegalArgumentException) {
+                    emptyList()
+                }
+            }
+        )
+    internal val savedServers = savedConnections.asStateFlow()
+
+    internal fun forgetServer(address: String) = action {
+        val remaining = savedConnections.value.filter { it.address != address }
+        require(prefs.edit().putString("servers", SavedServers.encode(remaining)).commit()) {
+            "Could not remove the saved server."
+        }
+        savedConnections.value = remaining
+        if (prefs.getString("origin", null) == address) {
+            vault.clear()
+            prefs.edit { remove("origin") }
+        }
+    }
+
     private val mutable = MutableStateFlow(Screen(address = prefs.getString("origin", "") ?: ""))
     internal val screen = mutable.asStateFlow()
     internal val player = MutableStateFlow<ExoPlayer?>(null)
@@ -124,7 +154,7 @@ class MediaViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    internal fun connect(address: String, remember: Boolean) = action {
+    internal fun connect(address: String, remember: Boolean, serverName: String = "") = action {
         val origin = ServerAddress.parse(address, BuildConfig.DEBUG)
         stopPlayer(false)
         connection?.close()
@@ -149,7 +179,23 @@ class MediaViewModel(app: Application) : AndroidViewModel(app) {
         connection = conn
         try {
             val info = conn.check()
-            prefs.edit { putString("origin", origin.toString()) }
+            val updatedServers =
+                SavedServers.remember(
+                    savedConnections.value,
+                    origin.toString(),
+                    serverName,
+                    BuildConfig.DEBUG,
+                )
+            require(
+                prefs
+                    .edit()
+                    .putString("origin", origin.toString())
+                    .putString("servers", SavedServers.encode(updatedServers))
+                    .commit()
+            ) {
+                "Connected, but the server address could not be saved."
+            }
+            savedConnections.value = updatedServers
             mutable.value =
                 Screen(
                     phase = "login",
@@ -599,6 +645,10 @@ class MediaViewModel(app: Application) : AndroidViewModel(app) {
 
     internal fun logout() = action {
         val conn = connection
+        // Finish an in-flight progress write on this connection before revoking it.
+        player.value?.pause()
+        save(player.value?.playbackState == Player.STATE_ENDED)
+        withTimeoutOrNull(5000) { pendingSaves.first { it == 0 } }
         stopPlayer(false)
         var revoked = false
         try {

@@ -138,6 +138,19 @@ class RealServerTest {
             assertNull(compose.activity.model.player.value)
             assertNull(vault.read())
             assertTrue(compose.activity.model.screen.value.items.isEmpty())
+            assertTrue(
+                compose.activity.model.savedServers.value.any {
+                    it.address == "http://127.0.0.1:5050/"
+                }
+            )
+            compose.onNodeWithText("Use 127.0.0.1").performScrollTo().performClick()
+            compose
+                .onNodeWithText("Connect", useUnmergedTree = true)
+                .performScrollTo()
+                .assertIsEnabled()
+            compose.runOnUiThread { compose.activity.model.forgetServer("http://127.0.0.1:5050/") }
+            compose.waitUntil(10000) { compose.activity.model.savedServers.value.isEmpty() }
+            assertNull(vault.read())
         }
         control.close()
     }

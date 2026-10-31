@@ -6,6 +6,7 @@ import {
   connect,
   login,
   logout,
+  forgetSavedSession,
   preferences,
   desktopCapabilities,
   savePreferences,
@@ -20,6 +21,12 @@ import {
   type Tracks,
   type SessionInfo,
 } from '../../../shared/api/src/client';
+import {
+  readSavedServers,
+  rememberServer,
+  writeSavedServers,
+  serverOrigin,
+} from './savedServers';
 import Player from '../../../frontend/src/components/Player';
 import Icon from '../../../frontend/src/components/Icon';
 import TitleDetails from '../../../frontend/src/components/TitleDetails';
@@ -68,6 +75,8 @@ function MediaCards({
 
 export default function App() {
   const [address, setAddress] = useState('https://');
+  const [savedServers, setSavedServers] = useState(readSavedServers);
+  const [serverName, setServerName] = useState('');
   const [remember, setRemember] = useState(false);
   const [persistentSessions, setPersistentSessions] = useState(false);
   const [clientPlatform, setClientPlatform] = useState('desktop');
@@ -248,15 +257,26 @@ export default function App() {
     setBusy(true);
     setError('');
     try {
-      const info = await connect(address, remember);
+      const origin = serverOrigin(address);
+      const info = await connect(origin, remember);
       if (info.setupRequired)
         throw new Error(
           'This server needs initial setup. Open its web interface in your browser first.',
         );
+      setAddress(origin);
+      const updatedServers = rememberServer(savedServers, origin, serverName);
+      try {
+        writeSavedServers(updatedServers);
+        setSavedServers(updatedServers);
+      } catch {
+        setError(
+          'Connected, but the server address could not be saved on this device.',
+        );
+      }
       setConnected(true);
       setVersion(info.serverVersion);
       setOnline(true);
-      await savePreferences(address, theme);
+      await savePreferences(origin, theme);
       if (remember) {
         try {
           setUser(await api.me());
@@ -372,8 +392,19 @@ export default function App() {
     clearTimeout(searchTimer.current);
     setBusy(true);
     try {
+      let progressWarning = '';
+      const video = document.querySelector('video');
+      if (selection && video && Number.isFinite(video.currentTime)) {
+        video.pause();
+        try {
+          await selection.writer.save(video.currentTime, video.ended);
+        } catch {
+          progressWarning =
+            'Your last playback position could not be saved. Earlier saved progress remains on the original server.';
+        }
+      }
       await logout();
-      setError('');
+      setError(progressWarning);
     } catch (e) {
       setError(
         (e && typeof e === 'object' && 'code' in e && e.code === 'VAULT'
@@ -389,6 +420,9 @@ export default function App() {
       setContinueItems([]);
       setSessions([]);
       setConnected(false);
+      setSearch('');
+      setOffset(0);
+      setView('library');
       setBusy(false);
     }
   }
@@ -415,7 +449,74 @@ export default function App() {
             Connect to the same server from Windows, Linux or another host. The
             desktop application does not host your media.
           </p>
+          {savedServers.length > 0 && (
+            <section aria-label="Saved servers">
+              <h2>Saved servers</h2>
+              {savedServers.map((server) => (
+                <div key={server.address}>
+                  <p>
+                    <strong>{server.name}</strong>
+                    <br />
+                    <span className="muted">{server.address}</span>
+                  </p>
+                  <button
+                    type="button"
+                    className="secondary"
+                    disabled={busy}
+                    onClick={() => {
+                      setAddress(server.address);
+                      setServerName(server.name);
+                      setError('');
+                    }}
+                    aria-label={`Use ${server.name}`}
+                  >
+                    Use server
+                  </button>{' '}
+                  <button
+                    type="button"
+                    className="text-button"
+                    disabled={busy}
+                    aria-label={`Forget ${server.name}`}
+                    onClick={async () => {
+                      setBusy(true);
+                      try {
+                        await forgetSavedSession(server.address);
+                        if (address === server.address) {
+                          await savePreferences('', theme);
+                          setAddress('https://');
+                          setServerName('');
+                        }
+                        const remaining = savedServers.filter(
+                          (s) => s.address !== server.address,
+                        );
+                        writeSavedServers(remaining);
+                        setSavedServers(remaining);
+                      } catch {
+                        setError(
+                          'Could not remove the saved server or its local credentials. Retry or clear the session through the operating system credential store.',
+                        );
+                      } finally {
+                        setBusy(false);
+                      }
+                    }}
+                  >
+                    Forget
+                  </button>
+                </div>
+              ))}
+            </section>
+          )}
           <form onSubmit={attach}>
+            <label>
+              Server name (optional)
+              <input
+                value={serverName}
+                onChange={(e) => setServerName(e.target.value)}
+                maxLength={80}
+                disabled={busy}
+                autoComplete="off"
+              />
+            </label>
             <label>
               Server address
               <input
@@ -442,6 +543,10 @@ export default function App() {
             <p className="muted">
               HTTPS is required for remote servers. Local HTTP sends credentials
               without encryption and is allowed only on this computer.
+            </p>
+            <p className="muted">
+              Successful connections save only the name and address on this
+              device. Passwords are never saved.
             </p>
             <button disabled={busy}>{busy ? 'Connecting…' : 'Connect'}</button>
           </form>
@@ -488,7 +593,7 @@ export default function App() {
           <button
             className="secondary"
             disabled={busy}
-            onClick={() => setConnected(false)}
+            onClick={() => void signOut()}
           >
             Change server
           </button>
@@ -541,6 +646,13 @@ export default function App() {
         <div className="sidebar-bottom">
           {online ? 'Connected' : 'Connection needs attention'}
           <p>{version} · Client 0.1.0-alpha.1</p>
+          <button
+            className="text-button"
+            disabled={busy}
+            onClick={() => void signOut()}
+          >
+            Change server
+          </button>
           <button className="text-button" onClick={() => void signOut()}>
             <Icon name="logout" /> Sign out · {user.name}
           </button>
