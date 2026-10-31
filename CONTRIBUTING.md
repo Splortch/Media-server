@@ -18,3 +18,5 @@ No mandatory external account is permitted in core playback. Discuss architectur
 For approved AI implementation tasks, use the [issue-to-PR operating guide](docs/development/AUTONOMY.md).
 A maintainer approves a focused issue with `/agent implement`; the agent proposes a PR and a human
 reviews it. Activation requires repository configuration. The agent never merges automatically.
+
+Repository administrators: review and activate the [main branch ruleset](docs/development/BRANCH-RULESET.md).
