@@ -1,5 +1,7 @@
 # Media Server
 
+**[Downloads & releases](RELEASES.md)** · [Getting started](docs/GETTING-STARTED.md) · [Changelog](CHANGELOG.md)
+
 A modern, open-source, self-hosted media server focused on performance, simplicity, and a seamless streaming experience.
 
 **Early alpha foundation.** Independent of Jellyfin, Plex and Emby. No cloud account, subscription, advertising or telemetry. Host only media you are entitled to use. Apache-2.0; see [LICENSE](LICENSE) and [NOTICE](NOTICE).
