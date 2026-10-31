@@ -1,5 +1,6 @@
 $ErrorActionPreference = 'Stop'
 $root = $PSScriptRoot
+. (Join-Path $root 'MediaServer.Network.ps1')
 $data = Join-Path $env:LOCALAPPDATA 'Splortch/MediaServer'
 New-Item -ItemType Directory -Path $data -Force | Out-Null
 $configFile = Join-Path $data 'launcher.json'
@@ -34,7 +35,8 @@ else {
 $env:MediaServer__DataDirectory = $data
 $env:MediaServer__AllowedRoots__0 = $config.media
 $env:MediaServer__FfprobePath = $probePath
-$env:ASPNETCORE_URLS = 'http://127.0.0.1:5050'
+$network = Set-ServerNetworkEnvironment $config $data
+$network.HomeUrls | ForEach-Object { Write-Host ('Home connection: ' + $_) }
 $server = Start-Process -FilePath (Join-Path $root 'Api.exe') -WorkingDirectory $root -NoNewWindow -PassThru
 try {
     $ready = $false

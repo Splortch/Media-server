@@ -39,6 +39,7 @@ function Test-ExternalServerLock {
 Add-Type -AssemblyName System.Windows.Forms
 Add-Type -AssemblyName System.Drawing
 [Windows.Forms.Application]::EnableVisualStyles()
+. (Join-Path $app 'MediaServer.Network.ps1')
 $exitCode = 0
 $lease = $null; $signal = $null; $server = $null; $tray = $null; $timer = $null
 $control = $null; $commandSignals = @{}; $busy = $false
@@ -120,11 +121,12 @@ try {
     $env:MediaServer__DataDirectory = $data
     $env:MediaServer__AllowedRoots__0 = $config.media
     $env:MediaServer__FfprobePath = $probePath
-    $env:ASPNETCORE_URLS = 'http://127.0.0.1:5050'
+    $network = $null
     }
     function Start-OwnedServer {
         $script:expectedStopped = $false; $script:unexpectedReported = $false
         if ($script:server -and -not $script:server.HasExited) { return }
+        $script:network = Set-ServerNetworkEnvironment $config $data
         foreach ($name in @('server.log', 'server-error.log')) {
             $path = Join-Path $data $name
             if (Test-Path -LiteralPath $path) { Move-Item -LiteralPath $path -Destination ($path + '.previous') -Force }
@@ -152,7 +154,15 @@ try {
             if (-not $script:server.WaitForExit(15000)) { throw 'The server did not stop. Check the server logs.' }
         }
     }
-    if (-not $externalMode) { Start-OwnedServer }
+    if (-not $externalMode) {
+        # A disconnected adapter must not lock the owner out of the settings UI.
+        try { Start-OwnedServer }
+        catch {
+            Stop-OwnedServer
+            if ($NonInteractive) { throw }
+            [Windows.Forms.MessageBox]::Show($_.Exception.Message, 'Server stopped - check Network settings', 'OK', 'Warning') | Out-Null
+        }
+    }
     $context = New-Object Windows.Forms.ApplicationContext
     $tray = New-Object Windows.Forms.NotifyIcon
     $tray.Icon = [Drawing.SystemIcons]::Application
@@ -194,7 +204,7 @@ try {
     })
     $control = New-Object Windows.Forms.Form
     $control.AutoScaleMode = 'Dpi'; $control.Font = New-Object Drawing.Font('Segoe UI', 9)
-    $control.Text = 'Media Server Control'; $control.ClientSize = New-Object Drawing.Size(540, 250)
+    $control.Text = 'Media Server Control'; $control.ClientSize = New-Object Drawing.Size(540, 400)
     $control.StartPosition = 'CenterScreen'; $control.FormBorderStyle = 'FixedDialog'; $control.MaximizeBox = $false
     $heading = New-Object Windows.Forms.Label
     $heading.Text = 'Your media server'; $heading.SetBounds(24, 20, 480, 30)
@@ -213,6 +223,63 @@ try {
     $hint = New-Object Windows.Forms.Label
     $hint.Text = if ($externalMode) { 'Started outside this controller. Stop it in its original terminal or app. Close and reopen this control after it stops to start a managed server.' } else { 'Stopping interrupts playback on all devices. Closing this window keeps the tray control available.' }
     $hint.SetBounds(24, 211, 488, 35)
+    $networkButton = New-Object Windows.Forms.Button
+    $networkButton.Text = 'Network settings'; $networkButton.SetBounds(210, 165, 170, 36)
+    $networkSummary = New-Object Windows.Forms.TextBox
+    $networkSummary.SetBounds(24, 260, 488, 115); $networkSummary.Multiline = $true
+    $networkSummary.ReadOnly = $true; $networkSummary.ScrollBars = 'Vertical'; $networkSummary.AccessibleName = 'Home network connection addresses'
+    $control.Controls.AddRange(@($networkButton, $networkSummary))
+    $networkButton.add_Click({
+        $dialog = New-Object Windows.Forms.Form
+        $dialog.Text = 'Media Server - network settings'; $dialog.ClientSize = New-Object Drawing.Size(540, 330)
+        $dialog.StartPosition = 'CenterParent'; $dialog.AutoScaleMode = 'Dpi'
+        $description = New-Object Windows.Forms.Label
+        $description.SetBounds(20, 15, 500, 65)
+        $description.Text = 'Choose who can connect. Stop the server before saving. Home HTTP is unencrypted: use only trusted home Wi-Fi. Keep authentication enabled. Never forward port 5050 to the internet.'
+        $mode = New-Object Windows.Forms.ComboBox
+        $mode.SetBounds(20, 85, 490, 30); $mode.DropDownStyle = 'DropDownList'; $mode.AccessibleName = 'Network access'
+        $mode.Items.AddRange(@('This computer', 'Home network (private IPv4 adapters)', 'Specific home IP'))
+        $mode.SelectedIndex = switch ([string]$config.networkMode) { 'home' { 1 }; 'specific' { 2 }; default { 0 } }
+        $addresses = New-Object Windows.Forms.ComboBox
+        $addresses.SetBounds(20, 125, 490, 30); $addresses.DropDownStyle = 'DropDownList'; $addresses.AccessibleName = 'Assigned home IP address'
+        foreach ($address in @(Get-HomeAddresses)) { [void]$addresses.Items.Add($address) }
+        if ($addresses.Items.Count) { $addresses.SelectedIndex = 0 }
+        if ($config.networkAddress -and $addresses.Items.Contains([string]$config.networkAddress)) { $addresses.SelectedItem = [string]$config.networkAddress }
+        $addresses.Enabled = $mode.SelectedIndex -eq 2
+        $mode.add_SelectedIndexChanged({ $addresses.Enabled = $mode.SelectedIndex -eq 2 })
+        $help = New-Object Windows.Forms.Label
+        $help.SetBounds(20, 165, 500, 70)
+        $help.Text = 'A specific IP must already belong to this PC. For a permanent address, reserve it for this PC in your router (DHCP reservation). Allow TCP 5050 on Private networks / LocalSubnet only; the app does not change your firewall or router.'
+        $save = New-Object Windows.Forms.Button
+        $save.Text = 'Save settings'; $save.SetBounds(20, 250, 150, 35)
+        $save.Enabled = -not ($script:server -and -not $script:server.HasExited)
+        $save.add_Click({
+            try {
+                if (Test-ExternalServerLock) { throw 'Stop the running server before changing network settings.' }
+                $candidate = $config | ConvertTo-Json | ConvertFrom-Json
+                $candidate | Add-Member -NotePropertyName networkMode -NotePropertyValue @('local', 'home', 'specific')[$mode.SelectedIndex] -Force
+                $candidate | Add-Member -NotePropertyName networkAddress -NotePropertyValue ([string]$addresses.SelectedItem) -Force
+                [void](Resolve-ServerNetwork $candidate @(Get-HomeAddresses))
+                if ($candidate.networkMode -ne 'local' -and (Test-Path (Join-Path $data 'setup-token'))) { throw 'Complete account setup on localhost before sharing with your home.' }
+                $temporaryConfig = $configPath + '.tmp'
+                $candidate | ConvertTo-Json | Set-Content -LiteralPath $temporaryConfig -Encoding UTF8
+                Move-Item -LiteralPath $temporaryConfig -Destination $configPath -Force
+                $script:config = $candidate
+                $script:network = $null
+                $dialog.Close()
+                Update-ControlStatus
+            } catch { [Windows.Forms.MessageBox]::Show($_.Exception.Message, 'Network settings', 'OK', 'Error') | Out-Null }
+        })
+        $guide = New-Object Windows.Forms.Button
+        $guide.Text = 'Setup guide'; $guide.SetBounds(190, 250, 150, 35)
+        $guide.add_Click({
+            $localGuide = Join-Path $app 'HOME-NETWORK.md'
+            if (Test-Path $localGuide) { Start-Process notepad.exe -ArgumentList ('"' + $localGuide + '"') }
+            else { Start-Process 'https://github.com/Splortch/Media-server/blob/main/docs/deployment/HOME-NETWORK.md' }
+        })
+        $dialog.Controls.AddRange(@($description, $mode, $addresses, $help, $save, $guide))
+        try { [void]$dialog.ShowDialog($control) } finally { $dialog.Dispose() }
+    })
     $control.Controls.AddRange(@($heading, $controlStatus, $startButton, $stopButton, $restartButton, $openButton, $hint))
     $control.add_FormClosing({
         param($sender, $eventArgs)
@@ -223,6 +290,8 @@ try {
     function Update-ControlStatus {
         $running = if ($externalMode) { Test-ExternalServerLock } else { $script:server -and -not $script:server.HasExited }
         $controlStatus.Text = if ($externalMode) { if ($running) { 'Running outside this controller - http://127.0.0.1:5050' } else { 'External server stopped. Close and reopen this controller to start it.' } } elseif ($running) { 'Running - http://127.0.0.1:5050' } else { 'Stopped - select Start server to go online again.' }
+        $networkButton.Enabled = -not $externalMode -and -not $busy
+        $networkSummary.Text = if ($externalMode) { 'Network settings are managed by the external launcher.' } elseif ($running -and $network -and $network.HomeUrls.Count) { 'Connect from other devices on trusted home Wi-Fi:' + [Environment]::NewLine + ($network.HomeUrls -join [Environment]::NewLine) } else { 'Home access is off or the server is stopped. Network settings take effect when you select Start server.' }
         $status.Text = $controlStatus.Text
         $tray.Text = if ($running) { 'Media Server - running locally' } else { 'Media Server - stopped' }
         $startButton.Enabled = -not $externalMode -and -not $busy -and -not $running
@@ -299,7 +368,10 @@ try {
         }
     })
     $timer.Start()
-    if (-not $NoBrowser) { & $showControl; Start-Process 'http://127.0.0.1:5050'; & $showToken }
+    if (-not $NoBrowser) {
+        & $showControl
+        if ($externalMode -or ($server -and -not $server.HasExited)) { Start-Process 'http://127.0.0.1:5050'; & $showToken }
+    }
     [Windows.Forms.Application]::Run($context)
     if ($exitCode -ne 0) { throw 'The owned server stopped unexpectedly.' }
 } catch {

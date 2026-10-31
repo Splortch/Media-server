@@ -57,6 +57,7 @@ def package_server():
         shutil.copyfile(ROOT / path, folder / path)
     shutil.copyfile(ROOT / 'docs/deployment/RELEASE-NOTES.md', folder / 'README.md')
     browser_licenses(folder)
+    shutil.copyfile(ROOT / 'docs/deployment/HOME-NETWORK.md', folder / 'HOME-NETWORK.md')
     shutil.copyfile(ROOT / 'docs/deployment/DISTRIBUTION-EVIDENCE.md', folder / 'DISTRIBUTION-EVIDENCE.md')
     shutil.copyfile(ROOT / 'docs/deployment/DESKTOP-INSTALLERS.md', folder / 'DESKTOP-INSTALLERS.md')
     shutil.copyfile(ROOT / 'scripts/update-server.py', folder / 'update-server.py')

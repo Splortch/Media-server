@@ -52,6 +52,19 @@ try {
     $hostProcess = Start-Tray
     & python scripts/test-installed-server.py $data $media initialize
     if ($LASTEXITCODE -ne 0) { throw 'Installed real-backend integration failed.' }
+    # Exercise the real installed backend on its assigned private adapter, then
+    # restore local-only mode. This does not open firewall rules or need a router.
+    . (Join-Path $install 'app/MediaServer.Network.ps1')
+    $homeAddresses = @(Get-HomeAddresses)
+    if (-not $homeAddresses.Count) { throw 'Windows LAN integration requires an assigned private IPv4 adapter.' }
+    Stop-Tray $hostProcess
+    @{ media = $media; networkMode = 'specific'; networkAddress = $homeAddresses[0] } | ConvertTo-Json | Set-Content (Join-Path $data 'launcher.json') -Encoding UTF8
+    $hostProcess = Start-Tray
+    & python scripts/test-installed-server.py $data $media verify ('http://' + $homeAddresses[0] + ':5050')
+    if ($LASTEXITCODE -ne 0) { throw 'Private-IP authentication, streaming or progress integration failed.' }
+    Stop-Tray $hostProcess
+    @{ media = $media; networkMode = 'local' } | ConvertTo-Json | Set-Content (Join-Path $data 'launcher.json') -Encoding UTF8
+    $hostProcess = Start-Tray
     # Reopening must dispatch to the original controller, not take .server.lock again.
     $originalBackend = (Get-Process Api | Select-Object -First 1).Id
     foreach ($suffix in @('', ' -Command Show')) {

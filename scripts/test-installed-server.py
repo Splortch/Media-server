@@ -9,7 +9,7 @@ import urllib.error
 import urllib.request
 
 data, media, mode = Path(sys.argv[1]), Path(sys.argv[2]), sys.argv[3]
-base = 'http://127.0.0.1:5050'
+base = sys.argv[4] if len(sys.argv) > 4 else 'http://127.0.0.1:5050'
 jar = http.cookiejar.CookieJar()
 client = urllib.request.build_opener(urllib.request.HTTPCookieProcessor(jar))
 

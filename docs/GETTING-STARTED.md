@@ -195,7 +195,7 @@ Do this only after browser playback works. It helps separate server problems fro
 
 The client does not install or start a server. Closing the server console stops playback for all clients. WebView2 codec support can differ from your browser; successful installer builds do not establish every codec or GPU path works on your PC.
 
-`127.0.0.1` always means **the device you are using**. On a phone or a second PC it does not point to your server. Native launchers bind to loopback by default, and the Windows client rejects non-local HTTP. Cross-device access therefore needs deliberate HTTPS, trusted certificates, exact allowed hosts and network configuration. It is not a one-click alpha feature. First complete this local test; do not forward router ports or expose port 5050 to the internet. See [security and remote-access limits](architecture/SECURITY.md).
+`127.0.0.1` always means **the device you are using**. To connect from a browser on another home device, use **Media Server Control → Stop server → Network settings** and follow the [home-network setup guide](deployment/HOME-NETWORK.md). Home HTTP is unencrypted and opt-in. Native Windows/Android clients retain their HTTPS requirement for other computers; see the [VPN/HTTPS guide](deployment/REMOTE-ACCESS.md). Never forward port 5050 to the internet.
 
 ## 7. Stop, restart and keep your data
 
