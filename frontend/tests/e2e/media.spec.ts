@@ -490,6 +490,14 @@ test('setup, accounts, collections, diagnostics, stream ranges and persist resum
       exact: true,
     })
     .click();
+  await page.getByLabel('Enable download center').check();
+  await page
+    .getByLabel('Approved source hosts')
+    .fill('raw.githubusercontent.com');
+  await page.getByRole('button', { name: 'Save download settings' }).click();
+  await expect(
+    page.getByRole('link', { name: 'Downloads', exact: true }),
+  ).toBeVisible();
   await page.getByRole('link', { name: 'Movie requests', exact: true }).click();
   await page
     .getByLabel('Movie title', { exact: true })
@@ -532,6 +540,71 @@ test('setup, accounts, collections, diagnostics, stream ranges and persist resum
     path: 'test-results/visual/family-requests.png',
     fullPage: true,
   });
+  await page
+    .getByLabel('Movie title', { exact: true })
+    .fill('Downloaded synthetic movie');
+  await page
+    .getByRole('button', { name: 'Send movie request', exact: true })
+    .click();
+  const downloadRequest = page.locator('article').filter({
+    has: page.getByRole('heading', {
+      name: 'Downloaded synthetic movie',
+      exact: true,
+    }),
+  });
+  await downloadRequest
+    .getByText('Approve authorized download for Downloaded synthetic movie', {
+      exact: true,
+    })
+    .click();
+  await downloadRequest
+    .getByLabel('Authorized HTTPS source')
+    .fill(
+      'https://raw.githubusercontent.com/Splortch/Media-server/1773f135fa760e60bd6696fc4756c15a72d2d359/tests/fixtures/download.webm',
+    );
+  await downloadRequest.getByLabel('Download size budget (MiB)').fill('1');
+  await downloadRequest
+    .getByLabel('Actual media container')
+    .selectOption('.webm');
+  await downloadRequest
+    .getByLabel('Approved content rating')
+    .selectOption('10');
+  const downloadFixture = await readFile(
+    path.resolve('../tests/fixtures/download.webm'),
+  );
+  await downloadRequest
+    .getByLabel('Publisher SHA-256 (optional)')
+    .fill(createHash('sha256').update(downloadFixture).digest('hex'));
+  await accessible(page);
+  await downloadRequest
+    .getByRole('button', { name: 'Approve download and delivery', exact: true })
+    .click();
+  await expect(
+    downloadRequest.getByRole('link', {
+      name: 'View added movie',
+      exact: true,
+    }),
+  ).toBeVisible({ timeout: 60000 });
+  await accessible(page);
+  await page.screenshot({
+    path: 'test-results/visual/family-download-delivered.png',
+    fullPage: true,
+  });
+  await downloadRequest
+    .getByRole('link', { name: 'View added movie', exact: true })
+    .click();
+  await expect(
+    page.getByRole('region', { name: 'Title information' }),
+  ).toBeVisible();
+  const importedId = (await page.evaluate(() => location.hash)).match(
+    /media\/(\d+)/,
+  )![1];
+  const importedBytes = await page.request.get(
+    `/api/media/${importedId}/stream`,
+    { headers: { Range: 'bytes=0-99' } },
+  );
+  expect(importedBytes.status()).toBe(206);
+  expect(await importedBytes.body()).toEqual(downloadFixture.subarray(0, 100));
   await page.goto('/' + requestReturnHash);
   await expect(
     page.getByRole('region', { name: 'Title information' }),

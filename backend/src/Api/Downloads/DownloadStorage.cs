@@ -83,7 +83,11 @@ public sealed class DownloadStorage(string data, IDownloadSpace space)
     {
         var rows = jobs.ToArray();
         var reserved = rows.Where(x => x.State is "queued" or "running" or "paused").Sum(Remaining);
-        if (Free() - Margin < reserved || rows.Sum(x => x.ReceivedBytes) + reserved > TotalLimit)
+        var importReserved = rows.Sum(DownloadAccess.ImportRemaining);
+        if (
+            Free() - Margin < reserved + importReserved
+            || rows.Sum(x => x.ReceivedBytes) + reserved > TotalLimit
+        )
             throw new DownloadFault("insufficient-storage");
     }
 }
@@ -96,6 +100,12 @@ public sealed class DownloadControl
     private string? active;
     private CancellationTokenSource? cancellation;
     private TaskCompletionSource? stopped;
+
+    public bool IsActive(string id)
+    {
+        lock (sync)
+            return active == id;
+    }
 
     public void Signal()
     {

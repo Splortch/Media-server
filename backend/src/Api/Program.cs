@@ -145,6 +145,7 @@ builder
     .PersistKeysToFileSystem(new DirectoryInfo(Path.Combine(data, "keys")));
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddSingleton<DownloadControl>();
+builder.Services.AddSingleton<DownloadImporter>();
 builder.Services.AddSingleton<IDownloadSpace, DownloadSpace>();
 builder.Services.AddSingleton(sp => new DownloadStorage(
     data,
@@ -433,6 +434,7 @@ app.MapFeatures();
 remoteAccess.Map(app);
 app.MapMovieRequests();
 app.MapDownloads();
+app.MapDownloadApprovals();
 app.MapBookmarks();
 app.MapExperiments(credentialGate);
 void MapApi(RouteGroupBuilder root)

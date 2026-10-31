@@ -659,7 +659,11 @@ export default function App() {
             )
           ) : route === 'requests' ? (
             featureVisible(features, 'movie-requests') ? (
-              <Requests admin={user?.role === 'Admin'} initialTitle={query} />
+              <Requests
+                admin={user?.role === 'Admin'}
+                initialTitle={query}
+                downloadsEnabled={featureVisible(features, 'downloads')}
+              />
             ) : (
               <p>
                 Movie requests are disabled or hidden. Administrators can enable

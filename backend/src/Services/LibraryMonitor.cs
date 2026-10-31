@@ -13,6 +13,34 @@ public sealed class ScanScheduler(IServiceScopeFactory scopes, ScanQueue queue)
 {
     private readonly SemaphoreSlim gate = new(1, 1);
 
+    // Import cleanup may remove only its own hidden catalog rows/files, while no scanner can use them.
+    public async Task<bool> WhileIdleAsync(
+        int libraryId,
+        Func<Task> operation,
+        CancellationToken ct
+    )
+    {
+        await gate.WaitAsync(ct);
+        try
+        {
+            using var scope = scopes.CreateScope();
+            var db = scope.ServiceProvider.GetRequiredService<MediaDb>();
+            if (
+                await db.Jobs.AnyAsync(
+                    x => x.LibraryId == libraryId && (x.State == "queued" || x.State == "running"),
+                    ct
+                )
+            )
+                return false;
+            await operation();
+            return true;
+        }
+        finally
+        {
+            gate.Release();
+        }
+    }
+
     // Share the scheduling gate so deletion cannot race a newly queued scan.
     public async Task<string> RemoveAsync(int libraryId, CancellationToken ct)
     {

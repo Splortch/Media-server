@@ -33,7 +33,8 @@ public record DownloadView(
     string? ContentHash,
     string? Error,
     long Revision,
-    bool CanResume
+    bool CanResume,
+    DownloadImportView? Import
 );
 
 public record DownloadSettingsView(
@@ -47,6 +48,25 @@ public record DownloadSettingsView(
 
 public static class DownloadEndpoints
 {
+    public static void Validate(DownloadInput input)
+    {
+        ArgumentNullException.ThrowIfNull(input);
+        if (
+            string.IsNullOrWhiteSpace(input.Name)
+            || input.Name.Length > 80
+            || input.Name.Any(char.IsControl)
+            || input.BudgetBytes is < 1 or > DownloadStorage.TotalLimit
+            || input.Priority is < -10 or > 10
+            || (
+                input.Sha256 != null
+                && (input.Sha256.Length != 64 || !input.Sha256.All(Uri.IsHexDigit))
+            )
+        )
+            throw new ArgumentException(
+                "Use a name of 1–80 characters, positive budget up to 100 GiB, priority -10…10 and an optional 64-digit SHA-256."
+            );
+    }
+
     public static DownloadView View(DownloadJob x) =>
         new(
             x.Id,
@@ -61,7 +81,8 @@ public static class DownloadEndpoints
             x.ContentHash,
             x.Error,
             x.Revision,
-            x.ReceivedBytes == 0 || x.ETag != null || x.TotalBytes == x.ReceivedBytes
+            x.ReceivedBytes == 0 || x.ETag != null || x.TotalBytes == x.ReceivedBytes,
+            DownloadApprovals.View(x)
         );
 
     private static readonly Expression<Func<DownloadJob, DownloadView>> Projection = x =>
@@ -78,7 +99,25 @@ public static class DownloadEndpoints
             x.ContentHash,
             x.Error,
             x.Revision,
-            x.ReceivedBytes == 0 || x.ETag != null || x.TotalBytes == x.ReceivedBytes
+            x.ReceivedBytes == 0 || x.ETag != null || x.TotalBytes == x.ReceivedBytes,
+            x.TargetLibraryId == null
+                ? null
+                : new DownloadImportView(
+                    x.RequestId,
+                    x.TargetLibraryId.Value,
+                    x.Classification!,
+                    x.ImportTitle!,
+                    x.ImportYear,
+                    x.Series,
+                    x.Season,
+                    x.Episode,
+                    x.ImportRating,
+                    x.ImportExtension!,
+                    x.ImportState,
+                    x.ImportError,
+                    x.ImportedMediaId,
+                    x.ImportCopiedBytes
+                )
         );
 
     public static async Task<DownloadSettingsView> Settings(
@@ -103,7 +142,7 @@ public static class DownloadEndpoints
             JsonSerializer.Deserialize<string[]>(policy?.HostsJson ?? "[]") ?? [],
             free,
             jobs.Where(x => x.State is "queued" or "running" or "paused")
-                .Sum(DownloadStorage.Remaining),
+                .Sum(DownloadStorage.Remaining) + jobs.Sum(DownloadAccess.ImportRemaining),
             DownloadStorage.Margin,
             DownloadStorage.TotalLimit
         );
@@ -192,6 +231,18 @@ public static class DownloadEndpoints
                                             .SetProperty(x => x.Revision, x => x.Revision + 1),
                                     ct
                                 );
+                            await db
+                                .Downloads.Where(x =>
+                                    x.ImportState == "queued"
+                                    || x.ImportState == "copying"
+                                    || x.ImportState == "scanning"
+                                )
+                                .ExecuteUpdateAsync(
+                                    s =>
+                                        s.SetProperty(x => x.ImportState, "held")
+                                            .SetProperty(x => x.ImportError, "settings-changed"),
+                                    ct
+                                );
                             control.Cancel();
                         }
                         finally
@@ -245,20 +296,7 @@ public static class DownloadEndpoints
                         CancellationToken ct
                     ) =>
                     {
-                        if (
-                            string.IsNullOrWhiteSpace(input.Name)
-                            || input.Name.Length > 80
-                            || input.Name.Any(char.IsControl)
-                            || input.BudgetBytes is < 1 or > DownloadStorage.TotalLimit
-                            || input.Priority is < -10 or > 10
-                            || (
-                                input.Sha256 != null
-                                && (input.Sha256.Length != 64 || !input.Sha256.All(Uri.IsHexDigit))
-                            )
-                        )
-                            throw new ArgumentException(
-                                "Use a name of 1–80 characters, positive budget up to 100 GiB, priority -10…10 and an optional 64-digit SHA-256."
-                            );
+                        Validate(input);
                         await control.Gate.WaitAsync(ct);
                         try
                         {
@@ -393,6 +431,7 @@ public static class DownloadEndpoints
                                     {
                                         storage.Discard(id);
                                         row.State = "cancelled";
+                                        row.ImportState = "discarded";
                                         row.ProtectedUrl = "";
                                         row.ReceivedBytes = 0;
                                         row.TotalBytes = null;
@@ -441,6 +480,20 @@ public static class DownloadEndpoints
                                 new
                                 {
                                     message = "Stop the job and refresh before removing its staged files.",
+                                }
+                            );
+                        if (
+                            control.IsActive(id)
+                            || (
+                                row.TargetLibraryId != null
+                                && row.ImportState
+                                    is not ("none" or "discarded" or "inbox" or "imported")
+                            )
+                        )
+                            return Results.Conflict(
+                                new
+                                {
+                                    message = "Hold and discard the import before removing its staged source.",
                                 }
                             );
                         storage.Discard(id);
