@@ -103,11 +103,9 @@ export default function Bookmarks({
             <button
               type="button"
               disabled={busy}
-              aria-label={`Jump to ${b.name} at ${b.seconds} seconds`}
               onClick={() => onSeek(b.seconds)}
             >
-              {b.name} · {Math.floor(b.seconds / 60)}:
-              {String(Math.floor(b.seconds % 60)).padStart(2, '0')}
+              Jump to {b.name} at {b.seconds} seconds
             </button>
             {b.note && <p style={{ whiteSpace: 'pre-wrap' }}>{b.note}</p>}
             <button

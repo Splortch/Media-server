@@ -806,8 +806,14 @@ mod tests {
             ("PUT", "/api/v1/media/4/progress-sync"),
             ("GET", "/api/v1/media/4/bookmarks"),
             ("POST", "/api/v1/media/4/bookmarks/import"),
-            ("PUT", "/api/v1/media/4/bookmarks/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"),
-            ("DELETE", "/api/v1/media/4/bookmarks/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/1"),
+            (
+                "PUT",
+                "/api/v1/media/4/bookmarks/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            ),
+            (
+                "DELETE",
+                "/api/v1/media/4/bookmarks/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/1",
+            ),
         ] {
             assert!(allowed_request(method, path));
         }
@@ -818,7 +824,10 @@ mod tests {
             ("GET", "/api/v1/media/4/stream"),
             ("GET", "/api/v1/media#x"),
             ("PUT", "/api/v1/media/4/bookmarks/../../users"),
-            ("DELETE", "/api/v1/media/4/bookmarks/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/bad"),
+            (
+                "DELETE",
+                "/api/v1/media/4/bookmarks/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/bad",
+            ),
             ("GET", "/api/v1/media/4/bookmarks/not-a-route"),
         ] {
             assert!(!allowed_request(method, path));
