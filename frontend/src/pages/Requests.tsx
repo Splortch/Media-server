@@ -1,3 +1,4 @@
+import { ApproveDownload } from '../features/downloads/ImportForm';
 import { useEffect, useState, type FormEvent } from 'react';
 import { api, serverTime } from '../services/api';
 import type { components } from '../../../shared/api/src/generated';
@@ -7,10 +8,37 @@ type Library = { id: number; name: string };
 export default function Requests({
   admin,
   initialTitle = '',
+  downloadsEnabled = false,
 }: {
   admin: boolean;
+  downloadsEnabled?: boolean;
   initialTitle?: string;
 }) {
+  const [downloadStatus, setDownloadStatus] = useState<
+    { requestId: number; state: string }[]
+  >([]);
+  useEffect(() => {
+    let active = true;
+    const refresh = () =>
+      void api<{ requestId: number; state: string }[]>(
+        '/requests/download-status',
+      )
+        .then((rows) => {
+          if (active)
+            setDownloadStatus(
+              Array.isArray(rows)
+                ? rows.filter((x) => typeof x.requestId === 'number')
+                : [],
+            );
+        })
+        .catch(() => {});
+    refresh();
+    const timer = window.setInterval(refresh, 5000);
+    return () => {
+      active = false;
+      window.clearInterval(timer);
+    };
+  }, []);
   const [items, setItems] = useState<Request[]>([]);
   const [libraries, setLibraries] = useState<Library[]>([]);
   const [title, setTitle] = useState(initialTitle);
@@ -220,6 +248,20 @@ export default function Requests({
               {item.state} · {item.library}
             </p>
             {item.note && <p>{item.note}</p>}
+            {downloadStatus.find((x) => x.requestId === item.id) && (
+              <p role="status">
+                Download:{' '}
+                {downloadStatus.find((x) => x.requestId === item.id)!.state}
+              </p>
+            )}
+            {admin &&
+              downloadsEnabled &&
+              !['Added', 'Declined'].includes(item.state) && (
+                <ApproveDownload
+                  request={item}
+                  onApproved={() => void refresh()}
+                />
+              )}
             {item.reply && (
               <p>
                 <strong>Administrator reply:</strong> {item.reply}

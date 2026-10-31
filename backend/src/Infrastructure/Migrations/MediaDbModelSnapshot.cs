@@ -22,6 +22,9 @@ namespace Infrastructure.Migrations
                     b.Property<string>("Id")
                         .HasColumnType("TEXT");
 
+                    b.Property<string>("Classification")
+                        .HasColumnType("TEXT");
+
                     b.Property<string>("ContentHash")
                         .HasColumnType("TEXT");
 
@@ -35,11 +38,48 @@ namespace Infrastructure.Migrations
                     b.Property<string>("ETag")
                         .HasColumnType("TEXT");
 
+                    b.Property<int?>("Episode")
+                        .HasColumnType("INTEGER");
+
                     b.Property<string>("Error")
                         .HasColumnType("TEXT");
 
                     b.Property<string>("ExpectedHash")
                         .HasColumnType("TEXT");
+
+                    b.Property<long>("ImportCopiedBytes")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("ImportError")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("ImportExtension")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("ImportNonce")
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("ImportRating")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("ImportRelativePath")
+                        .HasColumnType("TEXT");
+
+                    b.Property<int?>("ImportScanId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("ImportState")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("ImportTitle")
+                        .HasColumnType("TEXT");
+
+                    b.Property<int?>("ImportYear")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int?>("ImportedMediaId")
+                        .HasColumnType("INTEGER");
 
                     b.Property<long>("MaxBytes")
                         .HasColumnType("INTEGER");
@@ -58,8 +98,23 @@ namespace Infrastructure.Migrations
                     b.Property<long>("ReceivedBytes")
                         .HasColumnType("INTEGER");
 
+                    b.Property<int?>("RequestId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int?>("RequestOwnerId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<long?>("RequestRevision")
+                        .HasColumnType("INTEGER");
+
                     b.Property<long>("Revision")
                         .HasColumnType("INTEGER");
+
+                    b.Property<int?>("Season")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Series")
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("SourceHost")
                         .IsRequired()
@@ -72,6 +127,12 @@ namespace Infrastructure.Migrations
                         .IsRequired()
                         .HasColumnType("TEXT");
 
+                    b.Property<int?>("TargetLibraryId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("TargetRoot")
+                        .HasColumnType("TEXT");
+
                     b.Property<long?>("TotalBytes")
                         .HasColumnType("INTEGER");
 
@@ -82,6 +143,9 @@ namespace Infrastructure.Migrations
                         .HasColumnType("INTEGER");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("RequestId")
+                        .IsUnique();
 
                     b.HasIndex("UserId");
 
@@ -203,6 +267,9 @@ namespace Infrastructure.Migrations
                         .IsRequired()
                         .HasColumnType("TEXT");
 
+                    b.Property<string>("ImportJobId")
+                        .HasColumnType("TEXT");
+
                     b.Property<bool>("IsMissing")
                         .HasColumnType("INTEGER");
 
@@ -210,6 +277,9 @@ namespace Infrastructure.Migrations
                         .HasColumnType("INTEGER");
 
                     b.Property<long>("ModifiedTicks")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<bool>("PendingImport")
                         .HasColumnType("INTEGER");
 
                     b.Property<string>("RelativePath")

@@ -1,3 +1,4 @@
+import ImportForm from './ImportForm';
 import {
   useCallback,
   useEffect,
@@ -67,8 +68,9 @@ export function DownloadSettings({
       <h2>Download center</h2>
       <p className="muted">
         Optional administrator tool for authorized public HTTPS URLs. Files stay
-        in separate staging storage. Library import, family approvals, catalogs
-        and external clients are planned.
+        in separate staging storage until an administrator approves a library
+        match. Family approvals and managed Movies/TV imports are available;
+        catalogs and external clients are planned.
       </p>
       {error && (
         <p role="alert" className="error">
@@ -199,8 +201,8 @@ export default function Downloads() {
       <h1>Download center</h1>
       <p className="muted">
         Download only content you are authorized to obtain. Completed files are
-        staged for administrator retrieval; they do not appear in your library
-        automatically.
+        staged for administrator retrieval. Confirm a library match to organize
+        and scan them automatically.
       </p>
       <a href="#settings" className="back-link">
         Download settings
@@ -309,7 +311,82 @@ export default function Downloads() {
                   <code className="download-hash">{job.contentHash}</code>
                 </details>
               )}
+              {job.import && (
+                <div className="import-status">
+                  <p>
+                    Library import: {job.import.state} ·{' '}
+                    {job.import.classification === 'tv' ? 'TV Shows' : 'Movies'}
+                  </p>
+                  {job.import.error && (
+                    <p role="status">{job.import.error.replaceAll('-', ' ')}</p>
+                  )}
+                  {job.import.mediaItemId != null && (
+                    <a
+                      className="button"
+                      href={'#media/' + job.import.mediaItemId}
+                    >
+                      Open imported title
+                    </a>
+                  )}
+                </div>
+              )}
+              {job.state === 'completed' &&
+                (!job.import ||
+                  ['inbox', 'discarded'].includes(job.import.state)) && (
+                  <ImportForm job={job} busy={busy} mutate={mutate} />
+                )}
               <div className="download-actions">
+                {job.import &&
+                  ['waiting', 'queued', 'copying', 'scanning'].includes(
+                    job.import.state,
+                  ) && (
+                    <button
+                      disabled={busy}
+                      className="secondary"
+                      onClick={() =>
+                        void mutate(() =>
+                          api(`/downloads/${job.id}/import`, 'PUT', {
+                            revision: job.revision,
+                            action: 'hold',
+                          }),
+                        )
+                      }
+                    >
+                      Hold library import for {job.name}
+                    </button>
+                  )}
+                {job.import?.state === 'held' && job.state === 'completed' && (
+                  <>
+                    <button
+                      disabled={busy}
+                      onClick={() =>
+                        void mutate(() =>
+                          api(`/downloads/${job.id}/import`, 'PUT', {
+                            revision: job.revision,
+                            action: 'retry',
+                          }),
+                        )
+                      }
+                    >
+                      Retry library import for {job.name}
+                    </button>
+                    <button
+                      disabled={busy}
+                      className="secondary"
+                      onClick={() =>
+                        void mutate(() =>
+                          api(`/downloads/${job.id}/import`, 'PUT', {
+                            revision: job.revision,
+                            action: 'discard',
+                          }),
+                        )
+                      }
+                    >
+                      Discard import files, keep staged {job.name}
+                    </button>
+                  </>
+                )}
+
                 {['queued', 'running'].includes(job.state) && (
                   <button
                     className="secondary"

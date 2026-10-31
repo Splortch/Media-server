@@ -27,6 +27,8 @@ public class MediaItem
     public int LibraryId { get; set; }
     public string RelativePath { get; set; } = "";
     public string Title { get; set; } = "";
+    public bool PendingImport { get; set; }
+    public string? ImportJobId { get; set; }
     public string Container { get; set; } = "";
     public string VideoCodec { get; set; } = "";
     public string AudioCodec { get; set; } = "";
