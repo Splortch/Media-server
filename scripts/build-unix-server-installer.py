@@ -17,8 +17,14 @@ def build(root=ROOT, run=subprocess.run):
     if not match or rid not in ('linux-x64', 'osx-x64', 'osx-arm64'):
         raise ValueError('Invalid installer version or runtime')
     source = root / 'artifacts/staging' / f'MediaServer-v{version}-{rid}'
-    if not (source / 'Api').is_file() or not (source / 'wwwroot/index.html').is_file():
-        raise RuntimeError('Smoke-tested server payload and web UI are required')
+    launcher = 'start-media-server.sh' if rid == 'linux-x64' else 'Start-MediaServer.command'
+    if (
+        not (source / 'Api').is_file()
+        or not (source / 'wwwroot/index.html').is_file()
+        or not (source / launcher).is_file()
+        or any(path.is_symlink() for path in source.rglob('*'))
+    ):
+        raise RuntimeError('Smoke-tested server payload, launcher and clean file layout are required')
     output = root / 'artifacts/packages'
     output.mkdir(parents=True, exist_ok=True)
     with tempfile.TemporaryDirectory(prefix='media-server-package-') as temp:
@@ -26,7 +32,7 @@ def build(root=ROOT, run=subprocess.run):
         if rid == 'linux-x64':
             app = payload / 'opt/media-server'
             shutil.copytree(source, app)
-            for name in ('Api', 'start-media-server.sh'):
+            for name in ('Api', launcher):
                 (app / name).chmod(0o755)
             control = payload / 'DEBIAN/control'
             control.parent.mkdir()
@@ -55,7 +61,7 @@ Categories=AudioVideo;Video;
         else:
             app = payload / 'Applications/MediaServer'
             shutil.copytree(source, app)
-            for name in ('Api', 'Start-MediaServer.command'):
+            for name in ('Api', launcher):
                 (app / name).chmod(0o755)
             destination = output / f'MediaServer-v{version}-{rid}.pkg'
             # No root postinstall script or automatic service. The user launches the
