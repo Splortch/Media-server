@@ -7,7 +7,7 @@ const {platformNotes} = require('./release-notes.cjs');
 module.exports = async function publish({github, context}) {
   const sha = process.env.SOURCE_SHA;
   const tag = process.env.RELEASE_TAG;
-  if (!/^[0-9a-f]{40}$/.test(sha) || !/^v0\.2\.0-alpha\.[1-9][0-9]{0,4}$/.test(tag)) throw new Error('Invalid release identity.');
+  if (!/^[0-9a-f]{40}$/.test(sha) || !/^v0\.2\.\d+(?:-(?:alpha|beta)\.[1-9]\d{0,4})?$/.test(tag)) throw new Error('Invalid release identity.');
   const branch = await github.rest.repos.getBranch({...context.repo, branch:'main'});
   if (branch.data.commit.sha !== sha) return false;
   const folder = path.resolve('artifacts/release');
