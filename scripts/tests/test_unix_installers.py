@@ -66,6 +66,16 @@ class UnixInstallerTests(unittest.TestCase):
                 with patch.dict(os.environ, SERVER_VERSION=version, RID=rid), self.assertRaises(error):
                     module.build(Path(temporary))
 
+            with patch.dict(os.environ, SERVER_VERSION='0.2.0-alpha.42', RID='linux-x64'):
+                root = Path(temporary)
+                source = root / 'artifacts/staging' / 'MediaServer-v0.2.0-alpha.42-linux-x64'
+                source.mkdir(parents=True)
+                (source / 'Api').write_text('explicit executable fixture')
+                (source / 'wwwroot').mkdir()
+                (source / 'wwwroot/index.html').write_text('explicit frontend fixture')
+                with self.assertRaises(RuntimeError):
+                    module.build(root)
+
 
 if __name__ == '__main__':
     unittest.main()
