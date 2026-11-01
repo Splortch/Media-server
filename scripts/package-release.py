@@ -16,7 +16,7 @@ ARTIFACTS = ROOT / 'artifacts'
 
 def version(name):
     value = os.environ[name]
-    if not re.fullmatch(r'0\.[12]\.0-alpha\.[1-9][0-9]{0,4}', value):
+    if not re.fullmatch(r'0\.[12]\.0(?:-(?:alpha|beta)\.[1-9]\d{0,4})?', value):
         raise ValueError('Invalid release version')
     return value
 
