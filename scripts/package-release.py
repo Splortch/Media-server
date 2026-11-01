@@ -17,7 +17,7 @@ ARTIFACTS = ROOT / 'artifacts'
 def version(name):
     value = os.environ[name]
     if not re.fullmatch(r'0\.[12]\.0-alpha\.[1-9][0-9]{0,4}', value):
-        raise ValueError('Invalid alpha version')
+        raise ValueError('Invalid release version')
     return value
 
 
@@ -130,7 +130,7 @@ volumes:
     archive(setup, output / (setup.name + '.zip'))
     for name in ('CONTAINER-PACKAGES.txt', 'FFMPEG-LICENSE.txt', 'Container-Corresponding-Source.tar.gz'):
         shutil.copyfile(downloads / 'release-container' / name, output / name)
-    manifest = {'commit': sha, 'serverVersion': server, 'windowsClientVersion': client, 'image': image, 'channel': 'alpha', 'signed': False}
+    manifest = {'commit': sha, 'serverVersion': server, 'windowsClientVersion': client, 'image': image, 'channel': ('alpha' if '-alpha.' in server else 'beta' if '-beta.' in server else 'stable'), 'signed': False}
     (output / 'release.json').write_text(json.dumps(manifest, indent=2) + '\n', encoding='utf-8')
     sums = []
     for path in sorted(output.iterdir()):
