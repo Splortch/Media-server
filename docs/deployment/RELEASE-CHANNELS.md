@@ -1,6 +1,6 @@
 # Release channels and promotion
 
-All Splortch Media Server releases are public. Releases are separated by maturity, not by who may download them.
+All Splortch Media Server releases are public. These channel labels primarily help the official Splortch server and its maintainers identify which builds are experimental, under testing, or approved. They are **release labels and publication controls**, not an in-app user-facing channel system. Everyone may download any public release.
 
 | Channel | Example server version | Trigger | GitHub type |
 | --- | --- | --- | --- |
@@ -20,6 +20,9 @@ Promotion verifies that the selected **source release family** exists and points
 The workflow rebuilds installers for each promoted channel. It does not rename Alpha archives and pretend they are Beta/Stable. Public release artifacts remain separate for Windows, Linux, macOS, Docker and other supported components.
 
 A failed build must be investigated; do not manually override failed publication guards. Note that the GitHub Actions manual workflow permission is governed by repository write permissions. Limit who has write rights and require repository environment protection when broader team approval is required.
+
+## Scope
+This change is solely for official Splortch GitHub release tagging and server deployment decisions. Do not implement an application channel selector, a new updater, permissions based on channel, or separate distributions for users.
 
 ## Upgrades and downgrades
 Alpha/Beta versions are intended for testing. Back up configuration, account data, and the database before installation. A rollback of application binaries may not revert schema changes. Release channel selection happens only when maintainers publish GitHub releases; this feature does not add application settings or change the application's update UI.
