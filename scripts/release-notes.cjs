@@ -3,7 +3,8 @@ const {targets} = require('./release-targets.cjs');
 const {downloadTable, withDownloads} = require('./platform-downloads.cjs');
 function platformNotes(target, sha, repository, image, {serverInstaller = false, unixInstallers = false} = {}) {
   const docs = 'https://github.com/' + repository + '/blob/' + sha + '/docs/deployment/RELEASES.md';
-  const common = '\n\n### Before you install\n\nThis is an early alpha, intended for testing. Builds are unsigned. Back up existing server data before upgrading. HTTPS is required for safe remote access; server downloads bind to localhost by default.\n\n### Verify your download\n\nDownload SHA256SUMS to check file integrity. release.json records the platform, version and source commit. GitHub’s automatically added source archives are project source code, not installers.\n\n[Full setup and troubleshooting](' + docs + ') · [Source commit](https://github.com/' + repository + '/commit/' + sha + ')';
+  const channel = target.version.includes('-alpha.') ? 'Alpha' : target.version.includes('-beta.') ? 'Beta' : 'Stable';
+  const common = '\n\n### Before you install\n\nThis is a ' + channel + ' release.  Builds are unsigned. Back up existing server data before upgrading. HTTPS is required for safe remote access; server downloads bind to localhost by default.\n\n### Verify your download\n\nDownload SHA256SUMS to check file integrity. release.json records the platform, version and source commit. GitHub’s automatically added source archives are project source code, not installers.\n\n[Full setup and troubleshooting](' + docs + ') · [Source commit](https://github.com/' + repository + '/commit/' + sha + ')';
   const text = {
     'server-windows': [
       'Host your media library on a **Windows x64 PC**. This is the server: it scans your media and streams it to the included browser interface or a separate client. You do not need the Windows desktop client to use it.',
