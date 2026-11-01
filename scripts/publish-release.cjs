@@ -8,8 +8,17 @@ module.exports = async function publish({github, context}) {
   const sha = process.env.SOURCE_SHA;
   const tag = process.env.RELEASE_TAG;
   if (!/^[0-9a-f]{40}$/.test(sha) || !/^v0\.2\.\d+(?:-(?:alpha|beta)\.[1-9]\d{0,4})?$/.test(tag)) throw new Error('Invalid release identity.');
+  const promotion = ['beta','stable'].includes(process.env.RELEASE_CHANNEL);
   const branch = await github.rest.repos.getBranch({...context.repo, branch:'main'});
-  if (branch.data.commit.sha !== sha) return false;
+  if (!promotion && branch.data.commit.sha !== sha) return false;
+  if (promotion) {
+    const source = String(process.env.PROMOTION_SOURCE_TAG || '').replace(/^v/, '');
+    const sourceChannel = process.env.RELEASE_CHANNEL === 'beta' ? 'alpha' : 'beta';
+    const sourceInfo = parseVersion(source, 'server');
+    if (sourceInfo.channel !== sourceChannel || sourceInfo.channel !== sourceChannel) throw new Error('Invalid promotion source version');
+    const rel = await github.rest.repos.getReleaseByTag({...context.repo,tag:'server-windows/v'+source});
+    if (rel.data.draft || !rel.data.prerelease || rel.data.target_commitish !== sha) throw new Error('Source commit provenance failed');
+  }
   const folder = path.resolve('artifacts/release');
   const manifest = JSON.parse(fs.readFileSync(path.join(folder, 'release.json'), 'utf8'));
   if (manifest.commit !== sha || manifest.channel !== channelFor(manifest.serverVersion, manifest.windowsClientVersion) || `v${manifest.serverVersion}` !== tag) throw new Error('Artifact provenance does not match the release.');
@@ -33,7 +42,7 @@ module.exports = async function publish({github, context}) {
     for (const name of target.files) if (!entries.some(e => e.name === name)) throw new Error(`Missing platform asset: ${name}`);
   }
   for (const target of targets(manifest.serverVersion, manifest.windowsClientVersion)) {
-    if ((await github.rest.repos.getBranch({...context.repo,branch:'main'})).data.commit.sha !== sha) return false;
+    if (!promotion && (await github.rest.repos.getBranch({...context.repo,branch:'main'})).data.commit.sha !== sha) return false;
     let release;
     try { release = (await github.rest.repos.getReleaseByTag({...context.repo,tag:target.tag})).data; }
     catch(error) { if(error.status !== 404) throw error; }
@@ -55,7 +64,7 @@ module.exports = async function publish({github, context}) {
       const data = name === 'release.json' ? manifestData : name === 'SHA256SUMS' ? checksumData : fs.readFileSync(path.join(folder,name));
       await github.rest.repos.uploadReleaseAsset({...context.repo,release_id:release.id,name,data,headers:{'content-type':'application/octet-stream','content-length':data.length}});
     }
-    if ((await github.rest.repos.getBranch({...context.repo,branch:'main'})).data.commit.sha !== sha) return false;
+    if (!promotion && (await github.rest.repos.getBranch({...context.repo,branch:'main'})).data.commit.sha !== sha) return false;
     await github.rest.repos.updateRelease({...context.repo,release_id:release.id,draft:false,prerelease,body,make_latest:prerelease ? 'false' : 'true'});
   }
   return true;
