@@ -42,7 +42,7 @@ function promotionHarness(channel,source_tag,beta_number='1') {
   const sha = 'a'.repeat(40);
   const github = {
     rest: {repos: {getReleaseByTag: async ({tag}) => {
-      if (tag.includes('-alpha.') || tag.includes('-beta.')) return {data:{draft:false,prerelease:true,target_commitish:sha}};
+      if (tag.endsWith('/' + source_tag)) return {data:{draft:false,prerelease:true,target_commitish:sha}};
       throw Object.assign(new Error('Missing release'),{status:404});
     },listReleases: async () => ({data:[]})}},
     paginate: async () => []
