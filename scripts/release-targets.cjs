@@ -1,6 +1,7 @@
 // Stable release identities shared by the CI gate and publisher.
+const {channelFor} = require('./release-channels.cjs');
 function targets(server, client) {
-  if (!/^0\.2\.0-alpha\.[1-9][0-9]{0,4}$/.test(server) || !/^0\.1\.0-alpha\.[1-9][0-9]{0,4}$/.test(client)) throw new Error('Invalid platform versions.');
+  channelFor(server, client);
   return [
     {id:'server-windows', name:'Media Server for Windows', version:server, files:[`MediaServer-v${server}-win-x64.zip`,`MediaServer-v${server}-win-x64-setup.exe`], instructions:'Run the server setup.exe, or extract the portable ZIP and run Start-MediaServer.cmd. The web UI is included.'},
     {id:'server-linux', name:'Media Server for Linux', version:server, files:[`MediaServer-v${server}-linux-x64.tar.gz`,`MediaServer-v${server}-linux-x64.deb`], instructions:'Extract the archive, install FFprobe, and run ./start-media-server.sh. The web UI is included.'},
