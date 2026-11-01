@@ -37,6 +37,12 @@ async function plan({ github, context }) {
     }
     const server = inputs.channel === 'beta' ? '0.2.0-beta.' + sequence : '0.2.0';
     const client = inputs.channel === 'beta' ? '0.1.0-beta.' + sequence : '0.1.0';
+    if (inputs.channel === 'beta') {
+      const releases = await github.paginate(github.rest.repos.listReleases,{...context.repo,per_page:100});
+      const existingNumbers = releases.map(item => /^server-windows\/v0\.2\.0-beta\.([1-9]\d{0,4})$/.exec(item.tag_name))
+        .filter(Boolean).map(match => Number(match[1]));
+      if (existingNumbers.some(number => number >= sequence)) throw new Error('Beta sequence must increase monotonically');
+    }
     const planned = {build:true,publish:true,sha,server,client,msi:'0.1.'+context.runNumber,tag:'v'+server,channel:inputs.channel,sourceTag:'v'+source};
     for (const target of targets(server,client)) {
       try { await github.rest.repos.getReleaseByTag({...context.repo,tag:target.tag}); throw new Error('Destination already exists: '+target.tag); }
