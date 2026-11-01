@@ -1,8 +1,8 @@
 const fs = require('node:fs');
 function stamp(root, version, msi) {
-  if (!/^0\.1\.0-alpha\.[1-9][0-9]{0,4}$/.test(version)) throw new Error('Invalid Windows alpha version.');
+  if (!/^0\.1\.0(?:-(?:alpha|beta)\.[1-9]\d{0,4})?$/.test(version)) throw new Error('Invalid Windows release version.');
   const number = Number(version.split('.').at(-1));
-  if (number > 65535 || msi !== `0.1.${number}`) throw new Error('Invalid MSI version.');
+  if (!/^0\.1\.[1-9]\d{0,4}$/.test(msi) || Number(msi.split('.').at(-1)) > 65535) throw new Error('Invalid MSI version.');
   const path = `${root}/clients/windows/src-tauri`;
   const config = JSON.parse(fs.readFileSync(`${path}/tauri.conf.json`, 'utf8'));
   config.version = version;
