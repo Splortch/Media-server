@@ -1,6 +1,6 @@
 # Optional download center
 
-The first increment is an administrator-only authorized HTTPS URL manager. It is **disabled by default**. The media server and playback work without it. This is a built-in module; disabling it stops network transfers, but does not uninstall code or erase staged files.
+The source transfer manager is administrator-only; household members can submit requests through the existing request board. See [family approvals and managed imports](DOWNLOAD-IMPORTS.md). It is **disabled by default**. The media server and playback work without it. This is a built-in module; disabling it stops network transfers, but does not uninstall code or erase staged files.
 
 | Capability | Status |
 | --- | --- |
@@ -8,7 +8,8 @@ The first increment is an administrator-only authorized HTTPS URL manager. It is
 | Pause, validated range resume, cancel, priority | Implemented |
 | Available/reserved space and staging limits | Implemented |
 | Separate completed-file staging and administrator retrieval | Implemented |
-| Family request approvals and Movies/TV library organization | Planned: #109 |
+| Explicit matching, private pending catalog and safe managed imports | Implemented |
+| Family request approvals and Movies/TV library organization | Implemented: see [guide](DOWNLOAD-IMPORTS.md) |
 | Rights-aware public-domain catalog integration | Planned: #110 |
 | Compatible external download-client integration | Planned: #111 |
 | Descriptions, posters, seasons and episode matching | Planned: #10 |
@@ -24,7 +25,7 @@ The parent roadmap is [#107](https://github.com/Splortch/Media-server/issues/107
 5. Open **Downloads** in the sidebar. Give the transfer a name, paste its HTTPS URL, choose a maximum size in MiB, and optionally supply the publisher's SHA-256. Query tokens are hidden in the form, encrypted at rest, and excluded from queue responses.
 6. Add the download. Higher priorities run first after the current transfer; changing priority does not interrupt a running transfer. Real bytes and state are polled from the server.
 7. **Pause** retains partial data. **Resume** requires a strong ETag plus matching final source identity and correct Content-Range. A source without a validator requires **Discard partial & restart**. Changed sources and servers ignoring Range fail without appending their new response.
-8. When complete, **Save NAME** retrieves the staged file as an authenticated attachment. It has a generated `.bin` filename: verify the expected checksum/type and place it in your own library manually. Files are never automatically executed, probed or imported by this increment.
+8. When complete, **Save NAME** retrieves the staged file as an authenticated attachment. It has a generated `.bin` filename: verify the expected checksum/type and place it in your own library manually. Files without an approved import plan are not automatically probed or imported. Approved matches follow the [managed import pipeline](DOWNLOAD-IMPORTS.md).
 9. **Cancel & discard** stops a transfer and deletes its partial. **Remove NAME & staged file** explicitly deletes only that job's generated staging files and queue record. Existing libraries are never modified.
 10. To stop the module, clear **Enable download center** and save. No jobs resume implicitly when re-enabled; use explicit Resume. Completed staged-file retrieval and safe cleanup remain administrator-authorized even while disabled. Queue browsing requires the feature enabled.
 
@@ -32,7 +33,7 @@ After an interrupted server restart, previously running/finalizing jobs become p
 
 ## Limits and error handling
 
-One transfer at a time, at most 100 records, a 100 GiB combined staging cap, and a 512 MiB free-space safety margin. Pending/paused jobs reserve their remaining expected bytes (or maximum budget when length is unknown). Failed/completed partials still count as occupied bytes. Admission, periodic writes and completion check space; unrelated writers can still fill a disk between checks. Disk-full errors stop the job and preserve safe cleanup/retry states. Limits are deliberately fixed in this alpha.
+One transfer at a time, at most 100 records, a 100 GiB combined staging cap, and a 512 MiB free-space safety margin. Pending/paused jobs reserve their remaining expected bytes (or maximum budget when length is unknown). Planned import copies additionally reserve destination bytes, conservatively across the participating volumes. Failed/completed partials still count as occupied bytes. Admission, periodic writes and completion check space; unrelated writers can still fill a disk between checks. Disk-full errors stop the job and preserve safe cleanup/retry states. Limits are deliberately fixed in this alpha.
 
 The worker enforces a six-hour attempt limit, ten-second connection limit, thirty-second header/read-stall limits, a 16 KiB response-header bound and at most three redirects. Unknown-length bodies are bounded by the supplied budget. Failure codes contain no URL, token, remote response text or exception message. Safe restart retries from zero; automatic retries do not hide changed content or silently consume storage.
 

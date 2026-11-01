@@ -1601,3 +1601,20 @@ textarea {
 .download-hash {
   overflow-wrap: anywhere;
 }
+
+.download-form fieldset {
+  display: grid;
+  gap: 1rem;
+  border: 0;
+  padding: 0;
+  min-width: 0;
+  grid-column: 1/-1;
+}
+.download-approval {
+  margin: 1rem 0;
+  border-top: 1px solid var(--border);
+  padding-top: 1rem;
+}
+.import-status {
+  padding-block: 0.75rem;
+}

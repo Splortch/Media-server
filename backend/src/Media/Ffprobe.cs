@@ -7,13 +7,23 @@ namespace MediaServer.Media;
 
 public sealed class Ffprobe(string executable) : IMediaProbe
 {
-    public async Task<ProbeResult> ProbeAsync(string path, CancellationToken ct)
+    public Task<ProbeResult> ProbeAsync(string path, CancellationToken ct) =>
+        ProbeWithPolicyAsync(path, ct, false);
+
+    public Task<ProbeResult> ProbeImportAsync(string path, CancellationToken ct) =>
+        ProbeWithPolicyAsync(path, ct, true);
+
+    private async Task<ProbeResult> ProbeWithPolicyAsync(
+        string path,
+        CancellationToken ct,
+        bool importsOnly
+    )
     {
         using var deadline = CancellationTokenSource.CreateLinkedTokenSource(ct);
         deadline.CancelAfter(TimeSpan.FromSeconds(20));
         try
         {
-            return await ProbeCoreAsync(path, deadline.Token);
+            return await ProbeCoreAsync(path, deadline.Token, importsOnly);
         }
         catch (OperationCanceledException) when (!ct.IsCancellationRequested)
         {
@@ -21,7 +31,11 @@ public sealed class Ffprobe(string executable) : IMediaProbe
         }
     }
 
-    private async Task<ProbeResult> ProbeCoreAsync(string path, CancellationToken ct)
+    private async Task<ProbeResult> ProbeCoreAsync(
+        string path,
+        CancellationToken ct,
+        bool importsOnly
+    )
     {
         using var doc = await ReadJsonAsync(
             [
@@ -29,6 +43,11 @@ public sealed class Ffprobe(string executable) : IMediaProbe
                 "error",
                 "-protocol_whitelist",
                 "file",
+                .. (
+                    importsOnly
+                        ? new[] { "-format_whitelist", "mov,matroska,webm,avi" }
+                        : Array.Empty<string>()
+                ),
                 "-show_entries",
                 "format=duration,format_name:stream=index,codec_type,codec_name,width,height,channels,channel_layout,bits_per_raw_sample,pix_fmt,color_primaries,color_transfer,color_space:stream_tags=language,title:stream_disposition=default,forced:stream_side_data",
                 "-of",

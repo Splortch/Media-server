@@ -30,6 +30,7 @@ public class MediaDb(DbContextOptions<MediaDb> options, IUserContext? context = 
 
     protected override void OnModelCreating(ModelBuilder b)
     {
+        b.Entity<DownloadJob>().HasIndex(x => x.RequestId).IsUnique();
         b.Entity<DownloadJob>().HasOne<User>().WithMany().HasForeignKey(x => x.UserId);
         b.Entity<DownloadJob>()
             .HasIndex(x => new
@@ -75,26 +76,30 @@ public class MediaDb(DbContextOptions<MediaDb> options, IUserContext? context = 
         b.Entity<User>().HasIndex(x => x.Name).IsUnique();
         b.Entity<MediaItem>()
             .HasQueryFilter(item =>
-                CurrentUserId == null
-                || (
-                    !item.IsMissing
-                    && Users.Any(user =>
-                        user.Id == CurrentUserId
-                        && !user.Disabled
-                        && (
-                            user.Role == "Admin"
-                            || (
-                                (
-                                    user.AllLibraries
-                                    || Grants.Any(grant =>
-                                        grant.UserId == user.Id && grant.LibraryId == item.LibraryId
+                !item.PendingImport
+                && (
+                    CurrentUserId == null
+                    || (
+                        !item.IsMissing
+                        && Users.Any(user =>
+                            user.Id == CurrentUserId
+                            && !user.Disabled
+                            && (
+                                user.Role == "Admin"
+                                || (
+                                    (
+                                        user.AllLibraries
+                                        || Grants.Any(grant =>
+                                            grant.UserId == user.Id
+                                            && grant.LibraryId == item.LibraryId
+                                        )
                                     )
-                                )
-                                && (
-                                    user.MaximumRating == null
-                                    || (
-                                        item.ContentRating > 0
-                                        && item.ContentRating <= user.MaximumRating
+                                    && (
+                                        user.MaximumRating == null
+                                        || (
+                                            item.ContentRating > 0
+                                            && item.ContentRating <= user.MaximumRating
+                                        )
                                     )
                                 )
                             )

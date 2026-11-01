@@ -143,3 +143,5 @@ Private playback notes and timestamp bookmarks are available in web/desktop deta
 Web, desktop and Android support saved dark/light appearance. Dark is the default; see [themes](docs/clients/THEMES.md) for selection and extension guidance.
 
 Administrators can opt into the authorized-URL download manager. See the [download center guide](docs/architecture/DOWNLOADS.md) for setup, security limits, staging behavior and the remaining integration roadmap.
+
+Family members can request media; administrators approve authorized sources and explicit Movies/TV matches. Read the [family approval and managed import guide](docs/architecture/DOWNLOAD-IMPORTS.md) for permissions, storage, inbox matching and recovery.

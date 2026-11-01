@@ -16,6 +16,7 @@ public sealed class DownloadWorker(
     DownloadStorage storage,
     IDownloadTransport transport,
     IDataProtectionProvider protection,
+    DownloadImporter importer,
     ILogger<DownloadWorker> logger
 ) : BackgroundService
 {
@@ -35,6 +36,9 @@ public sealed class DownloadWorker(
                 MaxBytes = x.MaxBytes,
                 ReceivedBytes = x.ReceivedBytes,
                 TotalBytes = x.TotalBytes,
+                TargetLibraryId = x.TargetLibraryId,
+                ImportState = x.ImportState,
+                ImportCopiedBytes = x.ImportCopiedBytes,
             })
             .ToArrayAsync(ct);
 
@@ -54,9 +58,22 @@ public sealed class DownloadWorker(
                     stoppingToken
                 );
         }
+        using (var recovery = scopes.CreateScope())
+        {
+            var db = recovery.ServiceProvider.GetRequiredService<MediaDb>();
+            await db
+                .Downloads.Where(x => x.ImportState == "copying" || x.ImportState == "scanning")
+                .ExecuteUpdateAsync(
+                    s =>
+                        s.SetProperty(x => x.ImportState, "held")
+                            .SetProperty(x => x.ImportError, "server-restarted"),
+                    stoppingToken
+                );
+        }
         while (!stoppingToken.IsCancellationRequested)
         {
             string? id = null;
+            var isImport = false;
             CancellationToken ct = stoppingToken;
             await control.Gate.WaitAsync(stoppingToken);
             try
@@ -66,14 +83,26 @@ public sealed class DownloadWorker(
                 if (await Enabled(db, stoppingToken))
                 {
                     var row = await db
-                        .Downloads.Where(x => x.State == "queued" && x.Desired == "run")
+                        .Downloads.Where(x =>
+                            (x.State == "queued" && x.Desired == "run")
+                            || (x.State == "completed" && x.ImportState == "queued")
+                        )
                         .OrderByDescending(x => x.Priority)
                         .ThenBy(x => x.CreatedAt)
                         .FirstOrDefaultAsync(stoppingToken);
                     if (row != null)
                     {
-                        row.State = "running";
-                        row.Error = null;
+                        isImport = row.State == "completed";
+                        if (isImport)
+                        {
+                            row.ImportState = "copying";
+                            row.ImportError = null;
+                        }
+                        else
+                        {
+                            row.State = "running";
+                            row.Error = null;
+                        }
                         await db.SaveChangesAsync(stoppingToken);
                         id = row.Id;
                         ct = control.Begin(id, stoppingToken);
@@ -91,7 +120,10 @@ public sealed class DownloadWorker(
             }
             try
             {
-                await Transfer(id, ct);
+                if (isImport)
+                    await importer.Run(id, ct);
+                else
+                    await Transfer(id, ct);
             }
             catch (Exception ex)
             {
@@ -99,13 +131,17 @@ public sealed class DownloadWorker(
                 var code = ex switch
                 {
                     DownloadFault fault => fault.Code,
+                    MediaProbeException probe => probe.Code,
                     OperationCanceledException => "interrupted",
                     CryptographicException => "source-secret-unavailable",
                     IOException => "storage-or-connection-error",
                     _ => "source-unavailable",
                 };
                 logger.LogWarning("Download {DownloadId} stopped with {ErrorCode}", id, code);
-                await Interrupted(id, code);
+                if (isImport)
+                    await importer.Interrupted(id, code);
+                else
+                    await Interrupted(id, code);
             }
             finally
             {
@@ -123,14 +159,8 @@ public sealed class DownloadWorker(
         var hosts = DownloadNetwork.Hosts(
             JsonSerializer.Deserialize<string[]>(policy.HostsJson) ?? []
         );
-        if (
-            !await Enabled(db, ct)
-            || !await db.Users.AnyAsync(
-                x => x.Id == job.UserId && !x.Disabled && x.Role == "Admin",
-                ct
-            )
-        )
-            throw new DownloadFault("operator-unavailable");
+        if (!await Enabled(db, ct) || !await DownloadAccess.Allowed(db, job, ct))
+            throw new DownloadFault("request-access-revoked");
         if (storage.Exists(id, true))
         {
             using var existing = storage.OpenRead(id);
@@ -144,6 +174,15 @@ public sealed class DownloadWorker(
                 .ExecuteUpdateAsync(
                     s =>
                         s.SetProperty(x => x.State, "completed")
+                            .SetProperty(
+                                x => x.ImportState,
+                                x =>
+                                    x.TargetLibraryId != null
+                                    && x.ImportRelativePath != null
+                                    && x.ImportState == "waiting"
+                                        ? "queued"
+                                        : x.ImportState
+                            )
                             .SetProperty(x => x.ProtectedUrl, "")
                             .SetProperty(x => x.Error, (string?)null),
                     ct
@@ -297,6 +336,15 @@ public sealed class DownloadWorker(
             .ExecuteUpdateAsync(
                 s =>
                     s.SetProperty(x => x.State, "completed")
+                        .SetProperty(
+                            x => x.ImportState,
+                            x =>
+                                x.TargetLibraryId != null
+                                && x.ImportRelativePath != null
+                                && x.ImportState == "waiting"
+                                    ? "queued"
+                                    : x.ImportState
+                        )
                         .SetProperty(x => x.ProtectedUrl, "")
                         .SetProperty(x => x.Error, (string?)null)
                         .SetProperty(x => x.UpdatedAt, DateTime.UtcNow),
@@ -323,13 +371,9 @@ public sealed class DownloadWorker(
                 .SingleAsync(ct);
             if (!await Enabled(db, ct) || desired != "run")
                 throw new OperationCanceledException(ct);
-            if (
-                !await db.Users.AnyAsync(
-                    x => x.Id == job.UserId && !x.Disabled && x.Role == "Admin",
-                    ct
-                )
-            )
-                throw new DownloadFault("operator-unavailable");
+            var access = await db.Downloads.AsNoTracking().SingleAsync(x => x.Id == job.Id, ct);
+            if (!await DownloadAccess.Allowed(db, access, ct))
+                throw new DownloadFault("request-access-revoked");
             storage.Admit(await Budgets(db, ct));
         }
         finally
@@ -400,6 +444,7 @@ public sealed class DownloadWorker(
                 {
                     storage.Discard(id);
                     row.State = "cancelled";
+                    row.ImportState = "discarded";
                     row.ProtectedUrl = "";
                     row.ReceivedBytes = 0;
                     row.TotalBytes = null;

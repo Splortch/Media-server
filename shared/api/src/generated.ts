@@ -2267,6 +2267,203 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/requests/download-status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["HouseholdDownloadStatus"][];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/requests/{id}/download": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: number;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["DownloadApprovalInput"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["DownloadView"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/requests/{id}/download/decline": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: number;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["DownloadDecline"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/downloads/{id}/import-plan": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["DownloadMatchInput"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["DownloadView"];
+                    };
+                };
+            };
+        };
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/downloads/{id}/import": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["DownloadImportAction"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["DownloadView"];
+                    };
+                };
+            };
+        };
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/media/{id}/bookmarks": {
         parameters: {
             query?: never;
@@ -2710,6 +2907,62 @@ export interface components {
             /** Format: int32 */
             priority?: null | number;
         };
+        DownloadApprovalInput: {
+            /** Format: int64 */
+            requestRevision: number;
+            source: components["schemas"]["DownloadInput"];
+            plan: components["schemas"]["DownloadImportPlan"];
+        };
+        DownloadDecline: {
+            /** Format: int64 */
+            revision: number;
+            reason: string;
+        };
+        DownloadImportAction: {
+            /** Format: int64 */
+            revision: number;
+            action: string;
+        };
+        DownloadImportPlan: {
+            /** Format: int32 */
+            libraryId: number;
+            classification: string;
+            title: string;
+            /** Format: int32 */
+            year: null | number;
+            series: null | string;
+            /** Format: int32 */
+            season: null | number;
+            /** Format: int32 */
+            episode: null | number;
+            /** Format: int32 */
+            rating: number;
+            extension: string;
+        };
+        DownloadImportView: {
+            /** Format: int32 */
+            requestId: null | number;
+            /** Format: int32 */
+            libraryId: number;
+            classification: string;
+            title: string;
+            /** Format: int32 */
+            year: null | number;
+            series: null | string;
+            /** Format: int32 */
+            season: null | number;
+            /** Format: int32 */
+            episode: null | number;
+            /** Format: int32 */
+            rating: number;
+            extension: string;
+            state: string;
+            error: null | string;
+            /** Format: int32 */
+            mediaItemId: null | number;
+            /** Format: int64 */
+            copiedBytes: number;
+        };
         DownloadInput: {
             name: string;
             url: string;
@@ -2721,6 +2974,11 @@ export interface components {
              * @default 0
              */
             priority: number;
+        };
+        DownloadMatchInput: {
+            /** Format: int64 */
+            revision: number;
+            plan: components["schemas"]["DownloadImportPlan"];
         };
         DownloadSettingsInput: {
             enabled: null | boolean;
@@ -2757,6 +3015,7 @@ export interface components {
             /** Format: int64 */
             revision: number;
             canResume: boolean;
+            import: null | components["schemas"]["DownloadImportView"];
         };
         EncoderCapability: {
             encoder: string;
@@ -2786,6 +3045,13 @@ export interface components {
         GuestPolicy: {
             enabled: boolean;
             libraries: number[];
+        };
+        HouseholdDownloadStatus: {
+            /** Format: int32 */
+            requestId: number;
+            state: string;
+            /** Format: int32 */
+            mediaItemId: null | number;
         };
         Library: {
             /** Format: int32 */

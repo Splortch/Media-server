@@ -266,4 +266,4 @@ Dark is the default. Use **Theme** on setup/connection screens, **Settings → A
 
 ### Optional authorized downloads
 
-The download center is disabled by default. Administrators can approve public source hosts in **Settings → Download center**, enable the module, and open **Downloads**. See the [step-by-step guide](architecture/DOWNLOADS.md). This increment stages authorized URL downloads; automatic library organization and family approval are planned separately.
+The download center is disabled by default. Administrators can approve public source hosts in **Settings → Download center**, enable the module, and open **Downloads**. See the [step-by-step guide](architecture/DOWNLOADS.md). Authorized URL downloads can stay staged or follow an explicit approved library match. See [family requests, approvals and safe Movies/TV imports](architecture/DOWNLOAD-IMPORTS.md) for the full delivery steps.
