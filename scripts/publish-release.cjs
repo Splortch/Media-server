@@ -2,6 +2,7 @@ const fs = require('node:fs');
 const crypto = require('node:crypto');
 const path = require('node:path');
 const {targets} = require('./release-targets.cjs');
+const {parseVersion, channelFor} = require('./release-channels.cjs');
 const {platformNotes} = require('./release-notes.cjs');
 module.exports = async function publish({github, context}) {
   const sha = process.env.SOURCE_SHA;
@@ -11,7 +12,9 @@ module.exports = async function publish({github, context}) {
   if (branch.data.commit.sha !== sha) return false;
   const folder = path.resolve('artifacts/release');
   const manifest = JSON.parse(fs.readFileSync(path.join(folder, 'release.json'), 'utf8'));
-  if (manifest.commit !== sha || manifest.channel !== 'alpha' || `v${manifest.serverVersion}` !== tag) throw new Error('Artifact provenance does not match the release.');
+  if (manifest.commit !== sha || manifest.channel !== channelFor(manifest.serverVersion, manifest.windowsClientVersion) || `v${manifest.serverVersion}` !== tag) throw new Error('Artifact provenance does not match the release.');
+  const channel = parseVersion(manifest.serverVersion, 'server').channel;
+  const prerelease = channel !== 'stable';
   const entries = fs.readFileSync(path.join(folder, 'SHA256SUMS'), 'utf8').trim().split('\n').map(line => {
     const match = /^([0-9a-f]{64})  ([A-Za-z0-9._-]+)$/.exec(line);
     if (!match) throw new Error('Invalid checksum entry.');
@@ -37,8 +40,8 @@ module.exports = async function publish({github, context}) {
     if (release && release.target_commitish !== sha) throw new Error('Release tag source mismatch.');
     if (release && !release.draft) continue; // Already published platforms remain immutable on retries.
     const body = platformNotes(target, sha, `${context.repo.owner}/${context.repo.repo}`, manifest.image, {serverInstaller:true,unixInstallers:true});
-    if (!release) release = (await github.rest.repos.createRelease({...context.repo,tag_name:target.tag,target_commitish:sha,name:`${target.name} ${target.version}`,body,draft:true,prerelease:true,make_latest:'false'})).data;
-    const platformManifest = {commit:sha,platform:target.id,version:target.version,channel:'alpha',signed:false,...(target.id === 'docker' ? {image:manifest.image} : {})};
+    if (!release) release = (await github.rest.repos.createRelease({...context.repo,tag_name:target.tag,target_commitish:sha,name:`${target.name} ${target.version}`,body,draft:true,prerelease,make_latest:prerelease ? 'false' : 'true'})).data;
+    const platformManifest = {commit:sha,platform:target.id,version:target.version,channel,signed:false,...(target.id === 'docker' ? {image:manifest.image} : {})};
     const manifestData = Buffer.from(JSON.stringify(platformManifest,null,2)+'\n');
     const checksumData = Buffer.from([...target.files.map(name => {
       const entry = entries.find(e=>e.name===name);
@@ -53,7 +56,7 @@ module.exports = async function publish({github, context}) {
       await github.rest.repos.uploadReleaseAsset({...context.repo,release_id:release.id,name,data,headers:{'content-type':'application/octet-stream','content-length':data.length}});
     }
     if ((await github.rest.repos.getBranch({...context.repo,branch:'main'})).data.commit.sha !== sha) return false;
-    await github.rest.repos.updateRelease({...context.repo,release_id:release.id,draft:false,prerelease:true,body,make_latest:'false'});
+    await github.rest.repos.updateRelease({...context.repo,release_id:release.id,draft:false,prerelease,body,make_latest:prerelease ? 'false' : 'true'});
   }
   return true;
 };
