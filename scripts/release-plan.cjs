@@ -1,4 +1,5 @@
 const {targets} = require('./release-targets.cjs');
+const {parseVersion,canPromote} = require('./release-channels.cjs');
 const required = ['backend-server.yml', 'web-client.yml', 'windows-client.yml', 'ci.yml', 'agent-automation-tests.yml', 'desktop-clients.yml'];
 function versions(number) {
   if (!Number.isSafeInteger(number) || number < 1 || number > 65535) throw new Error('Release build number must fit the Windows installer version (1..65535).');
@@ -15,6 +16,34 @@ async function plan({ github, context }) {
   const repository = `${context.repo.owner}/${context.repo.repo}`;
   const dry = () => ({ build: true, publish: false, sha: context.sha, ...versions(context.runNumber) });
   if (context.eventName === 'pull_request') return dry();
+  const inputs = context.payload.inputs || {};
+  if (context.eventName === 'workflow_dispatch' && ['beta','stable'].includes(inputs.channel)) {
+    if (context.ref !== 'refs/heads/main' || ![true,'true'].includes(inputs.publish)) throw new Error('Promotion requires main and explicit approval');
+    const from = inputs.channel === 'beta' ? 'alpha' : 'beta';
+    if (!canPromote(from,inputs.channel)) throw new Error('Invalid promotion');
+    const source = String(inputs.source_tag || '').replace(/^v/, '');
+    const sourceInfo = parseVersion(source,'server');
+    if (sourceInfo.channel !== from) throw new Error('Incorrect source channel');
+    const sequence = Number(inputs.beta_number);
+    if (inputs.channel === 'beta' && (!Number.isInteger(sequence) || sequence < 1 || sequence > 65535)) throw new Error('Invalid beta sequence');
+    const sourceClient = '0.1.0-' + from + '.' + sourceInfo.sequence;
+    const sourceTargets = targets(source,sourceClient);
+    const origin = await github.rest.repos.getReleaseByTag({...context.repo,tag:sourceTargets[0].tag});
+    const sha = origin.data.target_commitish;
+    if (!/^[a-f0-9]{40}$/.test(sha)) throw new Error('Immutable source SHA required');
+    for (const target of sourceTargets) {
+      const rel = await github.rest.repos.getReleaseByTag({...context.repo,tag:target.tag});
+      if (rel.data.draft || !rel.data.prerelease || rel.data.target_commitish !== sha) throw new Error('Source releases are incomplete or inconsistent');
+    }
+    const server = inputs.channel === 'beta' ? '0.2.0-beta.' + sequence : '0.2.0';
+    const client = inputs.channel === 'beta' ? '0.1.0-beta.' + sequence : '0.1.0';
+    const planned = {build:true,publish:true,sha,server,client,msi:'0.1.'+context.runNumber,tag:'v'+server,channel:inputs.channel,sourceTag:'v'+source};
+    for (const target of targets(server,client)) {
+      try { await github.rest.repos.getReleaseByTag({...context.repo,tag:target.tag}); throw new Error('Destination already exists: '+target.tag); }
+      catch(error) { if (error.status !== 404) throw error; }
+    }
+    return planned;
+  }
   if (context.eventName === 'workflow_dispatch' && ![true, 'true'].includes(context.payload.inputs?.publish)) return dry();
   let sha;
   if (context.eventName === 'workflow_run') {
