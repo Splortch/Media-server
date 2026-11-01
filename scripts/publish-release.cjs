@@ -41,6 +41,7 @@ module.exports = async function publish({github, context}) {
   for (const target of targets(manifest.serverVersion, manifest.windowsClientVersion)) {
     for (const name of target.files) if (!entries.some(e => e.name === name)) throw new Error(`Missing platform asset: ${name}`);
   }
+  const staged = [];
   for (const target of targets(manifest.serverVersion, manifest.windowsClientVersion)) {
     if (!promotion && (await github.rest.repos.getBranch({...context.repo,branch:'main'})).data.commit.sha !== sha) return false;
     let release;
@@ -65,7 +66,13 @@ module.exports = async function publish({github, context}) {
       await github.rest.repos.uploadReleaseAsset({...context.repo,release_id:release.id,name,data,headers:{'content-type':'application/octet-stream','content-length':data.length}});
     }
     if (!promotion && (await github.rest.repos.getBranch({...context.repo,branch:'main'})).data.commit.sha !== sha) return false;
-    await github.rest.repos.updateRelease({...context.repo,release_id:release.id,draft:false,prerelease,body,make_latest:prerelease ? 'false' : 'true'});
+    staged.push({release_id: release.id, body});
+  }
+  // Stage all platform drafts and uploads before making any one public.
+  // GitHub has no multi-release atomic transaction, so a late API outage can still
+  // expose a partially published set; re-running safely completes remaining drafts.
+  for (const item of staged) {
+    await github.rest.repos.updateRelease({...context.repo,release_id:item.release_id,draft:false,prerelease,body:item.body,make_latest:prerelease ? 'false' : 'true'});
   }
   return true;
 };
