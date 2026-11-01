@@ -22,4 +22,4 @@ The workflow rebuilds installers for each promoted channel. It does not rename A
 A failed build must be investigated; do not manually override failed publication guards. Note that the GitHub Actions manual workflow permission is governed by repository write permissions. Limit who has write rights and require repository environment protection when broader team approval is required.
 
 ## Upgrades and downgrades
-Alpha/Beta versions are intended for testing. Back up configuration, account data, and the database before installation. A rollback of application binaries may not revert schema changes. Stable builds must not automatically consume experimental update channels.
+Alpha/Beta versions are intended for testing. Back up configuration, account data, and the database before installation. A rollback of application binaries may not revert schema changes. Release channel selection happens only when maintainers publish GitHub releases; this feature does not add application settings or change the application's update UI.
