@@ -19,7 +19,7 @@ The parent roadmap is [#107](https://github.com/Splortch/Media-server/issues/107
 ## Step by step
 
 1. Update the server normally and sign in as an administrator. SQLite migrations run at startup.
-2. Open **Settings → Download center**. Check the available space. Staging uses the server **data-directory filesystem**, which may differ from your media-library disks.
+2. Open **Settings → Administration → Download center**. Check the available space. Staging uses the server **data-directory filesystem**, which may differ from your media-library disks.
 3. Enter exact public source hostnames, one per line (no URL, port or wildcard). Include every host used by authorized redirects. Only approve sources you trust and are authorized to download from.
 4. Check **Enable download center**, then **Save download settings**. Saving any policy change pauses existing active/queued jobs, so an old host policy cannot keep running in pooled connections.
 5. Open **Downloads** in the sidebar. Give the transfer a name, paste its HTTPS URL, choose a maximum size in MiB, and optionally supply the publisher's SHA-256. Query tokens are hidden in the form, encrypted at rest, and excluded from queue responses.

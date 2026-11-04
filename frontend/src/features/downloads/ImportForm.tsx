@@ -3,13 +3,13 @@ import { api } from '../../services/api';
 import type { components } from '../../../../shared/api/src/generated';
 type Plan = components['schemas']['DownloadImportPlan'];
 type Job = components['schemas']['DownloadView'];
-type Library = { id: number; name: string; kind: string };
+export type ImportLibrary = { id: number; name: string; kind: string };
 export function ImportFields({
   libraries,
   initial,
   requestLibrary,
 }: {
-  libraries: Library[];
+  libraries: ImportLibrary[];
   initial?: Partial<Plan>;
   requestLibrary?: number;
 }) {
@@ -142,12 +142,12 @@ export function importPlan(data: FormData): Plan {
     episode: optional('episode'),
   };
 }
-function useLibraries() {
-  const [libraries, setLibraries] = useState<Library[]>([]);
+export function useLibraries() {
+  const [libraries, setLibraries] = useState<ImportLibrary[]>([]);
   const [error, setError] = useState('');
   useEffect(() => {
     let active = true;
-    void api<Library[]>('/browse-libraries')
+    void api<ImportLibrary[]>('/browse-libraries')
       .then((rows) => {
         if (active) setLibraries(rows);
       })
@@ -289,6 +289,13 @@ export default function ImportForm({
     <details>
       <summary>Match and organize {job.name}</summary>
       {error && <p role="alert">{error}</p>}
+      {!error && libraries.length === 0 && (
+        <p>
+          No libraries are configured.{' '}
+          <a href="#settings/libraries">Add a media library</a> before
+          organizing this download.
+        </p>
+      )}
       {libraries.length > 0 && (
         <form
           className="download-form"

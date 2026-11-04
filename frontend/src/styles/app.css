@@ -1642,3 +1642,30 @@ textarea {
 .import-status {
   padding-block: 0.75rem;
 }
+
+.settings-categories {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 15rem), 1fr));
+  gap: 1rem;
+  margin-block: 1.5rem 2rem;
+}
+.settings-categories > div {
+  padding: 1rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+.settings-categories h2 {
+  font-size: 1rem;
+  margin: 0 0 0.75rem;
+}
+.settings-categories .settings-nav {
+  margin: 0;
+}
+.settings-category {
+  scroll-margin-top: 6rem;
+  margin-block: 2rem;
+}
+.settings-category > h2 {
+  margin-bottom: 0.5rem;
+}

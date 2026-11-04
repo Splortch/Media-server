@@ -23,7 +23,7 @@ const job = {
 };
 it('submits a real source request and clears the secret input after acceptance', async () => {
   vi.mocked(api).mockResolvedValue([]);
-  render(<Downloads />);
+  render(<Downloads admin />);
   await screen.findByText('No downloads yet.');
   fireEvent.change(screen.getByLabelText('Download name'), {
     target: { value: 'Authorized movie' },
@@ -59,7 +59,7 @@ it('sends revision protected pause and resume', async () => {
       };
     return [row];
   });
-  render(<Downloads />);
+  render(<Downloads admin />);
   fireEvent.click(await screen.findByRole('button', { name: 'Pause Sample' }));
   await waitFor(() =>
     expect(api).toHaveBeenCalledWith('/downloads/fixture', 'PUT', {
@@ -79,7 +79,7 @@ it('sends revision protected pause and resume', async () => {
 });
 it('reports server failures and blocks queue creation until loaded', async () => {
   vi.mocked(api).mockRejectedValue(new Error('Server unavailable'));
-  render(<Downloads />);
+  render(<Downloads admin />);
   expect(await screen.findByRole('alert')).toHaveTextContent(
     'Server unavailable',
   );
@@ -114,5 +114,53 @@ it('saves explicit opt in and refreshes the feature registry', async () => {
   );
   await waitFor(() =>
     expect(changed).toHaveBeenCalledWith({ features: [], available: true }),
+  );
+});
+
+it('keeps the download center inaccessible to non-admins without requesting private data', () => {
+  render(<Downloads admin={false} />);
+  expect(screen.getByText(/administrator account/)).toBeInTheDocument();
+  expect(api).not.toHaveBeenCalled();
+});
+it('sends the chosen library plan together with the initial download', async () => {
+  vi.mocked(api).mockImplementation(async (path) =>
+    path === '/browse-libraries'
+      ? [{ id: 7, name: 'Movies', kind: 'movies' }]
+      : [],
+  );
+  render(<Downloads admin />);
+  await screen.findByText('No downloads yet.');
+  fireEvent.change(screen.getByLabelText('Download name'), {
+    target: { value: 'A movie' },
+  });
+  await waitFor(() =>
+    expect(
+      screen.getByRole('option', {
+        name: 'Add to a media library automatically',
+      }),
+    ).not.toBeDisabled(),
+  );
+  fireEvent.change(screen.getByLabelText('After downloading'), {
+    target: { value: 'library' },
+  });
+  expect(screen.getByLabelText('Confirmed title')).toHaveValue('A movie');
+  fireEvent.change(screen.getByLabelText('HTTPS source URL'), {
+    target: { value: 'https://media.example/movie.mp4' },
+  });
+  fireEvent.click(screen.getByRole('button', { name: 'Add download' }));
+  await waitFor(() =>
+    expect(api).toHaveBeenCalledWith(
+      '/downloads',
+      'POST',
+      expect.objectContaining({
+        name: 'A movie',
+        importPlan: expect.objectContaining({
+          libraryId: 7,
+          classification: 'movies',
+          title: 'A movie',
+          extension: '.mp4',
+        }),
+      }),
+    ),
   );
 });

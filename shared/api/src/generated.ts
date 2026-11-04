@@ -2974,6 +2974,7 @@ export interface components {
              * @default 0
              */
             priority: number;
+            importPlan?: null | components["schemas"]["DownloadImportPlan"];
         };
         DownloadMatchInput: {
             /** Format: int64 */
