@@ -790,7 +790,7 @@ h2:focus {
   border: 1px solid var(--border);
   border-radius: var(--radius);
   background: var(--surface);
-  box-shadow: 0 2px 8px #0002;
+  box-shadow: 0 2px 8px #00000008;
 }
 .panel h2 {
   margin-bottom: 12px;
@@ -977,7 +977,7 @@ footer {
   display: grid;
   gap: 20px;
   padding: 32px;
-  animation: surface-in 0.4s var(--ease) both;
+  animation: surface-in 0.4s var(--ease);
 }
 .auth-form h2 {
   font-size: 28px;

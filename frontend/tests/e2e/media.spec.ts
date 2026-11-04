@@ -147,7 +147,9 @@ test('setup, accounts, collections, diagnostics, stream ranges and persist resum
   ).toHaveAttribute('aria-current', 'page');
   await expect(page.locator('#main-content')).toBeFocused();
   await page.keyboard.press('Tab');
-  await expect(page.getByLabel('Smart collection', { exact: true })).toBeFocused();
+  await expect(
+    page.getByLabel('Smart collection', { exact: true }),
+  ).toBeFocused();
   await page.keyboard.press('Tab');
   await expect(page.getByLabel('Search library')).toBeFocused();
   await page.getByLabel('Search library').fill('does-not-exist');
@@ -220,9 +222,13 @@ test('setup, accounts, collections, diagnostics, stream ranges and persist resum
   expect(earlyStreams).toHaveLength(0);
   await page.getByText('Private bookmarks and notes', { exact: true }).focus();
   await page.keyboard.press('Enter');
-  await page.getByLabel('Bookmark name', { exact: true }).fill('Scene to revisit');
+  await page
+    .getByLabel('Bookmark name', { exact: true })
+    .fill('Scene to revisit');
   await page.getByLabel('Timestamp in seconds', { exact: true }).fill('3');
-  await page.getByLabel('Private note', { exact: true }).fill('Private scene note');
+  await page
+    .getByLabel('Private note', { exact: true })
+    .fill('Private scene note');
   await page.getByRole('button', { name: 'Add bookmark', exact: true }).click();
   await expect(
     page.getByRole('button', { name: 'Jump to Scene to revisit at 3 seconds' }),
@@ -282,7 +288,9 @@ test('setup, accounts, collections, diagnostics, stream ranges and persist resum
   await page.getByRole('button', { name: 'Edit Scene to revisit' }).click();
   await expect(page.getByLabel('Bookmark name', { exact: true })).toBeFocused();
   await page.getByLabel('Bookmark name', { exact: true }).fill('Renamed scene');
-  await page.getByRole('button', { name: 'Save bookmark', exact: true }).click();
+  await page
+    .getByRole('button', { name: 'Save bookmark', exact: true })
+    .click();
   await expect(
     page.getByRole('button', { name: 'Delete Renamed scene' }),
   ).toBeVisible();
@@ -359,7 +367,9 @@ test('setup, accounts, collections, diagnostics, stream ranges and persist resum
   await page.getByRole('link', { name: 'Settings', exact: true }).click();
   await page.getByLabel('Collection name', { exact: true }).fill('Samples');
   await page.getByLabel('Title starts with', { exact: true }).fill('sample');
-  await page.getByRole('button', { name: 'Save smart collection', exact: true }).click();
+  await page
+    .getByRole('button', { name: 'Save smart collection', exact: true })
+    .click();
   // Navigation fetches the library's collection list. Wait for the confirmed
   // creation UI so that GET cannot overtake the still-pending POST.
   await expect(
@@ -404,7 +414,9 @@ test('setup, accounts, collections, diagnostics, stream ranges and persist resum
     ),
   ).toBeVisible();
   await accessible(page);
-  await page.getByRole('button', { name: 'Sign out · maintainer', exact: true }).click();
+  await page
+    .getByRole('button', { name: 'Sign out · maintainer', exact: true })
+    .click();
   await page.getByLabel('Username', { exact: true }).fill('friend');
   await page
     .getByLabel('Password', { exact: true })
@@ -430,7 +442,9 @@ test('setup, accounts, collections, diagnostics, stream ranges and persist resum
     }),
   ).toHaveCount(0);
   await accessible(page);
-  await page.getByRole('button', { name: 'Sign out · friend', exact: true }).click();
+  await page
+    .getByRole('button', { name: 'Sign out · friend', exact: true })
+    .click();
   await page.getByLabel('Username', { exact: true }).fill('maintainer');
   await page
     .getByLabel('Password', { exact: true })
@@ -472,7 +486,9 @@ test('setup, accounts, collections, diagnostics, stream ranges and persist resum
   await accessible(page);
   await page.getByRole('link', { name: 'Library', exact: true }).click();
   await expect(page.getByLabel('Search library')).toBeVisible();
-  await expect(page.getByLabel('Smart collection', { exact: true })).toHaveCount(0);
+  await expect(
+    page.getByLabel('Smart collection', { exact: true }),
+  ).toHaveCount(0);
   await page.getByRole('link', { name: 'Settings', exact: true }).click();
   await page.getByText('Server-wide availability', { exact: true }).click();
   await page
@@ -510,18 +526,24 @@ test('setup, accounts, collections, diagnostics, stream ranges and persist resum
     page.getByRole('link', { name: 'Downloads', exact: true }),
   ).toBeVisible();
   await page.getByRole('link', { name: 'Movie requests', exact: true }).click();
-  await page.getByLabel('Movie title', { exact: true }).fill('Family future film');
+  await page
+    .getByLabel('Movie title', { exact: true })
+    .fill('Family future film');
   await page
     .getByLabel('Note (optional)', { exact: true })
     .fill('For our next movie night');
-  await page.getByRole('button', { name: 'Send movie request', exact: true }).click();
+  await page
+    .getByRole('button', { name: 'Send movie request', exact: true })
+    .click();
   await expect(
     page.getByText('Request sent. Your administrator can review it here.'),
   ).toBeVisible();
   await page
     .getByText('Review request: Family future film', { exact: true })
     .click();
-  await page.getByRole('combobox', { name: 'Status', exact: true }).selectOption('Added');
+  await page
+    .getByRole('combobox', { name: 'Status', exact: true })
+    .selectOption('Added');
   await expect(
     page.getByRole('combobox', { name: 'Confirm library title', exact: true }),
   ).toHaveValue('');
@@ -545,8 +567,12 @@ test('setup, accounts, collections, diagnostics, stream ranges and persist resum
     path: 'test-results/visual/family-requests.png',
     fullPage: true,
   });
-  await page.getByLabel('Movie title', { exact: true }).fill('Downloaded synthetic movie');
-  await page.getByRole('button', { name: 'Send movie request', exact: true }).click();
+  await page
+    .getByLabel('Movie title', { exact: true })
+    .fill('Downloaded synthetic movie');
+  await page
+    .getByRole('button', { name: 'Send movie request', exact: true })
+    .click();
   const downloadRequest = page.locator('article').filter({
     has: page.getByRole('heading', {
       name: 'Downloaded synthetic movie',
@@ -564,8 +590,12 @@ test('setup, accounts, collections, diagnostics, stream ranges and persist resum
       'https://raw.githubusercontent.com/Splortch/Media-server/1773f135fa760e60bd6696fc4756c15a72d2d359/tests/fixtures/download.webm',
     );
   await downloadRequest.getByLabel('Download size budget (MiB)').fill('1');
-  await downloadRequest.getByLabel('Actual media container').selectOption('.webm');
-  await downloadRequest.getByLabel('Approved content rating').selectOption('10');
+  await downloadRequest
+    .getByLabel('Actual media container')
+    .selectOption('.webm');
+  await downloadRequest
+    .getByLabel('Approved content rating')
+    .selectOption('10');
   const downloadFixture = await readFile(
     path.resolve('../tests/fixtures/download.webm'),
   );
@@ -613,7 +643,9 @@ test('setup, accounts, collections, diagnostics, stream ranges and persist resum
   ).toBeVisible();
   await page.getByLabel('Test collection', { exact: true }).check();
   await page.getByLabel('Enable guest access', { exact: true }).check();
-  await page.getByRole('button', { name: 'Save guest policy', exact: true }).click();
+  await page
+    .getByRole('button', { name: 'Save guest policy', exact: true })
+    .click();
   await expect(page.getByRole('status')).toContainText('Guest policy saved');
   await accessible(page);
   await page.screenshot({
@@ -653,7 +685,9 @@ test('setup, accounts, collections, diagnostics, stream ranges and persist resum
       ),
     ).toBeVisible();
     await page.getByLabel('Enable guest access', { exact: true }).uncheck();
-    await page.getByRole('button', { name: 'Save guest policy', exact: true }).click();
+    await page
+      .getByRole('button', { name: 'Save guest policy', exact: true })
+      .click();
     await expect(page.getByRole('status')).toContainText('Guest policy saved');
     await visitor.reload();
     await expect(
