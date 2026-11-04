@@ -5,7 +5,7 @@ This extends the optional [download manager](DOWNLOADS.md). Downloads and movie 
 ## Family request → approval → playback
 
 1. Configure a **writable destination library** inside the operator's allowed media roots. Choose its Movies or TV classification in library settings. Existing media can remain read-only; use a separate managed library when appropriate. The destination must not overlap the private server data directory.
-2. In **Settings → Download center**, approve exact public HTTPS hosts and enable downloads. In **Settings → Customize → Server-wide availability**, enable movie requests.
+2. In **Settings → Administration → Download center**, approve exact public HTTPS hosts and enable downloads. In **Settings → Administration → Server features → Server-wide availability**, enable movie requests.
 3. Grant the household member access to the intended library and an appropriate maximum content rating. The member opens **Movie requests**, chooses that library, and submits a title. This alone never fetches anything.
 4. An administrator opens the request's **Approve authorized download** panel. Confirm the authorized HTTPS URL, size budget, requested destination library, Movies/TV classification, actual container, content rating and title/year. A publisher SHA-256 is optional but recommended.
 5. For TV, explicitly supply **series, season and episode** together. Leave all three blank if unknown: the transfer completes into an administrator inbox, with no guessed episode or visible library item. Use **Downloads → Match and organize** when the correct match is known.
