@@ -17,6 +17,16 @@ class MacPackagingTests(unittest.TestCase):
         self.assertEqual(run.call_count, 2)
         wait.assert_called_once_with(5)
 
+    def test_retries_busy_disk_image_ejection(self):
+        run = Mock(side_effect=[
+            SimpleNamespace(returncode=1, stdout="hdiutil: couldn't eject disk2 - Resource busy"),
+            SimpleNamespace(returncode=0, stdout='Packaged'),
+        ])
+        wait = Mock()
+        self.assertEqual(module.build(['fixture'], run, wait), 0)
+        self.assertEqual(run.call_count, 2)
+        wait.assert_called_once_with(5)
+
     def test_does_not_retry_compilation_or_other_packaging_errors(self):
         for error in ('Rust compilation failed', 'hdiutil: create failed - Permission denied'):
             run = Mock(return_value=SimpleNamespace(returncode=7, stdout=error))

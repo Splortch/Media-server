@@ -248,33 +248,60 @@ test('setup, accounts, collections, diagnostics, stream ranges and persist resum
     .poll(() => video.evaluate((v: HTMLVideoElement) => v.readyState))
     .toBeGreaterThanOrEqual(1);
   await expect(video).not.toHaveAttribute('controls');
-  await page.getByRole('button', { name: 'Fullscreen', exact: true }).click();
-  await expect
-    .poll(() =>
-      page.locator('.player-surface').evaluate((surface) => {
-        const stage = surface.querySelector('.player-video-stage')!;
-        const controls = surface.querySelector('.player-controls')!;
-        const video = stage.querySelector('video')!;
-        const height = (element: Element) =>
-          element.getBoundingClientRect().height;
-        return (
-          surface.matches(':fullscreen') &&
-          Math.abs(height(surface) - height(stage) - height(controls)) <= 1 &&
-          Math.abs(height(stage) - height(video)) <= 1
-        );
-      }),
-    )
-    .toBe(true);
-  await page
-    .getByRole('button', { name: 'Exit fullscreen', exact: true })
-    .click();
-  await expect
-    .poll(() =>
-      page
-        .locator('.player-surface')
-        .evaluate((surface) => surface.matches(':fullscreen')),
-    )
-    .toBe(false);
+  const originalViewport = page.viewportSize()!;
+  for (const viewport of [
+    { width: 1280, height: 720 },
+    { width: 390, height: 844 },
+    { width: 844, height: 390 },
+  ]) {
+    await page.setViewportSize(viewport);
+    await page.getByRole('button', { name: 'Fullscreen', exact: true }).click();
+    await expect
+      .poll(() =>
+        page.locator('.player-surface').evaluate((surface) => {
+          const stage = surface
+            .querySelector('.player-video-stage')!
+            .getBoundingClientRect();
+          const controls = surface
+            .querySelector('.player-controls')!
+            .getBoundingClientRect();
+          const video = surface.querySelector('video')!.getBoundingClientRect();
+          const bounds = surface.getBoundingClientRect();
+          return (
+            surface.matches(':fullscreen') &&
+            stage.height > 0 &&
+            Math.abs(bounds.height - window.innerHeight) <= 1 &&
+            Math.abs(stage.bottom - controls.top) <= 1 &&
+            Math.abs(controls.bottom - bounds.bottom) <= 1 &&
+            Math.abs(stage.height - video.height) <= 1 &&
+            Math.abs(stage.width - video.width) <= 1 &&
+            Array.from(surface.querySelectorAll('button,input')).every(
+              (element) => {
+                const rect = element.getBoundingClientRect();
+                return (
+                  rect.left >= bounds.left &&
+                  rect.right <= bounds.right + 1 &&
+                  rect.top >= bounds.top &&
+                  rect.bottom <= bounds.bottom + 1
+                );
+              },
+            )
+          );
+        }),
+      )
+      .toBe(true);
+    await page
+      .getByRole('button', { name: 'Exit fullscreen', exact: true })
+      .click();
+    await expect
+      .poll(() =>
+        page
+          .locator('.player-surface')
+          .evaluate((surface) => surface.matches(':fullscreen')),
+      )
+      .toBe(false);
+  }
+  await page.setViewportSize(originalViewport);
   await video.evaluate((v: HTMLVideoElement) => v.pause());
   await page.getByText('Private bookmarks and notes', { exact: true }).click();
   const bookmarkJump = page.getByRole('button', {

@@ -42,6 +42,12 @@ it('blocks the native video context menu to keep controls custom', () => {
   );
   const video = screen.getByLabelText('Own video') as HTMLVideoElement;
   expect(video.controls).toBe(false);
+  expect(video).toHaveAttribute('disablepictureinpicture');
+  expect(video).toHaveAttribute('disableremoteplayback');
+  expect(video).toHaveAttribute(
+    'controlslist',
+    'nodownload nofullscreen noremoteplayback',
+  );
   expect(fireEvent.contextMenu(video)).toBe(false);
   expect(video.controls).toBe(false);
 });

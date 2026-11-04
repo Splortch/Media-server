@@ -274,6 +274,10 @@ export default function Player({
             ref={videoRef}
             crossOrigin={playbackTransport ? 'anonymous' : undefined}
             playsInline
+            controls={false}
+            disablePictureInPicture
+            disableRemotePlayback
+            controlsList="nodownload nofullscreen noremoteplayback"
             preload="metadata"
             aria-label={item.title}
             src={source.endsWith('.m3u8') ? undefined : source}
