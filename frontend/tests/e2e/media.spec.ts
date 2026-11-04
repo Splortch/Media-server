@@ -48,7 +48,7 @@ test('setup, accounts, collections, diagnostics, stream ranges and persist resum
   await page.getByRole('button', { name: 'Sign in', exact: true }).click();
   await page.getByRole('link', { name: 'Settings', exact: true }).click();
   await expect(
-    page.getByRole('heading', { name: 'Server settings' }),
+    page.getByRole('heading', { name: 'Settings', exact: true }),
   ).toBeVisible();
   await accessible(page);
   await page
@@ -86,6 +86,7 @@ test('setup, accounts, collections, diagnostics, stream ranges and persist resum
       'https://raw.githubusercontent.com/Splortch/Media-server/721a610c3b4eec3194fbfa3f35d5ad29a376cad8/LICENSE',
     );
   await page.getByLabel('Maximum size (MiB)').fill('1');
+  await page.getByText('Advanced download options', { exact: true }).click();
   const license = await readFile(path.resolve('../LICENSE'));
   await page
     .getByLabel('SHA-256 checksum (optional)')
@@ -676,6 +677,8 @@ test('setup, accounts, collections, diagnostics, stream ranges and persist resum
   await page.getByLabel('Maximum size (MiB)').fill('1');
   await page.getByLabel('Actual media container').selectOption('.webm');
   await page.getByLabel('Approved content rating').selectOption('10');
+  await page.getByText('Advanced download options', { exact: true }).click();
+  await expect(page.getByLabel('SHA-256 checksum (optional)')).toBeVisible();
   await page
     .getByLabel('SHA-256 checksum (optional)')
     .fill(createHash('sha256').update(downloadFixture).digest('hex'));
