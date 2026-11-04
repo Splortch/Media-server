@@ -23,7 +23,7 @@ concurrency:
 jobs:
   software:
     runs-on: ubuntu-24.04
-    timeout-minutes: 15
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-dotnet@v6
@@ -31,7 +31,20 @@ jobs:
           global-json-file: global.json
           cache: true
           cache-dependency-path: backend/**/packages.lock.json
-      - run: sudo apt-get -o Acquire::Retries=2 install -y --no-install-recommends ffmpeg
+      - name: Ensure software benchmark media tooling
+        timeout-minutes: 5
+        shell: bash
+        run: |
+          if ! command -v ffmpeg >/dev/null || ! command -v ffprobe >/dev/null; then
+            # Avoid the Azure mirror that can consume the entire job timeout.
+            if [ -f /etc/apt/apt-mirrors.txt ]; then
+              sudo sed -i 's|http://azure.archive.ubuntu.com/ubuntu|https://archive.ubuntu.com/ubuntu|g' /etc/apt/apt-mirrors.txt
+            fi
+            sudo apt-get -o Acquire::Retries=2 -o Acquire::http::Timeout=30 -o Acquire::https::Timeout=30 update
+            sudo apt-get -o Acquire::Retries=2 -o Acquire::http::Timeout=30 -o Acquire::https::Timeout=30 install -y --no-install-recommends ffmpeg
+          fi
+          ffmpeg -version
+          ffprobe -version
       - run: dotnet restore backend/tools/PlaybackBenchmark --locked-mode
       - run: dotnet build backend/tools/PlaybackBenchmark --no-restore -warnaserror
       - name: Validate synthetic SDR, HEVC HDR and AV1 HDR conversions
@@ -43,7 +56,7 @@ jobs:
       - name: Validate evidence reporting
         run: python3 -m unittest discover -s scripts/tests -p test_playback_evidence.py
       - name: Publish software evidence matrix
-        if: always()
+        if: ${{ !cancelled() && hashFiles('artifacts/*.json') != '' }}
         run: python3 scripts/playback-evidence.py artifacts/*.json --output artifacts/matrix.md >> "$GITHUB_STEP_SUMMARY"
       - uses: actions/upload-artifact@v7
         if: always()

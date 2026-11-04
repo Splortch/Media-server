@@ -1063,16 +1063,16 @@ details[open] > summary {
   border-radius: 0;
 }
 .player-controls {
-  padding: 18px 20px;
+  padding: 10px 16px 12px;
   color: #effbff;
-  background: #101e2a;
+  background: #0c141e;
 }
 .player-timeline {
   display: flex;
   align-items: center;
   gap: 14px;
-  margin-bottom: 12px;
-  font-size: 11px;
+  margin-bottom: 2px;
+  font-size: 12px;
   font-variant-numeric: tabular-nums;
   color: #bfd6df;
 }
@@ -1096,39 +1096,49 @@ details[open] > summary {
   gap: 8px;
 }
 .player-buttons {
-  gap: 20px;
+  gap: 16px;
   flex-wrap: wrap;
 }
 .player-buttons button {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
   min-width: 44px;
+  height: 44px;
   padding: 10px;
-  min-height: 44px;
-  color: #effbff;
-  background: #203746;
-  border: 1px solid #4a6c7d;
+  color: #fff;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 50%;
 }
 .player-buttons button:hover {
-  background: #2a495b;
+  background: #ffffff24;
 }
-.player-buttons .player-play {
-  color: #061a23;
-  background: var(--action-gradient);
-  border-color: #2be0a0;
-  min-width: 90px;
-  padding: 10px 16px;
+.player-buttons button:focus-visible {
+  outline: 2px solid #fff;
+  outline-offset: 2px;
 }
-.player-buttons .player-play:hover {
-  background: var(--action-gradient-hover);
-  color: #061a23;
-  border-color: #88ffd1;
+.player-buttons .player-play svg {
+  width: 26px;
+  height: 26px;
+  fill: currentColor;
+}
+.player-skip-label {
+  position: absolute;
+  bottom: 0;
+  font-size: 9px;
+  font-weight: 700;
+  line-height: 12px;
 }
 .player-transport {
-  gap: 6px;
+  gap: 4px;
 }
 .player-volume {
-  max-width: 190px;
+  max-width: 150px;
   flex: 1;
-  min-width: 145px;
+  min-width: 110px;
 }
 .player-volume input {
   width: 100%;
@@ -1143,14 +1153,35 @@ details[open] > summary {
   border: 0;
   border-radius: 0;
 }
+.player-surface:fullscreen .player-video-stage {
+  flex: 1 1 0;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  background: #000;
+}
 .player-surface:fullscreen video {
-  flex: 1;
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
   min-height: 0;
   max-height: none;
   object-fit: contain;
 }
 .player-surface:fullscreen .player-controls {
-  flex-shrink: 0;
+  position: absolute;
+  inset: auto 0 0;
+  z-index: 3;
+  background: linear-gradient(transparent, #060c13ee 28%);
+  transition: opacity 180ms ease;
+}
+.player-surface:fullscreen.player-controls-hidden {
+  cursor: none;
+}
+.player-surface:fullscreen.player-controls-hidden .player-controls {
+  opacity: 0;
+  pointer-events: none;
 }
 @keyframes surface-in {
   from {
@@ -1414,19 +1445,12 @@ details[open] > summary {
   .player-controls {
     padding: 12px;
   }
-  .player-buttons {
-    gap: 10px;
-  }
   .player-volume {
-    order: 3;
-    flex: 1 0 100%;
-    max-width: none;
+    flex: 0 1 110px;
+    min-width: 70px;
   }
-  .player-fullscreen {
-    order: 2;
-  }
-  .control-caption {
-    display: none;
+  .player-buttons {
+    gap: 4px;
   }
 }
 @media (prefers-reduced-motion: reduce) {

@@ -1,4 +1,10 @@
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import {
+  render,
+  screen,
+  fireEvent,
+  waitFor,
+  act,
+} from '@testing-library/react';
 import { vi, expect, it, afterEach } from 'vitest';
 import Player, {
   bookmarkStreamTime,
@@ -24,6 +30,32 @@ it('uses the authenticated stream endpoint and reports unsupported playback', ()
   expect(video).toHaveAttribute('src', '/api/media/3/stream');
   fireEvent.error(video);
   expect(screen.getByRole('alert')).toHaveTextContent('Prepare HLS playback');
+});
+it('blocks the native video context menu to keep controls custom', () => {
+  render(
+    <Player
+      item={{
+        id: 3,
+        title: 'Own video',
+        duration: 100,
+        size: 100,
+        container: 'mp4',
+        videoCodec: 'h264',
+        audioCodec: 'aac',
+      }}
+      resume={0}
+    />,
+  );
+  const video = screen.getByLabelText('Own video') as HTMLVideoElement;
+  expect(video.controls).toBe(false);
+  expect(video).toHaveAttribute('disablepictureinpicture');
+  expect(video).toHaveAttribute('disableremoteplayback');
+  expect(video).toHaveAttribute(
+    'controlslist',
+    'nodownload nofullscreen noremoteplayback',
+  );
+  expect(fireEvent.contextMenu(video)).toBe(false);
+  expect(video.controls).toBe(false);
 });
 it('saves real playback progress with an antiforgery token', async () => {
   const fetch = vi
@@ -319,4 +351,104 @@ it('captures and jumps to bookmarks relative to a nonzero current stream origin'
   expect(screen.getByLabelText('Timestamp in seconds')).toHaveValue(15);
   fireEvent.click(jump);
   expect(video.currentTime).toBe(110);
+});
+
+it('toggles playback by clicking video and supports seeking and volume shortcuts', async () => {
+  render(
+    <Player
+      item={{
+        id: 21,
+        title: 'Interactive video',
+        duration: 100,
+        size: 1,
+        container: 'mp4',
+        videoCodec: 'h264',
+        audioCodec: 'aac',
+      }}
+      resume={0}
+      guest
+      onSaveProgress={async () => {}}
+    />,
+  );
+  const video = screen.getByLabelText('Interactive video') as HTMLVideoElement;
+  const surface = screen.getByLabelText('Playback controls');
+  Object.defineProperty(video, 'duration', { value: 100, configurable: true });
+  fireEvent.loadedMetadata(video);
+  const play = vi.spyOn(video, 'play').mockResolvedValue();
+  const pause = vi.spyOn(video, 'pause').mockImplementation(() => {});
+  fireEvent.click(video);
+  expect(play).toHaveBeenCalledOnce();
+  expect(surface).toHaveFocus();
+  Object.defineProperty(video, 'paused', { value: false, configurable: true });
+  fireEvent.click(video);
+  expect(pause).toHaveBeenCalledOnce();
+  fireEvent.keyDown(surface, { key: 'End' });
+  expect(video.currentTime).toBe(100);
+  fireEvent.keyDown(surface, { key: 'ArrowLeft' });
+  expect(video.currentTime).toBe(90);
+  fireEvent.keyDown(surface, { key: 'Home' });
+  expect(video.currentTime).toBe(0);
+  fireEvent.keyDown(surface, { key: 'ArrowRight' });
+  expect(video.currentTime).toBe(10);
+  fireEvent.keyDown(surface, { key: 'ArrowDown' });
+  expect(video.volume).toBeCloseTo(0.95);
+  fireEvent.keyDown(surface, { key: 'ArrowUp' });
+  expect(video.volume).toBe(1);
+  fireEvent.keyDown(surface, { key: 'k', repeat: true });
+  expect(pause).toHaveBeenCalledOnce();
+  fireEvent.keyDown(screen.getByLabelText('Volume'), { key: 'Home' });
+  expect(video.currentTime).toBe(10);
+});
+
+it('hides fullscreen controls when idle and reveals them for movement, pause and keyboard focus', () => {
+  vi.useFakeTimers();
+  try {
+    render(
+      <Player
+        item={{
+          id: 22,
+          title: 'Idle video',
+          duration: 100,
+          size: 1,
+          container: 'mp4',
+          videoCodec: 'h264',
+          audioCodec: 'aac',
+        }}
+        resume={0}
+        guest
+        onSaveProgress={async () => {}}
+      />,
+    );
+    const surface = screen.getByLabelText('Playback controls');
+    const video = screen.getByLabelText('Idle video');
+    Object.defineProperty(document, 'fullscreenElement', {
+      configurable: true,
+      get: () => surface,
+    });
+    fireEvent(document, new Event('fullscreenchange'));
+    fireEvent.play(video);
+    act(() => vi.advanceTimersByTime(2500));
+    expect(surface).toHaveClass('player-controls-hidden');
+    expect(surface.querySelector('.player-controls')).toHaveAttribute('inert');
+    fireEvent.pointerMove(surface);
+    expect(surface).not.toHaveClass('player-controls-hidden');
+    act(() => vi.advanceTimersByTime(2500));
+    fireEvent.keyDown(surface, { key: 'ArrowLeft' });
+    expect(surface).not.toHaveClass('player-controls-hidden');
+    fireEvent.focus(screen.getByRole('button', { name: 'Pause' }));
+    act(() => vi.advanceTimersByTime(5000));
+    expect(surface).not.toHaveClass('player-controls-hidden');
+    fireEvent.blur(screen.getByRole('button', { name: 'Pause' }), {
+      relatedTarget: surface,
+    });
+    act(() => vi.advanceTimersByTime(2500));
+    expect(surface).toHaveClass('player-controls-hidden');
+    fireEvent.pause(video);
+    expect(surface).not.toHaveClass('player-controls-hidden');
+    act(() => vi.advanceTimersByTime(5000));
+    expect(surface).not.toHaveClass('player-controls-hidden');
+  } finally {
+    Reflect.deleteProperty(document, 'fullscreenElement');
+    vi.useRealTimers();
+  }
 });
