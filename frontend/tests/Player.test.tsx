@@ -25,6 +25,26 @@ it('uses the authenticated stream endpoint and reports unsupported playback', ()
   fireEvent.error(video);
   expect(screen.getByRole('alert')).toHaveTextContent('Prepare HLS playback');
 });
+it('blocks the native video context menu to keep controls custom', () => {
+  render(
+    <Player
+      item={{
+        id: 3,
+        title: 'Own video',
+        duration: 100,
+        size: 100,
+        container: 'mp4',
+        videoCodec: 'h264',
+        audioCodec: 'aac',
+      }}
+      resume={0}
+    />,
+  );
+  const video = screen.getByLabelText('Own video') as HTMLVideoElement;
+  expect(video.controls).toBe(false);
+  expect(fireEvent.contextMenu(video)).toBe(false);
+  expect(video.controls).toBe(false);
+});
 it('saves real playback progress with an antiforgery token', async () => {
   const fetch = vi
     .spyOn(globalThis, 'fetch')
