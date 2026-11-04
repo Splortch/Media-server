@@ -87,8 +87,9 @@ export function DownloadSettings({
     >
       <h2>Download center</h2>
       <p className="muted">
-        Optional administrator tool for authorized public HTTPS URLs. Files stay
-        in separate staging storage until an administrator approves a library
+        Optional administrator tool for authorized public HTTPS URLs. Choose
+        automatic library delivery when adding a download, or keep files in
+        separate staging storage until an administrator approves a library
         match. Family approvals and managed Movies/TV imports are available;
         catalogs and external clients are planned.
       </p>
@@ -234,9 +235,9 @@ function AdminDownloads() {
       <p className="eyebrow">YOUR SOURCES. YOUR CONTROL.</p>
       <h1>Download center</h1>
       <p className="muted">
-        Download only content you are authorized to obtain. Completed files are
-        staged for administrator retrieval. Confirm a library match to organize
-        and scan them automatically.
+        Download only content you are authorized to obtain. Choose a destination
+        library to organize and scan completed media automatically, or keep
+        files in staging and confirm a library match later.
       </p>
       <a href="#settings/downloads" className="back-link">
         Download settings
@@ -249,6 +250,16 @@ function AdminDownloads() {
       <section className="panel">
         <h2>Add an authorized URL</h2>
         <form className="download-form" onSubmit={create} aria-busy={busy}>
+          <label>
+            Download name
+            <input
+              name="name"
+              required
+              maxLength={80}
+              value={downloadName}
+              onChange={(e) => setDownloadName(e.target.value)}
+            />
+          </label>
           <label>
             After downloading
             <select
@@ -277,16 +288,6 @@ function AdminDownloads() {
               />
             </fieldset>
           )}
-          <label>
-            Download name
-            <input
-              name="name"
-              required
-              maxLength={80}
-              value={downloadName}
-              onChange={(e) => setDownloadName(e.target.value)}
-            />
-          </label>
           <label>
             HTTPS source URL
             <input
