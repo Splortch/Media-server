@@ -677,6 +677,8 @@ test('setup, accounts, collections, diagnostics, stream ranges and persist resum
   await page.getByLabel('Maximum size (MiB)').fill('1');
   await page.getByLabel('Actual media container').selectOption('.webm');
   await page.getByLabel('Approved content rating').selectOption('10');
+  await page.getByText('Advanced download options', { exact: true }).click();
+  await expect(page.getByLabel('SHA-256 checksum (optional)')).toBeVisible();
   await page
     .getByLabel('SHA-256 checksum (optional)')
     .fill(createHash('sha256').update(downloadFixture).digest('hex'));
