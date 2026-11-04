@@ -6,6 +6,8 @@ revision-checked progress saving remain unchanged.
 
 - Play / pause, seek timeline, elapsed and total time, and ten-second skips.
 - Mute, volume, and fullscreen including the custom toolbar.
+- Fullscreen uses the available viewport for video while preserving its aspect ratio.
+- The native video context menu is disabled so browser controls cannot be exposed.
 - Focus the player surface: Space or K toggles playback, Left / Right skips ten
   seconds, M toggles mute, and F toggles fullscreen.
 - Use Tab and Enter for buttons, and arrow keys for timeline and volume sliders.
