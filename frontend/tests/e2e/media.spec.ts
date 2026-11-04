@@ -248,6 +248,7 @@ test('setup, accounts, collections, diagnostics, stream ranges and persist resum
     .poll(() => video.evaluate((v: HTMLVideoElement) => v.readyState))
     .toBeGreaterThanOrEqual(1);
   await expect(video).not.toHaveAttribute('controls');
+  await video.evaluate((v: HTMLVideoElement) => v.pause());
   const originalViewport = page.viewportSize()!;
   for (const viewport of [
     { width: 1280, height: 720 },
@@ -271,7 +272,7 @@ test('setup, accounts, collections, diagnostics, stream ranges and persist resum
             surface.matches(':fullscreen') &&
             stage.height > 0 &&
             Math.abs(bounds.height - window.innerHeight) <= 1 &&
-            Math.abs(stage.bottom - controls.top) <= 1 &&
+            Math.abs(stage.bottom - bounds.bottom) <= 1 &&
             Math.abs(controls.bottom - bounds.bottom) <= 1 &&
             Math.abs(stage.height - video.height) <= 1 &&
             Math.abs(stage.width - video.width) <= 1 &&

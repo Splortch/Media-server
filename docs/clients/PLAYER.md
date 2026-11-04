@@ -6,14 +6,22 @@ revision-checked progress saving remain unchanged.
 
 - Play / pause, seek timeline, elapsed and total time, and ten-second skips.
 - Mute, volume, and fullscreen including the custom toolbar.
-- Fullscreen uses the available viewport for video while preserving its aspect ratio.
+- Fullscreen video fills the available viewport while preserving its aspect ratio;
+  the compact icon toolbar overlays the bottom of the video.
+- Click or tap the video to pause or resume. This also focuses the player for shortcuts.
 - The native video context menu is disabled so browser controls cannot be exposed.
 - Focus the player surface: Space or K toggles playback, Left / Right skips ten
-  seconds, M toggles mute, and F toggles fullscreen.
+  seconds, Up / Down changes volume by 5%, Home / End seeks to the beginning / end,
+  M toggles mute, and F toggles fullscreen. Escape exits browser fullscreen.
 - Use Tab and Enter for buttons, and arrow keys for timeline and volume sliders.
   Shortcuts do not override slider input.
 
-Controls stay visible for keyboard and touch use. Errors, buffering, diagnostics,
+Fullscreen controls fade out after 2.5 seconds of playback inactivity, and the
+cursor hides. Pointer movement, a tap, or a supported keyboard shortcut reveals
+them. Controls remain visible while paused, buffering, showing a playback error,
+hovered, or focused with the keyboard. Hidden controls leave the tab order;
+Tab reveals them again. Outside fullscreen, controls remain visible.
+Errors, buffering, diagnostics,
 and synchronization failures remain available below the player.
 
 This interface uses HTML video. Browser/WebView2 codec limits still apply.

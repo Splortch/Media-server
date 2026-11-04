@@ -63,6 +63,14 @@ export default function Player({
   const [volume, setVolume] = useState(1);
   const [muted, setMuted] = useState(false);
   const [fullscreen, setFullscreen] = useState(false);
+  const [controlsVisible, setControlsVisible] = useState(true);
+  const [activity, setActivity] = useState(0);
+  const [controlsFocused, setControlsFocused] = useState(false);
+  const [controlsHovered, setControlsHovered] = useState(false);
+  function revealControls() {
+    setControlsVisible(true);
+    setActivity((value) => value + 1);
+  }
   useEffect(() => {
     const changed = () =>
       setFullscreen(document.fullscreenElement === surfaceRef.current);
@@ -187,6 +195,35 @@ export default function Player({
   const blocked = useRef(false);
   const [error, setError] = useState('');
   const [saveError, setSaveError] = useState('');
+  useEffect(() => {
+    if (
+      !fullscreen ||
+      paused ||
+      buffering ||
+      error ||
+      controlsFocused ||
+      controlsHovered
+    )
+      return;
+    const timer = window.setTimeout(() => setControlsVisible(false), 2500);
+    return () => window.clearTimeout(timer);
+  }, [
+    fullscreen,
+    paused,
+    buffering,
+    error,
+    controlsFocused,
+    controlsHovered,
+    activity,
+  ]);
+  const showControls =
+    !fullscreen ||
+    paused ||
+    buffering ||
+    !!error ||
+    controlsFocused ||
+    controlsHovered ||
+    controlsVisible;
   async function save(
     video: HTMLVideoElement,
     force = false,
@@ -239,12 +276,16 @@ export default function Player({
         />
       )}
       <div
-        className="player-surface"
+        className={`player-surface${showControls ? '' : ' player-controls-hidden'}`}
         role="group"
         ref={surfaceRef}
         tabIndex={0}
         aria-label="Playback controls"
+        aria-keyshortcuts="Space K F M ArrowLeft ArrowRight ArrowUp ArrowDown Home End"
+        onPointerMove={revealControls}
+        onPointerDown={revealControls}
         onKeyDown={(event) => {
+          if (event.key === 'Tab') revealControls();
           if (
             event.ctrlKey ||
             event.altKey ||
@@ -254,14 +295,41 @@ export default function Player({
           )
             return;
           const key = event.key.toLowerCase();
-          if (![' ', 'k', 'f', 'm', 'arrowleft', 'arrowright'].includes(key))
+          if (
+            ![
+              ' ',
+              'k',
+              'f',
+              'm',
+              'arrowleft',
+              'arrowright',
+              'arrowup',
+              'arrowdown',
+              'home',
+              'end',
+            ].includes(key)
+          )
             return;
           event.preventDefault();
           event.stopPropagation();
+          revealControls();
+          if (event.repeat && [' ', 'k', 'f', 'm'].includes(key)) return;
           if (key === ' ' || key === 'k') void togglePlay();
           if (key === 'f') void toggleFullscreen();
           if (key === 'm' && videoRef.current)
             videoRef.current.muted = !videoRef.current.muted;
+          if (key === 'home') seek(0);
+          if (key === 'end') seek(videoRef.current?.duration ?? 0);
+          if ((key === 'arrowup' || key === 'arrowdown') && videoRef.current) {
+            videoRef.current.volume = Math.max(
+              0,
+              Math.min(
+                1,
+                videoRef.current.volume + (key === 'arrowup' ? 0.05 : -0.05),
+              ),
+            );
+            videoRef.current.muted = false;
+          }
           if (key === 'arrowleft' || key === 'arrowright')
             seek(
               (videoRef.current?.currentTime ?? 0) +
@@ -281,6 +349,11 @@ export default function Player({
             preload="metadata"
             aria-label={item.title}
             src={source.endsWith('.m3u8') ? undefined : source}
+            onClick={() => {
+              surfaceRef.current?.focus();
+              revealControls();
+              void togglePlay();
+            }}
             onContextMenu={(event) => event.preventDefault()}
             onLoadedMetadata={(e) => {
               const v = e.currentTarget;
@@ -382,7 +455,25 @@ export default function Player({
             />
           )}
         </div>
-        <div className="player-controls">
+        <div
+          className="player-controls"
+          inert={!showControls}
+          onPointerEnter={() => setControlsHovered(true)}
+          onPointerLeave={() => {
+            setControlsHovered(false);
+            revealControls();
+          }}
+          onFocus={() => {
+            setControlsFocused(true);
+            revealControls();
+          }}
+          onBlur={(event) => {
+            if (!event.currentTarget.contains(event.relatedTarget)) {
+              setControlsFocused(false);
+              revealControls();
+            }
+          }}
+        >
           <div className="player-timeline">
             <span>{formatPlaybackTime(position)}</span>
             <input
@@ -408,28 +499,35 @@ export default function Player({
                 type="button"
                 className="player-play"
                 onClick={() => void togglePlay()}
+                title={paused ? 'Play (Space / K)' : 'Pause (Space / K)'}
                 aria-label={paused ? 'Play' : 'Pause'}
               >
                 <Icon name={paused ? 'play' : 'pause'} />{' '}
-                <span>{paused ? 'Play' : 'Pause'}</span>
+                <span className="sr-only">{paused ? 'Play' : 'Pause'}</span>
               </button>
               <button
                 type="button"
                 disabled={!duration}
                 onClick={() => seek((videoRef.current?.currentTime ?? 0) - 10)}
+                title="Rewind 10 seconds (←)"
                 aria-label="Rewind 10 seconds"
               >
                 <Icon name="rewind" />{' '}
-                <span className="control-caption">10 seconds</span>
+                <span className="player-skip-label" aria-hidden="true">
+                  10
+                </span>
               </button>
               <button
                 type="button"
                 disabled={!duration}
                 onClick={() => seek((videoRef.current?.currentTime ?? 0) + 10)}
+                title="Forward 10 seconds (→)"
                 aria-label="Forward 10 seconds"
               >
                 <Icon name="forward" />{' '}
-                <span className="control-caption">10 seconds</span>
+                <span className="player-skip-label" aria-hidden="true">
+                  10
+                </span>
               </button>
             </div>
             <div
@@ -466,11 +564,18 @@ export default function Player({
             <button
               type="button"
               aria-label={fullscreen ? 'Exit fullscreen' : 'Fullscreen'}
+              title={
+                fullscreen ? 'Exit fullscreen (F / Esc)' : 'Fullscreen (F)'
+              }
               className="player-fullscreen"
-              onClick={() => void toggleFullscreen()}
+              onClick={(event) => {
+                if (event.detail > 0) surfaceRef.current?.focus();
+                revealControls();
+                void toggleFullscreen();
+              }}
             >
               <Icon name="fullscreen" />
-              <span className="control-caption">
+              <span className="sr-only">
                 {fullscreen ? 'Exit fullscreen' : 'Fullscreen'}
               </span>
             </button>
