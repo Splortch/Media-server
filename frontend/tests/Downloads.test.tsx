@@ -164,3 +164,50 @@ it('sends the chosen library plan together with the initial download', async () 
     ),
   );
 });
+
+it('finds downloads by destination library and separates paused transfers', async () => {
+  vi.mocked(api).mockImplementation(async (path) =>
+    path === '/browse-libraries'
+      ? [{ id: 7, name: 'Family films', kind: 'movies' }]
+      : [
+          { ...job, import: null },
+          {
+            ...job,
+            id: 'movie',
+            name: 'Another film',
+            state: 'paused',
+            import: {
+              libraryId: 7,
+              title: 'Matched film',
+              year: 2020,
+              state: 'waiting',
+              classification: 'movies',
+              mediaItemId: null,
+            },
+          },
+        ],
+  );
+  render(<Downloads admin />);
+  await screen.findByRole('button', { name: 'Pause Sample' });
+  fireEvent.change(screen.getByLabelText('Search downloads'), {
+    target: { value: 'Family films' },
+  });
+  expect(
+    screen.queryByRole('button', { name: 'Pause Sample' }),
+  ).not.toBeInTheDocument();
+  expect(screen.getByText(/Destination: Family films/)).toHaveTextContent(
+    'Matched film (2020)',
+  );
+  fireEvent.change(screen.getByLabelText('Show downloads'), {
+    target: { value: 'paused' },
+  });
+  expect(
+    screen.getByRole('button', { name: 'Resume Another film' }),
+  ).toBeInTheDocument();
+  fireEvent.change(screen.getByLabelText('Search downloads'), {
+    target: { value: 'missing' },
+  });
+  expect(
+    screen.getByText('No downloads match your search and category.'),
+  ).toBeInTheDocument();
+});

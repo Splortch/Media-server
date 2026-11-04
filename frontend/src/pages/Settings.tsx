@@ -17,7 +17,7 @@ import { api, type Library } from '../services/api';
 type ScanIssue = { fileName: string; code: string; correlationId: string };
 type Job = { id: number; state: string; discovered: number; failed: number };
 export default function Settings({
-  admin = true,
+  admin = false,
   features = unavailableFeatures,
   onFeaturesChanged = () => {},
   initialSection,
@@ -206,7 +206,7 @@ export default function Settings({
   return (
     <>
       <p className="eyebrow">MAKE YOURSELF AT HOME</p>
-      <h1>Server settings</h1>
+      <h1>Settings</h1>
       <p className="muted">
         Your files stay yours. Scanning reads media and never changes the
         originals.
@@ -237,25 +237,29 @@ export default function Settings({
                 },
               ]
             : []),
-        ].map((group) => (
-          <div key={group.label}>
-            <h2>{group.label}</h2>
-            <div className="settings-nav">
-              {sections
-                .filter((section) => group.ids.includes(section.id))
-                .map((section) => (
-                  <button
-                    key={section.id}
-                    type="button"
-                    onClick={() => jump(section.id)}
-                  >
-                    <Icon name={section.icon} />
-                    {section.label}
-                  </button>
-                ))}
+        ]
+          .filter((group) =>
+            sections.some((section) => group.ids.includes(section.id)),
+          )
+          .map((group) => (
+            <div key={group.label}>
+              <h2>{group.label}</h2>
+              <div className="settings-nav">
+                {sections
+                  .filter((section) => group.ids.includes(section.id))
+                  .map((section) => (
+                    <button
+                      key={section.id}
+                      type="button"
+                      onClick={() => jump(section.id)}
+                    >
+                      <Icon name={section.icon} />
+                      {section.label}
+                    </button>
+                  ))}
+              </div>
             </div>
-          </div>
-        ))}
+          ))}
       </nav>
       <section
         className="settings-category"
@@ -329,25 +333,27 @@ export default function Settings({
           onChange={onFeaturesChanged}
         />
       </section>
-      <section
-        className="settings-category"
-        aria-labelledby="settings-library-heading"
-      >
-        <h2 id="settings-library-heading">Library experience</h2>
-        <p className="muted">
-          Personal collection preferences. Administrators manage directories and
-          downloads below.
-        </p>
-        {featureVisible(features, 'smart-collections') && (
-          <div
-            id="settings-collections"
-            tabIndex={-1}
-            className="settings-target"
-          >
-            <Collections />
-          </div>
-        )}
-      </section>
+      {featureVisible(features, 'smart-collections') && (
+        <section
+          className="settings-category"
+          aria-labelledby="settings-library-heading"
+        >
+          <h2 id="settings-library-heading">Library experience</h2>
+          <p className="muted">
+            Personal collection preferences. Administrators manage directories
+            and downloads below.
+          </p>
+          {featureVisible(features, 'smart-collections') && (
+            <div
+              id="settings-collections"
+              tabIndex={-1}
+              className="settings-target"
+            >
+              <Collections />
+            </div>
+          )}
+        </section>
+      )}
       {admin && (
         <section
           className="settings-category"

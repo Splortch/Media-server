@@ -21,6 +21,7 @@ const bytes = (value: number) =>
     ? `${(value / mib / 1024).toFixed(1)} GiB`
     : `${(value / mib).toFixed(1)} MiB`;
 function inCategory(job: Job, filter: string) {
+  if (filter === 'paused') return ['paused', 'failed'].includes(job.state);
   if (filter === 'imported') return job.import?.state === 'imported';
   if (filter === 'review')
     return (
@@ -157,6 +158,7 @@ function AdminDownloads() {
   const [delivery, setDelivery] = useState('staging');
   const [downloadName, setDownloadName] = useState('');
   const [filter, setFilter] = useState('all');
+  const [search, setSearch] = useState('');
   const [jobs, setJobs] = useState<Job[]>([]);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
@@ -230,9 +232,18 @@ function AdminDownloads() {
       setDownloadName('');
     });
   }
+  const matches = (job: Job) =>
+    inCategory(job, filter) &&
+    [
+      job.name,
+      job.import?.title,
+      libraries.find((library) => library.id === job.import?.libraryId)?.name,
+    ].some((value) =>
+      value?.toLowerCase().includes(search.trim().toLowerCase()),
+    );
   return (
     <>
-      <p className="eyebrow">YOUR SOURCES. YOUR CONTROL.</p>
+      <p className="eyebrow">ADMINISTRATION · DOWNLOADS</p>
       <h1>Download center</h1>
       <p className="muted">
         Download only content you are authorized to obtain. Choose a destination
@@ -247,6 +258,22 @@ function AdminDownloads() {
           {error} Refresh the page if settings changed.
         </p>
       )}
+      <section className="panel">
+        <h2>Library delivery</h2>
+        <p>
+          Choose a library when adding a URL to download, organize and scan the
+          title in one step. Completed staged files can be matched from the
+          queue.
+        </p>
+        <div className="download-actions">
+          <a className="button secondary" href="#settings/libraries">
+            Manage media libraries
+          </a>
+          <a className="button secondary" href="#requests">
+            Review family requests
+          </a>
+        </div>
+      </section>
       <section className="panel">
         <h2>Add an authorized URL</h2>
         <form className="download-form" onSubmit={create} aria-busy={busy}>
@@ -310,31 +337,34 @@ function AdminDownloads() {
               defaultValue={1024}
             />
           </label>
-          <label>
-            Priority
-            <input
-              name="priority"
-              type="number"
-              min={-10}
-              max={10}
-              defaultValue={0}
-              required
-            />
-          </label>
-          <label>
-            SHA-256 checksum (optional)
-            <input
-              name="checksum"
-              pattern="[a-fA-F0-9]{64}"
-              maxLength={64}
-              autoComplete="off"
-            />
-          </label>
-          <p className="muted">
-            Higher priority runs first after the current transfer. The size
-            budget reserves space before starting. URL tokens are encrypted on
-            the server.
-          </p>
+          <details>
+            <summary>Advanced download options</summary>
+            <label>
+              Priority
+              <input
+                name="priority"
+                type="number"
+                min={-10}
+                max={10}
+                defaultValue={0}
+                required
+              />
+            </label>
+            <label>
+              SHA-256 checksum (optional)
+              <input
+                name="checksum"
+                pattern="[a-fA-F0-9]{64}"
+                maxLength={64}
+                autoComplete="off"
+              />
+            </label>
+            <p className="muted">
+              Higher priority runs first after the current transfer. The size
+              budget reserves space before starting. URL tokens are encrypted on
+              the server.
+            </p>
+          </details>
           <button disabled={busy || !loaded}>
             {busy ? 'Working…' : 'Add download'}
           </button>
@@ -343,11 +373,21 @@ function AdminDownloads() {
       <section aria-label="Download queue">
         <h2>Queue</h2>
         <label>
+          Search downloads
+          <input
+            type="search"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Title or library name"
+          />
+        </label>
+        <label>
           Show downloads
           <select value={filter} onChange={(e) => setFilter(e.target.value)}>
             <option value="all">All downloads</option>
             <option value="active">Downloading and organizing</option>
             <option value="review">Needs library attention</option>
+            <option value="paused">Paused or failed</option>
             <option value="imported">Added to library</option>
           </select>
         </label>
@@ -356,218 +396,223 @@ function AdminDownloads() {
         ) : (
           !jobs.length && <p>No downloads yet.</p>
         )}
-        {loaded &&
-          jobs.length > 0 &&
-          filter !== 'all' &&
-          !jobs.some((job) => inCategory(job, filter)) && (
-            <p>No downloads in this category.</p>
-          )}
+        {loaded && jobs.length > 0 && !jobs.some(matches) && (
+          <p>No downloads match your search and category.</p>
+        )}
         <div className="download-queue">
-          {jobs
-            .filter((job) => inCategory(job, filter))
-            .map((job) => (
-              <article className="panel download-job" key={job.id}>
-                <h3>{job.name}</h3>
+          {jobs.filter(matches).map((job) => (
+            <article className="panel download-job" key={job.id}>
+              <h3>{job.name}</h3>
+              <p className="muted">
+                {job.sourceHost} ·{' '}
+                {job.state === 'running' && job.totalBytes === job.receivedBytes
+                  ? 'verifying'
+                  : job.state}{' '}
+                · priority {job.priority}
+              </p>
+              <progress
+                aria-label={`${job.name} download progress`}
+                max={job.totalBytes || job.budgetBytes}
+                value={job.receivedBytes}
+              />
+              <p>
+                {bytes(job.receivedBytes)} /{' '}
+                {job.totalBytes === null
+                  ? `${bytes(job.budgetBytes)} budget (size unknown)`
+                  : bytes(job.totalBytes)}
+              </p>
+              {job.error && (
+                <p className="muted" role="status">
+                  {job.error.replaceAll('-', ' ')}
+                </p>
+              )}
+              {job.contentHash && (
+                <details>
+                  <summary>Staged SHA-256</summary>
+                  <code className="download-hash">{job.contentHash}</code>
+                </details>
+              )}
+              {!job.import && (
                 <p className="muted">
-                  {job.sourceHost} ·{' '}
-                  {job.state === 'running' &&
-                  job.totalBytes === job.receivedBytes
-                    ? 'verifying'
-                    : job.state}{' '}
-                  · priority {job.priority}
+                  Destination: staging ·{' '}
+                  {job.state === 'completed'
+                    ? 'Ready to match and add to a library'
+                    : 'Choose a library after downloading'}
                 </p>
-                <progress
-                  aria-label={`${job.name} download progress`}
-                  max={job.totalBytes || job.budgetBytes}
-                  value={job.receivedBytes}
-                />
-                <p>
-                  {bytes(job.receivedBytes)} /{' '}
-                  {job.totalBytes === null
-                    ? `${bytes(job.budgetBytes)} budget (size unknown)`
-                    : bytes(job.totalBytes)}
-                </p>
-                {job.error && (
-                  <p className="muted" role="status">
-                    {job.error.replaceAll('-', ' ')}
+              )}
+              {job.import && (
+                <div className="import-status">
+                  <p>
+                    Destination:{' '}
+                    {libraries.find(
+                      (library) => library.id === job.import?.libraryId,
+                    )?.name ?? 'Library unavailable'}{' '}
+                    · {job.import.title}
+                    {job.import.year ? ` (${job.import.year})` : ''}
                   </p>
-                )}
-                {job.contentHash && (
-                  <details>
-                    <summary>Staged SHA-256</summary>
-                    <code className="download-hash">{job.contentHash}</code>
-                  </details>
-                )}
-                {job.import && (
-                  <div className="import-status">
-                    <p>
-                      Library import: {job.import.state} ·{' '}
-                      {job.import.classification === 'tv'
-                        ? 'TV Shows'
-                        : 'Movies'}
-                    </p>
-                    {job.import.error && (
-                      <p role="status">
-                        {job.import.error.replaceAll('-', ' ')}
-                      </p>
-                    )}
-                    {job.import.mediaItemId != null && (
-                      <a
-                        className="button"
-                        href={'#media/' + job.import.mediaItemId}
-                      >
-                        Open imported title
-                      </a>
-                    )}
-                  </div>
-                )}
-                {job.state === 'completed' &&
-                  (!job.import ||
-                    ['inbox', 'discarded'].includes(job.import.state)) && (
-                    <ImportForm job={job} busy={busy} mutate={mutate} />
+                  <p>
+                    Library import: {job.import.state} ·{' '}
+                    {job.import.classification === 'tv' ? 'TV Shows' : 'Movies'}
+                  </p>
+                  {job.import.error && (
+                    <p role="status">{job.import.error.replaceAll('-', ' ')}</p>
                   )}
-                <div className="download-actions">
-                  {job.import &&
-                    ['waiting', 'queued', 'copying', 'scanning'].includes(
-                      job.import.state,
-                    ) && (
-                      <button
-                        disabled={busy}
-                        className="secondary"
-                        onClick={() =>
-                          void mutate(() =>
-                            api(`/downloads/${job.id}/import`, 'PUT', {
-                              revision: job.revision,
-                              action: 'hold',
-                            }),
-                          )
-                        }
-                      >
-                        Hold library import for {job.name}
-                      </button>
-                    )}
-                  {job.import?.state === 'held' &&
-                    job.state === 'completed' && (
-                      <>
-                        <button
-                          disabled={busy}
-                          onClick={() =>
-                            void mutate(() =>
-                              api(`/downloads/${job.id}/import`, 'PUT', {
-                                revision: job.revision,
-                                action: 'retry',
-                              }),
-                            )
-                          }
-                        >
-                          Retry library import for {job.name}
-                        </button>
-                        <button
-                          disabled={busy}
-                          className="secondary"
-                          onClick={() =>
-                            void mutate(() =>
-                              api(`/downloads/${job.id}/import`, 'PUT', {
-                                revision: job.revision,
-                                action: 'discard',
-                              }),
-                            )
-                          }
-                        >
-                          Discard import files, keep staged {job.name}
-                        </button>
-                      </>
-                    )}
-
-                  {['queued', 'running'].includes(job.state) && (
-                    <button
-                      className="secondary"
-                      disabled={busy || job.desired !== 'run'}
-                      onClick={() => action(job, 'pause')}
-                    >
-                      Pause {job.name}
-                    </button>
-                  )}
-                  {['paused', 'failed'].includes(job.state) && (
-                    <>
-                      {job.canResume && (
-                        <button
-                          disabled={busy}
-                          onClick={() => action(job, 'resume')}
-                        >
-                          Resume {job.name}
-                        </button>
-                      )}
-                      <button
-                        className="secondary"
-                        disabled={busy}
-                        onClick={() => action(job, 'restart')}
-                      >
-                        Discard partial &amp; restart {job.name}
-                      </button>
-                    </>
-                  )}
-                  {['queued', 'paused', 'failed'].includes(job.state) && (
-                    <label>
-                      Priority for {job.name}
-                      <input
-                        type="number"
-                        min={-10}
-                        max={10}
-                        defaultValue={job.priority}
-                        key={`${job.id}-${job.priority}`}
-                        onBlur={(e) => {
-                          const n = e.currentTarget.valueAsNumber;
-                          if (
-                            Number.isInteger(n) &&
-                            n !== job.priority &&
-                            n >= -10 &&
-                            n <= 10
-                          )
-                            action(job, 'priority', n);
-                        }}
-                        disabled={busy}
-                      />
-                    </label>
-                  )}
-                  {!['completed', 'cancelled', 'finalizing'].includes(
-                    job.state,
-                  ) && (
-                    <button
-                      className="secondary"
-                      disabled={busy || job.desired === 'cancel'}
-                      onClick={() => action(job, 'cancel')}
-                    >
-                      Cancel &amp; discard {job.name}
-                    </button>
-                  )}
-                  {job.state === 'completed' && (
+                  {job.import.mediaItemId != null && (
                     <a
                       className="button"
-                      href={`/api/downloads/${job.id}/file`}
-                      download
+                      href={'#media/' + job.import.mediaItemId}
                     >
-                      Save {job.name}
+                      Open imported title
                     </a>
                   )}
-                  {['completed', 'cancelled', 'paused', 'failed'].includes(
-                    job.state,
+                </div>
+              )}
+              {job.state === 'completed' &&
+                (!job.import ||
+                  ['inbox', 'discarded'].includes(job.import.state)) && (
+                  <ImportForm job={job} busy={busy} mutate={mutate} />
+                )}
+              <div className="download-actions">
+                {job.import &&
+                  ['waiting', 'queued', 'copying', 'scanning'].includes(
+                    job.import.state,
                   ) && (
                     <button
-                      className="secondary"
                       disabled={busy}
+                      className="secondary"
                       onClick={() =>
                         void mutate(() =>
-                          api(`/downloads/${job.id}/${job.revision}`, 'DELETE'),
+                          api(`/downloads/${job.id}/import`, 'PUT', {
+                            revision: job.revision,
+                            action: 'hold',
+                          }),
                         )
                       }
                     >
-                      Remove {job.name} &amp; staged file
+                      Hold library import for {job.name}
                     </button>
                   )}
-                </div>
-              </article>
-            ))}
+                {job.import?.state === 'held' && job.state === 'completed' && (
+                  <>
+                    <button
+                      disabled={busy}
+                      onClick={() =>
+                        void mutate(() =>
+                          api(`/downloads/${job.id}/import`, 'PUT', {
+                            revision: job.revision,
+                            action: 'retry',
+                          }),
+                        )
+                      }
+                    >
+                      Retry library import for {job.name}
+                    </button>
+                    <button
+                      disabled={busy}
+                      className="secondary"
+                      onClick={() =>
+                        void mutate(() =>
+                          api(`/downloads/${job.id}/import`, 'PUT', {
+                            revision: job.revision,
+                            action: 'discard',
+                          }),
+                        )
+                      }
+                    >
+                      Discard import files, keep staged {job.name}
+                    </button>
+                  </>
+                )}
+
+                {['queued', 'running'].includes(job.state) && (
+                  <button
+                    className="secondary"
+                    disabled={busy || job.desired !== 'run'}
+                    onClick={() => action(job, 'pause')}
+                  >
+                    Pause {job.name}
+                  </button>
+                )}
+                {['paused', 'failed'].includes(job.state) && (
+                  <>
+                    {job.canResume && (
+                      <button
+                        disabled={busy}
+                        onClick={() => action(job, 'resume')}
+                      >
+                        Resume {job.name}
+                      </button>
+                    )}
+                    <button
+                      className="secondary"
+                      disabled={busy}
+                      onClick={() => action(job, 'restart')}
+                    >
+                      Discard partial &amp; restart {job.name}
+                    </button>
+                  </>
+                )}
+                {['queued', 'paused', 'failed'].includes(job.state) && (
+                  <label>
+                    Priority for {job.name}
+                    <input
+                      type="number"
+                      min={-10}
+                      max={10}
+                      defaultValue={job.priority}
+                      key={`${job.id}-${job.priority}`}
+                      onBlur={(e) => {
+                        const n = e.currentTarget.valueAsNumber;
+                        if (
+                          Number.isInteger(n) &&
+                          n !== job.priority &&
+                          n >= -10 &&
+                          n <= 10
+                        )
+                          action(job, 'priority', n);
+                      }}
+                      disabled={busy}
+                    />
+                  </label>
+                )}
+                {!['completed', 'cancelled', 'finalizing'].includes(
+                  job.state,
+                ) && (
+                  <button
+                    className="secondary"
+                    disabled={busy || job.desired === 'cancel'}
+                    onClick={() => action(job, 'cancel')}
+                  >
+                    Cancel &amp; discard {job.name}
+                  </button>
+                )}
+                {job.state === 'completed' && (
+                  <a
+                    className="button"
+                    href={`/api/downloads/${job.id}/file`}
+                    download
+                  >
+                    Save {job.name}
+                  </a>
+                )}
+                {['completed', 'cancelled', 'paused', 'failed'].includes(
+                  job.state,
+                ) && (
+                  <button
+                    className="secondary"
+                    disabled={busy}
+                    onClick={() =>
+                      void mutate(() =>
+                        api(`/downloads/${job.id}/${job.revision}`, 'DELETE'),
+                      )
+                    }
+                  >
+                    Remove {job.name} &amp; staged file
+                  </button>
+                )}
+              </div>
+            </article>
+          ))}
         </div>
       </section>
     </>
