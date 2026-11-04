@@ -277,6 +277,7 @@ export default function Player({
             preload="metadata"
             aria-label={item.title}
             src={source.endsWith('.m3u8') ? undefined : source}
+            onContextMenu={(event) => event.preventDefault()}
             onLoadedMetadata={(e) => {
               const v = e.currentTarget;
               setDuration(Number.isFinite(v.duration) ? v.duration : 0);

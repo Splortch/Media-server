@@ -248,6 +248,33 @@ test('setup, accounts, collections, diagnostics, stream ranges and persist resum
     .poll(() => video.evaluate((v: HTMLVideoElement) => v.readyState))
     .toBeGreaterThanOrEqual(1);
   await expect(video).not.toHaveAttribute('controls');
+  await page.getByRole('button', { name: 'Fullscreen', exact: true }).click();
+  await expect
+    .poll(() =>
+      page.locator('.player-surface').evaluate((surface) => {
+        const stage = surface.querySelector('.player-video-stage')!;
+        const controls = surface.querySelector('.player-controls')!;
+        const video = stage.querySelector('video')!;
+        const height = (element: Element) =>
+          element.getBoundingClientRect().height;
+        return (
+          surface.matches(':fullscreen') &&
+          Math.abs(height(surface) - height(stage) - height(controls)) <= 1 &&
+          Math.abs(height(stage) - height(video)) <= 1
+        );
+      }),
+    )
+    .toBe(true);
+  await page
+    .getByRole('button', { name: 'Exit fullscreen', exact: true })
+    .click();
+  await expect
+    .poll(() =>
+      page
+        .locator('.player-surface')
+        .evaluate((surface) => surface.matches(':fullscreen')),
+    )
+    .toBe(false);
   await video.evaluate((v: HTMLVideoElement) => v.pause());
   await page.getByText('Private bookmarks and notes', { exact: true }).click();
   const bookmarkJump = page.getByRole('button', {
