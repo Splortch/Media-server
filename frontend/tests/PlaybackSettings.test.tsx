@@ -170,3 +170,19 @@ it('settings shortcuts move keyboard focus and respect reduced motion without ch
   expect(scroll).toHaveBeenCalledWith({ behavior: 'auto', block: 'start' });
   expect(location.hash).toBe('#settings');
 });
+
+it('groups settings and never renders administration controls for members', () => {
+  vi.mocked(api).mockResolvedValue([]);
+  render(<Settings admin={false} />);
+  expect(
+    screen.getByRole('navigation', { name: 'Settings categories' }),
+  ).toHaveTextContent('Personal');
+  expect(
+    screen.queryByRole('heading', { name: 'Administration' }),
+  ).not.toBeInTheDocument();
+  expect(
+    screen.queryByRole('button', { name: 'Downloads' }),
+  ).not.toBeInTheDocument();
+  expect(api).not.toHaveBeenCalledWith('/libraries');
+  expect(api).not.toHaveBeenCalledWith('/downloads/settings');
+});

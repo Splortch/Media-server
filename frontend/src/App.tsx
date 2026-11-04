@@ -293,7 +293,7 @@ export default function App() {
         } else mainRef.current?.focus();
         focusedRoute.current = key;
       }
-      document.title = `${route === 'requests' ? 'Movie requests' : route === 'experimental' ? 'Experimental' : route === 'settings' ? 'Settings' : route === 'history' ? 'Watch history' : item?.title || (route === 'library' ? 'Library' : 'Home')} · Media Server`;
+      document.title = `${route === 'requests' ? 'Movie requests' : route === 'experimental' ? 'Experimental' : route === 'settings' || route.startsWith('settings/') ? 'Settings' : route === 'history' ? 'Watch history' : item?.title || (route === 'library' ? 'Library' : 'Home')} · Media Server`;
     } else if (phase === 'setup' || phase === 'login') {
       if (focusedRoute.current !== key) {
         authHeading.current?.focus();
@@ -545,8 +545,16 @@ export default function App() {
           </a>
           {user?.role !== 'Guest' && (
             <a
-              aria-current={route === 'settings' ? 'page' : undefined}
-              className={route === 'settings' ? 'active' : ''}
+              aria-current={
+                route === 'settings' || route.startsWith('settings/')
+                  ? 'page'
+                  : undefined
+              }
+              className={
+                route === 'settings' || route.startsWith('settings/')
+                  ? 'active'
+                  : ''
+              }
               href="#settings"
             >
               <Icon name="settings" /> <span>Settings</span>
@@ -623,7 +631,7 @@ export default function App() {
                   ? 'Movie requests'
                   : route === 'experimental'
                     ? 'Experimental'
-                    : route === 'settings'
+                    : route === 'settings' || route.startsWith('settings/')
                       ? 'Server settings'
                       : route === 'history'
                         ? 'Watch history'
@@ -650,11 +658,11 @@ export default function App() {
           )}
           {route === 'downloads' ? (
             user?.role === 'Admin' && featureVisible(features, 'downloads') ? (
-              <Downloads />
+              <Downloads admin={user?.role === 'Admin'} />
             ) : (
               <p>
                 Downloads are disabled or hidden. Administrators can enable them
-                in Settings → Download center.
+                in Settings → Administration → Download center.
               </p>
             )
           ) : route === 'requests' ? (
@@ -672,11 +680,17 @@ export default function App() {
             )
           ) : route === 'experimental' ? (
             <Experimental admin={user?.role === 'Admin'} />
-          ) : route === 'settings' && user?.role !== 'Guest' ? (
+          ) : (route === 'settings' || route.startsWith('settings/')) &&
+            user?.role !== 'Guest' ? (
             <Settings
               admin={user?.role === 'Admin'}
               features={features}
               onFeaturesChanged={changeFeatures}
+              initialSection={
+                route.startsWith('settings/')
+                  ? route.slice('settings/'.length)
+                  : undefined
+              }
             />
           ) : route === 'history' ? (
             user?.role === 'Guest' ? (

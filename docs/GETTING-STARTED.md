@@ -267,3 +267,7 @@ Dark is the default. Use **Theme** on setup/connection screens, **Settings → A
 ### Optional authorized downloads
 
 The download center is disabled by default. Administrators can approve public source hosts in **Settings → Download center**, enable the module, and open **Downloads**. See the [step-by-step guide](architecture/DOWNLOADS.md). Authorized URL downloads can stay staged or follow an explicit approved library match. See [family requests, approvals and safe Movies/TV imports](architecture/DOWNLOAD-IMPORTS.md) for the full delivery steps.
+
+### Find personal and administrator settings
+
+Settings groups controls under **Personal**, **Library experience**, and **Administration**. Appearance, account security and personal visibility preferences are separate from server-wide feature policies. Only administrators see Administration, which contains directories, the download center, people, monitoring, remote access and server features. Download settings and library setup also have direct links from the download center.

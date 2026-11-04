@@ -15,6 +15,14 @@ This extends the optional [download manager](DOWNLOADS.md). Downloads and movie 
 
 The destination is deliberately the library selected by the request, so approval cannot silently redirect a family request into another library. Correct an incorrectly selected library by withdrawing/recreating the request. Restricted users cannot receive unrated or above-limit approvals. Account disabling, removed grants, changed ratings, withdrawn/declined requests, changed review revisions and changed/deleted target libraries stop further authorized processing. Delivery rechecks permissions inside the final database transaction.
 
+## Start a download directly into a library
+
+Administrators can open **Downloads**, enter a name, and choose **After downloading → Add to a media library automatically**. Confirm the destination, title, actual container and content rating before starting. The server validates the plan and storage reservation before creating the job; an invalid plan cannot start a transfer. Leaving **Keep in download staging** selected preserves the previous manual workflow.
+
+The queue can show **Downloading and organizing**, **Needs library attention**, or **Added to library**. Use **Open imported title** after successful ingestion. If no library exists, **Manage libraries** opens the administrator library setup directly.
+
+The download center and all transfer/import controls remain administrator-only. Regular household members use the request board and their permitted playback/library interfaces.
+
 ## Import an administrator's existing staged download
 
 Open **Downloads**, expand **Match and organize NAME**, select a library, and confirm the classification, title, container and content rating. TV uses explicit episode matching as above. The original download remains staged until you explicitly remove it; importing does not delete its source.

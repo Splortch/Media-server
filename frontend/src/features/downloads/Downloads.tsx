@@ -1,4 +1,8 @@
-import ImportForm from './ImportForm';
+import ImportForm, {
+  ImportFields,
+  importPlan,
+  useLibraries,
+} from './ImportForm';
 import {
   useCallback,
   useEffect,
@@ -16,6 +20,22 @@ const bytes = (value: number) =>
   value >= mib * 1024
     ? `${(value / mib / 1024).toFixed(1)} GiB`
     : `${(value / mib).toFixed(1)} MiB`;
+function inCategory(job: Job, filter: string) {
+  if (filter === 'imported') return job.import?.state === 'imported';
+  if (filter === 'review')
+    return (
+      job.state === 'completed' &&
+      (!job.import || ['inbox', 'held', 'discarded'].includes(job.import.state))
+    );
+  if (filter === 'active')
+    return (
+      ['queued', 'running', 'finalizing'].includes(job.state) ||
+      ['waiting', 'queued', 'copying', 'scanning'].includes(
+        job.import?.state ?? '',
+      )
+    );
+  return true;
+}
 export function DownloadSettings({
   onChange,
 }: {
@@ -124,7 +144,18 @@ export function DownloadSettings({
     </section>
   );
 }
-export default function Downloads() {
+export default function Downloads({ admin = false }: { admin?: boolean }) {
+  return admin ? (
+    <AdminDownloads />
+  ) : (
+    <p>You need an administrator account to open the download center.</p>
+  );
+}
+function AdminDownloads() {
+  const { libraries, error: libraryError } = useLibraries();
+  const [delivery, setDelivery] = useState('staging');
+  const [downloadName, setDownloadName] = useState('');
+  const [filter, setFilter] = useState('all');
   const [jobs, setJobs] = useState<Job[]>([]);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
@@ -191,8 +222,11 @@ export default function Downloads() {
         budgetBytes: Math.floor(Number(input.get('budget')) * mib),
         sha256: input.get('checksum') || null,
         priority: Number(input.get('priority')),
+        ...(delivery === 'library' ? { importPlan: importPlan(input) } : {}),
       });
       form.reset();
+      setDelivery('staging');
+      setDownloadName('');
     });
   }
   return (
@@ -204,7 +238,7 @@ export default function Downloads() {
         staged for administrator retrieval. Confirm a library match to organize
         and scan them automatically.
       </p>
-      <a href="#settings" className="back-link">
+      <a href="#settings/downloads" className="back-link">
         Download settings
       </a>
       {error && (
@@ -216,8 +250,42 @@ export default function Downloads() {
         <h2>Add an authorized URL</h2>
         <form className="download-form" onSubmit={create} aria-busy={busy}>
           <label>
+            After downloading
+            <select
+              value={delivery}
+              onChange={(e) => setDelivery(e.target.value)}
+            >
+              <option value="staging">Keep in download staging</option>
+              <option value="library" disabled={!libraries.length}>
+                Add to a media library automatically
+              </option>
+            </select>
+          </label>
+          {!libraries.length && (
+            <p className="muted">
+              {libraryError ||
+                'Add a library to enable automatic organization.'}{' '}
+              <a href="#settings/libraries">Manage libraries</a>
+            </p>
+          )}
+          {delivery === 'library' && (
+            <fieldset>
+              <legend>Library destination and movie information</legend>
+              <ImportFields
+                libraries={libraries}
+                initial={{ title: downloadName }}
+              />
+            </fieldset>
+          )}
+          <label>
             Download name
-            <input name="name" required maxLength={80} />
+            <input
+              name="name"
+              required
+              maxLength={80}
+              value={downloadName}
+              onChange={(e) => setDownloadName(e.target.value)}
+            />
           </label>
           <label>
             HTTPS source URL
@@ -273,209 +341,232 @@ export default function Downloads() {
       </section>
       <section aria-label="Download queue">
         <h2>Queue</h2>
+        <label>
+          Show downloads
+          <select value={filter} onChange={(e) => setFilter(e.target.value)}>
+            <option value="all">All downloads</option>
+            <option value="active">Downloading and organizing</option>
+            <option value="review">Needs library attention</option>
+            <option value="imported">Added to library</option>
+          </select>
+        </label>
         {!loaded ? (
           <p role="status">Loading downloads…</p>
         ) : (
           !jobs.length && <p>No downloads yet.</p>
         )}
+        {loaded &&
+          jobs.length > 0 &&
+          filter !== 'all' &&
+          !jobs.some((job) => inCategory(job, filter)) && (
+            <p>No downloads in this category.</p>
+          )}
         <div className="download-queue">
-          {jobs.map((job) => (
-            <article className="panel download-job" key={job.id}>
-              <h3>{job.name}</h3>
-              <p className="muted">
-                {job.sourceHost} ·{' '}
-                {job.state === 'running' && job.totalBytes === job.receivedBytes
-                  ? 'verifying'
-                  : job.state}{' '}
-                · priority {job.priority}
-              </p>
-              <progress
-                aria-label={`${job.name} download progress`}
-                max={job.totalBytes || job.budgetBytes}
-                value={job.receivedBytes}
-              />
-              <p>
-                {bytes(job.receivedBytes)} /{' '}
-                {job.totalBytes === null
-                  ? `${bytes(job.budgetBytes)} budget (size unknown)`
-                  : bytes(job.totalBytes)}
-              </p>
-              {job.error && (
-                <p className="muted" role="status">
-                  {job.error.replaceAll('-', ' ')}
+          {jobs
+            .filter((job) => inCategory(job, filter))
+            .map((job) => (
+              <article className="panel download-job" key={job.id}>
+                <h3>{job.name}</h3>
+                <p className="muted">
+                  {job.sourceHost} ·{' '}
+                  {job.state === 'running' &&
+                  job.totalBytes === job.receivedBytes
+                    ? 'verifying'
+                    : job.state}{' '}
+                  · priority {job.priority}
                 </p>
-              )}
-              {job.contentHash && (
-                <details>
-                  <summary>Staged SHA-256</summary>
-                  <code className="download-hash">{job.contentHash}</code>
-                </details>
-              )}
-              {job.import && (
-                <div className="import-status">
-                  <p>
-                    Library import: {job.import.state} ·{' '}
-                    {job.import.classification === 'tv' ? 'TV Shows' : 'Movies'}
+                <progress
+                  aria-label={`${job.name} download progress`}
+                  max={job.totalBytes || job.budgetBytes}
+                  value={job.receivedBytes}
+                />
+                <p>
+                  {bytes(job.receivedBytes)} /{' '}
+                  {job.totalBytes === null
+                    ? `${bytes(job.budgetBytes)} budget (size unknown)`
+                    : bytes(job.totalBytes)}
+                </p>
+                {job.error && (
+                  <p className="muted" role="status">
+                    {job.error.replaceAll('-', ' ')}
                   </p>
-                  {job.import.error && (
-                    <p role="status">{job.import.error.replaceAll('-', ' ')}</p>
-                  )}
-                  {job.import.mediaItemId != null && (
-                    <a
-                      className="button"
-                      href={'#media/' + job.import.mediaItemId}
-                    >
-                      Open imported title
-                    </a>
-                  )}
-                </div>
-              )}
-              {job.state === 'completed' &&
-                (!job.import ||
-                  ['inbox', 'discarded'].includes(job.import.state)) && (
-                  <ImportForm job={job} busy={busy} mutate={mutate} />
                 )}
-              <div className="download-actions">
-                {job.import &&
-                  ['waiting', 'queued', 'copying', 'scanning'].includes(
-                    job.import.state,
-                  ) && (
-                    <button
-                      disabled={busy}
-                      className="secondary"
-                      onClick={() =>
-                        void mutate(() =>
-                          api(`/downloads/${job.id}/import`, 'PUT', {
-                            revision: job.revision,
-                            action: 'hold',
-                          }),
-                        )
-                      }
-                    >
-                      Hold library import for {job.name}
-                    </button>
+                {job.contentHash && (
+                  <details>
+                    <summary>Staged SHA-256</summary>
+                    <code className="download-hash">{job.contentHash}</code>
+                  </details>
+                )}
+                {job.import && (
+                  <div className="import-status">
+                    <p>
+                      Library import: {job.import.state} ·{' '}
+                      {job.import.classification === 'tv'
+                        ? 'TV Shows'
+                        : 'Movies'}
+                    </p>
+                    {job.import.error && (
+                      <p role="status">
+                        {job.import.error.replaceAll('-', ' ')}
+                      </p>
+                    )}
+                    {job.import.mediaItemId != null && (
+                      <a
+                        className="button"
+                        href={'#media/' + job.import.mediaItemId}
+                      >
+                        Open imported title
+                      </a>
+                    )}
+                  </div>
+                )}
+                {job.state === 'completed' &&
+                  (!job.import ||
+                    ['inbox', 'discarded'].includes(job.import.state)) && (
+                    <ImportForm job={job} busy={busy} mutate={mutate} />
                   )}
-                {job.import?.state === 'held' && job.state === 'completed' && (
-                  <>
-                    <button
-                      disabled={busy}
-                      onClick={() =>
-                        void mutate(() =>
-                          api(`/downloads/${job.id}/import`, 'PUT', {
-                            revision: job.revision,
-                            action: 'retry',
-                          }),
-                        )
-                      }
-                    >
-                      Retry library import for {job.name}
-                    </button>
-                    <button
-                      disabled={busy}
-                      className="secondary"
-                      onClick={() =>
-                        void mutate(() =>
-                          api(`/downloads/${job.id}/import`, 'PUT', {
-                            revision: job.revision,
-                            action: 'discard',
-                          }),
-                        )
-                      }
-                    >
-                      Discard import files, keep staged {job.name}
-                    </button>
-                  </>
-                )}
-
-                {['queued', 'running'].includes(job.state) && (
-                  <button
-                    className="secondary"
-                    disabled={busy || job.desired !== 'run'}
-                    onClick={() => action(job, 'pause')}
-                  >
-                    Pause {job.name}
-                  </button>
-                )}
-                {['paused', 'failed'].includes(job.state) && (
-                  <>
-                    {job.canResume && (
+                <div className="download-actions">
+                  {job.import &&
+                    ['waiting', 'queued', 'copying', 'scanning'].includes(
+                      job.import.state,
+                    ) && (
                       <button
                         disabled={busy}
-                        onClick={() => action(job, 'resume')}
+                        className="secondary"
+                        onClick={() =>
+                          void mutate(() =>
+                            api(`/downloads/${job.id}/import`, 'PUT', {
+                              revision: job.revision,
+                              action: 'hold',
+                            }),
+                          )
+                        }
                       >
-                        Resume {job.name}
+                        Hold library import for {job.name}
                       </button>
                     )}
+                  {job.import?.state === 'held' &&
+                    job.state === 'completed' && (
+                      <>
+                        <button
+                          disabled={busy}
+                          onClick={() =>
+                            void mutate(() =>
+                              api(`/downloads/${job.id}/import`, 'PUT', {
+                                revision: job.revision,
+                                action: 'retry',
+                              }),
+                            )
+                          }
+                        >
+                          Retry library import for {job.name}
+                        </button>
+                        <button
+                          disabled={busy}
+                          className="secondary"
+                          onClick={() =>
+                            void mutate(() =>
+                              api(`/downloads/${job.id}/import`, 'PUT', {
+                                revision: job.revision,
+                                action: 'discard',
+                              }),
+                            )
+                          }
+                        >
+                          Discard import files, keep staged {job.name}
+                        </button>
+                      </>
+                    )}
+
+                  {['queued', 'running'].includes(job.state) && (
+                    <button
+                      className="secondary"
+                      disabled={busy || job.desired !== 'run'}
+                      onClick={() => action(job, 'pause')}
+                    >
+                      Pause {job.name}
+                    </button>
+                  )}
+                  {['paused', 'failed'].includes(job.state) && (
+                    <>
+                      {job.canResume && (
+                        <button
+                          disabled={busy}
+                          onClick={() => action(job, 'resume')}
+                        >
+                          Resume {job.name}
+                        </button>
+                      )}
+                      <button
+                        className="secondary"
+                        disabled={busy}
+                        onClick={() => action(job, 'restart')}
+                      >
+                        Discard partial &amp; restart {job.name}
+                      </button>
+                    </>
+                  )}
+                  {['queued', 'paused', 'failed'].includes(job.state) && (
+                    <label>
+                      Priority for {job.name}
+                      <input
+                        type="number"
+                        min={-10}
+                        max={10}
+                        defaultValue={job.priority}
+                        key={`${job.id}-${job.priority}`}
+                        onBlur={(e) => {
+                          const n = e.currentTarget.valueAsNumber;
+                          if (
+                            Number.isInteger(n) &&
+                            n !== job.priority &&
+                            n >= -10 &&
+                            n <= 10
+                          )
+                            action(job, 'priority', n);
+                        }}
+                        disabled={busy}
+                      />
+                    </label>
+                  )}
+                  {!['completed', 'cancelled', 'finalizing'].includes(
+                    job.state,
+                  ) && (
+                    <button
+                      className="secondary"
+                      disabled={busy || job.desired === 'cancel'}
+                      onClick={() => action(job, 'cancel')}
+                    >
+                      Cancel &amp; discard {job.name}
+                    </button>
+                  )}
+                  {job.state === 'completed' && (
+                    <a
+                      className="button"
+                      href={`/api/downloads/${job.id}/file`}
+                      download
+                    >
+                      Save {job.name}
+                    </a>
+                  )}
+                  {['completed', 'cancelled', 'paused', 'failed'].includes(
+                    job.state,
+                  ) && (
                     <button
                       className="secondary"
                       disabled={busy}
-                      onClick={() => action(job, 'restart')}
-                    >
-                      Discard partial &amp; restart {job.name}
-                    </button>
-                  </>
-                )}
-                {['queued', 'paused', 'failed'].includes(job.state) && (
-                  <label>
-                    Priority for {job.name}
-                    <input
-                      type="number"
-                      min={-10}
-                      max={10}
-                      defaultValue={job.priority}
-                      key={`${job.id}-${job.priority}`}
-                      onBlur={(e) => {
-                        const n = e.currentTarget.valueAsNumber;
-                        if (
-                          Number.isInteger(n) &&
-                          n !== job.priority &&
-                          n >= -10 &&
-                          n <= 10
+                      onClick={() =>
+                        void mutate(() =>
+                          api(`/downloads/${job.id}/${job.revision}`, 'DELETE'),
                         )
-                          action(job, 'priority', n);
-                      }}
-                      disabled={busy}
-                    />
-                  </label>
-                )}
-                {!['completed', 'cancelled', 'finalizing'].includes(
-                  job.state,
-                ) && (
-                  <button
-                    className="secondary"
-                    disabled={busy || job.desired === 'cancel'}
-                    onClick={() => action(job, 'cancel')}
-                  >
-                    Cancel &amp; discard {job.name}
-                  </button>
-                )}
-                {job.state === 'completed' && (
-                  <a
-                    className="button"
-                    href={`/api/downloads/${job.id}/file`}
-                    download
-                  >
-                    Save {job.name}
-                  </a>
-                )}
-                {['completed', 'cancelled', 'paused', 'failed'].includes(
-                  job.state,
-                ) && (
-                  <button
-                    className="secondary"
-                    disabled={busy}
-                    onClick={() =>
-                      void mutate(() =>
-                        api(`/downloads/${job.id}/${job.revision}`, 'DELETE'),
-                      )
-                    }
-                  >
-                    Remove {job.name} &amp; staged file
-                  </button>
-                )}
-              </div>
-            </article>
-          ))}
+                      }
+                    >
+                      Remove {job.name} &amp; staged file
+                    </button>
+                  )}
+                </div>
+              </article>
+            ))}
         </div>
       </section>
     </>

@@ -10,9 +10,11 @@ export default function Customize({
   state,
   admin,
   onChange,
+  serverOnly = false,
 }: {
   state: FeatureState;
   admin: boolean;
+  serverOnly?: boolean;
   onChange: (state: FeatureState) => void;
 }) {
   const mounted = useRef(true);
@@ -41,15 +43,15 @@ export default function Customize({
   return (
     <section
       className="panel"
-      id="settings-customize"
+      id={serverOnly ? 'settings-features' : 'settings-customize'}
       tabIndex={-1}
       aria-busy={busy}
     >
-      <h2>Customize</h2>
+      <h2>{serverOnly ? 'Server features' : 'Customize'}</h2>
       <p className="muted">
-        Choose what appears for your account. Library, search, playback, resume
-        and security controls always stay available. These preferences follow
-        your account in supported clients.
+        {serverOnly
+          ? 'Manage optional modules for everyone on this server. Download permissions and source policies are managed separately under Download center.'
+          : 'Choose what appears for your account. Library, search, playback, resume and security controls always stay available. These preferences follow your account in supported clients.'}
       </p>
       {!state.available ? (
         <>
@@ -78,46 +80,52 @@ export default function Customize({
         </>
       ) : (
         <>
-          {state.features.map((feature) => (
-            <div className="feature-option" key={feature.key}>
-              <label className="check">
-                <input
-                  type="checkbox"
-                  checked={
-                    !(pendingHidden
-                      ? pendingHidden.includes(feature.key)
-                      : feature.hidden)
-                  }
-                  disabled={busy || !feature.enabled}
-                  onChange={(event) => {
-                    const hidden = new Set(
-                      state.features.filter((f) => f.hidden).map((f) => f.key),
-                    );
-                    if (event.target.checked) hidden.delete(feature.key);
-                    else hidden.add(feature.key);
-                    setPendingHidden([...hidden]);
-                    void save('/preferences/features', 'PUT', {
-                      hidden: [...hidden],
-                    });
-                  }}
-                />
-                Show {feature.name}
-              </label>
-              {!feature.enabled && (
-                <p className="muted">
-                  Disabled by the administrator. Your personal preference is
-                  retained.
-                </p>
-              )}
-            </div>
-          ))}
-          <button
-            className="secondary"
-            disabled={busy}
-            onClick={() => void save('/preferences/features', 'DELETE')}
-          >
-            Reset visibility to defaults
-          </button>
+          {!serverOnly && (
+            <>
+              {state.features.map((feature) => (
+                <div className="feature-option" key={feature.key}>
+                  <label className="check">
+                    <input
+                      type="checkbox"
+                      checked={
+                        !(pendingHidden
+                          ? pendingHidden.includes(feature.key)
+                          : feature.hidden)
+                      }
+                      disabled={busy || !feature.enabled}
+                      onChange={(event) => {
+                        const hidden = new Set(
+                          state.features
+                            .filter((f) => f.hidden)
+                            .map((f) => f.key),
+                        );
+                        if (event.target.checked) hidden.delete(feature.key);
+                        else hidden.add(feature.key);
+                        setPendingHidden([...hidden]);
+                        void save('/preferences/features', 'PUT', {
+                          hidden: [...hidden],
+                        });
+                      }}
+                    />
+                    Show {feature.name}
+                  </label>
+                  {!feature.enabled && (
+                    <p className="muted">
+                      Disabled by the administrator. Your personal preference is
+                      retained.
+                    </p>
+                  )}
+                </div>
+              ))}
+              <button
+                className="secondary"
+                disabled={busy}
+                onClick={() => void save('/preferences/features', 'DELETE')}
+              >
+                Reset visibility to defaults
+              </button>
+            </>
+          )}
           {admin && (
             <details className="feature-policy">
               <summary>Server-wide availability</summary>

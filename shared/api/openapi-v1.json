@@ -3104,6 +3104,16 @@
             "type": "integer",
             "format": "int32",
             "default": 0
+          },
+          "importPlan": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/DownloadImportPlan"
+              }
+            ]
           }
         }
       },

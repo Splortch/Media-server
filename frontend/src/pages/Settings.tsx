@@ -20,8 +20,10 @@ export default function Settings({
   admin = true,
   features = unavailableFeatures,
   onFeaturesChanged = () => {},
+  initialSection,
 }: {
   admin?: boolean;
+  initialSection?: string;
   features?: FeatureState;
   onFeaturesChanged?: (state: FeatureState) => void;
 }) {
@@ -137,6 +139,22 @@ export default function Settings({
       block: 'start',
     });
   }
+  useEffect(() => {
+    const allowed = [
+      'libraries',
+      'downloads',
+      'people',
+      'activity',
+      'remote',
+      'appearance',
+      'account',
+      'customize',
+      'collections',
+      'features',
+    ];
+    if (initialSection && allowed.includes(initialSection))
+      jump('settings-' + initialSection);
+  }, [initialSection]);
   const sections: { id: string; label: string; icon: IconName }[] = [
     ...(admin
       ? [
@@ -146,6 +164,11 @@ export default function Settings({
             icon: 'library' as const,
           },
           { id: 'settings-people', label: 'People', icon: 'users' as const },
+          {
+            id: 'settings-features',
+            label: 'Server features',
+            icon: 'settings' as const,
+          },
           {
             id: 'settings-remote',
             label: 'Remote access',
@@ -188,227 +211,313 @@ export default function Settings({
         Your files stay yours. Scanning reads media and never changes the
         originals.
       </p>
-      <nav className="settings-nav" aria-label="Settings sections">
-        {sections.map((section) => (
-          <button
-            key={section.id}
-            type="button"
-            onClick={() => jump(section.id)}
-          >
-            <Icon name={section.icon} />
-            {section.label}
-          </button>
+      <nav className="settings-categories" aria-label="Settings categories">
+        {[
+          {
+            label: 'Personal',
+            ids: [
+              'settings-appearance',
+              'settings-account',
+              'settings-customize',
+            ],
+          },
+          { label: 'Library experience', ids: ['settings-collections'] },
+          ...(admin
+            ? [
+                {
+                  label: 'Administration',
+                  ids: [
+                    'settings-libraries',
+                    'settings-downloads',
+                    'settings-people',
+                    'settings-remote',
+                    'settings-activity',
+                    'settings-features',
+                  ],
+                },
+              ]
+            : []),
+        ].map((group) => (
+          <div key={group.label}>
+            <h2>{group.label}</h2>
+            <div className="settings-nav">
+              {sections
+                .filter((section) => group.ids.includes(section.id))
+                .map((section) => (
+                  <button
+                    key={section.id}
+                    type="button"
+                    onClick={() => jump(section.id)}
+                  >
+                    <Icon name={section.icon} />
+                    {section.label}
+                  </button>
+                ))}
+            </div>
+          </div>
         ))}
       </nav>
       <section
-        id="settings-appearance"
-        tabIndex={-1}
-        className="panel settings-target"
+        className="settings-category"
+        aria-labelledby="settings-personal-heading"
       >
-        <h2>Appearance</h2>
-        <ThemePicker />
-      </section>
-      {admin && <DownloadSettings onChange={onFeaturesChanged} />}
-      {admin && (
-        <>
-          <section
-            id="settings-libraries"
-            tabIndex={-1}
-            className="panel settings-target"
+        <h2 id="settings-personal-heading">Personal</h2>
+        <section
+          id="settings-appearance"
+          tabIndex={-1}
+          className="panel settings-target"
+        >
+          <h2>Appearance</h2>
+          <ThemePicker />
+        </section>
+        <section
+          id="settings-account"
+          tabIndex={-1}
+          className="panel settings-target"
+        >
+          <h2>Change password</h2>
+          <p className="muted">
+            Changing your password signs out every device, including this one.
+            Sign in again with your new password.
+          </p>
+          <form
+            className="settings-form"
+            onSubmit={(e) => void changePassword(e)}
+            aria-busy={passwordBusy}
           >
-            <h2>Add a media directory</h2>
-            <p className="muted">
-              Use an absolute directory inside the allowed roots configured by
-              the server operator.
+            <label>
+              Current password
+              <input
+                name="currentPassword"
+                type="password"
+                autoComplete="current-password"
+                required
+                maxLength={256}
+              />
+            </label>
+            <label>
+              New password
+              <input
+                name="newPassword"
+                type="password"
+                autoComplete="new-password"
+                required
+                minLength={12}
+                maxLength={256}
+                aria-describedby="password-help"
+              />
+            </label>
+            <p id="password-help" className="muted">
+              Use 12–256 characters.
             </p>
-            <form onSubmit={add} className="settings-form" aria-busy={busy}>
-              <label>
-                Library name
-                <input
-                  required
-                  maxLength={100}
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  placeholder="Movies"
-                />
-              </label>
-              <label>
-                Directory on the server
-                <input
-                  required
-                  value={path}
-                  onChange={(e) => setPath(e.target.value)}
-                  placeholder="/media/movies or D:\Movies"
-                />
-              </label>
-              <button disabled={busy}>
-                <Icon name="plus" /> {busy ? 'Adding…' : 'Add library'}
-              </button>
-            </form>
-            {error && (
+            {passwordError && (
               <p role="alert" className="error">
-                {error}
+                {passwordError}
               </p>
             )}
-          </section>
-          <section className="panel">
-            <h2>Media libraries</h2>
-            {!libraries.length && (
-              <p className="muted">
-                No directories configured. Add your first library above.
-              </p>
-            )}
-            {libraries.map((l) => (
-              <div className="library-row" key={l.id}>
-                <div className="library-info">
-                  <strong>{l.name}</strong>
-                  <p className="muted path">{l.path}</p>
-                </div>
-                <div className="library-actions">
-                  <button
-                    className="secondary"
-                    onClick={() => void scan(l.id)}
-                    aria-label={`Scan library ${l.name}`}
-                  >
-                    <Icon name="scan" /> Scan library
+            <button disabled={passwordBusy}>
+              {passwordBusy
+                ? 'Changing password…'
+                : 'Change password and sign out'}
+            </button>
+          </form>
+        </section>
+        <Sessions />
+        <Customize
+          state={features}
+          admin={false}
+          onChange={onFeaturesChanged}
+        />
+      </section>
+      <section
+        className="settings-category"
+        aria-labelledby="settings-library-heading"
+      >
+        <h2 id="settings-library-heading">Library experience</h2>
+        <p className="muted">
+          Personal collection preferences. Administrators manage directories and
+          downloads below.
+        </p>
+        {featureVisible(features, 'smart-collections') && (
+          <div
+            id="settings-collections"
+            tabIndex={-1}
+            className="settings-target"
+          >
+            <Collections />
+          </div>
+        )}
+      </section>
+      {admin && (
+        <section
+          className="settings-category"
+          aria-labelledby="settings-admin-heading"
+        >
+          <h2 id="settings-admin-heading">Administration</h2>
+          <p className="muted">
+            Server-wide controls available only to administrators.
+          </p>
+          {admin && <DownloadSettings onChange={onFeaturesChanged} />}
+          {admin && (
+            <>
+              <section
+                id="settings-libraries"
+                tabIndex={-1}
+                className="panel settings-target"
+              >
+                <h2>Add a media directory</h2>
+                <p className="muted">
+                  Use an absolute directory inside the allowed roots configured
+                  by the server operator.
+                </p>
+                <form onSubmit={add} className="settings-form" aria-busy={busy}>
+                  <label>
+                    Library name
+                    <input
+                      required
+                      maxLength={100}
+                      value={name}
+                      onChange={(e) => setName(e.target.value)}
+                      placeholder="Movies"
+                    />
+                  </label>
+                  <label>
+                    Directory on the server
+                    <input
+                      required
+                      value={path}
+                      onChange={(e) => setPath(e.target.value)}
+                      placeholder="/media/movies or D:\Movies"
+                    />
+                  </label>
+                  <button disabled={busy}>
+                    <Icon name="plus" /> {busy ? 'Adding…' : 'Add library'}
                   </button>
-                  <button
-                    className="danger-ghost"
-                    disabled={busy}
-                    onClick={() => setRemoving(l.id)}
-                    aria-label={`Remove library ${l.name}`}
-                  >
-                    <Icon name="trash" /> Remove library
-                  </button>
-                </div>
-                {removing === l.id && (
-                  <div role="group" aria-label={`Confirm removal of ${l.name}`}>
-                    <p>
-                      Remove {l.name} from the server? Its catalog, grants,
-                      watch history and progress will be removed. Original media
-                      files stay on disk. Active scans must finish first.
-                    </p>
-                    <div className="action-group">
-                      <button
-                        className="danger"
-                        disabled={busy}
-                        onClick={() => void remove(l.id)}
-                      >
-                        <Icon name="trash" /> Confirm removal
-                      </button>
+                </form>
+                {error && (
+                  <p role="alert" className="error">
+                    {error}
+                  </p>
+                )}
+              </section>
+              <section className="panel">
+                <h2>Media libraries</h2>
+                {!libraries.length && (
+                  <p className="muted">
+                    No directories configured. Add your first library above.
+                  </p>
+                )}
+                {libraries.map((l) => (
+                  <div className="library-row" key={l.id}>
+                    <div className="library-info">
+                      <strong>{l.name}</strong>
+                      <p className="muted path">{l.path}</p>
+                    </div>
+                    <div className="library-actions">
                       <button
                         className="secondary"
-                        disabled={busy}
-                        onClick={() => setRemoving(null)}
+                        onClick={() => void scan(l.id)}
+                        aria-label={`Scan library ${l.name}`}
                       >
-                        Cancel
+                        <Icon name="scan" /> Scan library
+                      </button>
+                      <button
+                        className="danger-ghost"
+                        disabled={busy}
+                        onClick={() => setRemoving(l.id)}
+                        aria-label={`Remove library ${l.name}`}
+                      >
+                        <Icon name="trash" /> Remove library
                       </button>
                     </div>
+                    {removing === l.id && (
+                      <div
+                        role="group"
+                        aria-label={`Confirm removal of ${l.name}`}
+                      >
+                        <p>
+                          Remove {l.name} from the server? Its catalog, grants,
+                          watch history and progress will be removed. Original
+                          media files stay on disk. Active scans must finish
+                          first.
+                        </p>
+                        <div className="action-group">
+                          <button
+                            className="danger"
+                            disabled={busy}
+                            onClick={() => void remove(l.id)}
+                          >
+                            <Icon name="trash" /> Confirm removal
+                          </button>
+                          <button
+                            className="secondary"
+                            disabled={busy}
+                            onClick={() => setRemoving(null)}
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      </div>
+                    )}
                   </div>
-                )}
+                ))}
+                {Object.values(jobs).map((j) => (
+                  <div key={j.id}>
+                    <p role="status">
+                      Scan #{j.id}: {j.state} · {j.discovered} identified ·{' '}
+                      {j.failed} failed
+                    </p>
+                    {!!issues[j.id]?.length && (
+                      <details>
+                        <summary>
+                          Scan #{j.id} problems ({issues[j.id].length}; up to
+                          100 shown)
+                        </summary>
+                        <ul>
+                          {issues[j.id].map((issue) => (
+                            <li key={issue.correlationId}>
+                              {issue.fileName}: {scanReason(issue.code)} ·
+                              Reference {issue.correlationId}
+                            </li>
+                          ))}
+                        </ul>
+                      </details>
+                    )}
+                  </div>
+                ))}
+              </section>
+              <LibraryTools libraries={libraries} />
+              <div
+                id="settings-people"
+                className="settings-target"
+                tabIndex={-1}
+              >
+                <Accounts />
               </div>
-            ))}
-            {Object.values(jobs).map((j) => (
-              <div key={j.id}>
-                <p role="status">
-                  Scan #{j.id}: {j.state} · {j.discovered} identified ·{' '}
-                  {j.failed} failed
-                </p>
-                {!!issues[j.id]?.length && (
-                  <details>
-                    <summary>
-                      Scan #{j.id} problems ({issues[j.id].length}; up to 100
-                      shown)
-                    </summary>
-                    <ul>
-                      {issues[j.id].map((issue) => (
-                        <li key={issue.correlationId}>
-                          {issue.fileName}: {scanReason(issue.code)} · Reference{' '}
-                          {issue.correlationId}
-                        </li>
-                      ))}
-                    </ul>
-                  </details>
-                )}
+              <div
+                id="settings-activity"
+                className="settings-target"
+                tabIndex={-1}
+              >
+                <Monitoring />
               </div>
-            ))}
-          </section>
-          <LibraryTools libraries={libraries} />
-          <div id="settings-people" className="settings-target" tabIndex={-1}>
-            <Accounts />
-          </div>
-          <div id="settings-activity" className="settings-target" tabIndex={-1}>
-            <Monitoring />
-          </div>
-        </>
-      )}
-      <section
-        id="settings-account"
-        tabIndex={-1}
-        className="panel settings-target"
-      >
-        <h2>Change password</h2>
-        <p className="muted">
-          Changing your password signs out every device, including this one.
-          Sign in again with your new password.
-        </p>
-        <form
-          className="settings-form"
-          onSubmit={(e) => void changePassword(e)}
-          aria-busy={passwordBusy}
-        >
-          <label>
-            Current password
-            <input
-              name="currentPassword"
-              type="password"
-              autoComplete="current-password"
-              required
-              maxLength={256}
-            />
-          </label>
-          <label>
-            New password
-            <input
-              name="newPassword"
-              type="password"
-              autoComplete="new-password"
-              required
-              minLength={12}
-              maxLength={256}
-              aria-describedby="password-help"
-            />
-          </label>
-          <p id="password-help" className="muted">
-            Use 12–256 characters.
-          </p>
-          {passwordError && (
-            <p role="alert" className="error">
-              {passwordError}
-            </p>
+            </>
           )}
-          <button disabled={passwordBusy}>
-            {passwordBusy
-              ? 'Changing password…'
-              : 'Change password and sign out'}
-          </button>
-        </form>
-      </section>
-      <Sessions />
-      <Customize state={features} admin={admin} onChange={onFeaturesChanged} />
-      {featureVisible(features, 'smart-collections') && (
-        <div
-          id="settings-collections"
-          tabIndex={-1}
-          className="settings-target"
-        >
-          <Collections />
-        </div>
-      )}
-      {admin && (
-        <div id="settings-remote" tabIndex={-1} className="settings-target">
-          <RemoteAccessStatus />
-        </div>
+          {admin && (
+            <div id="settings-remote" tabIndex={-1} className="settings-target">
+              <RemoteAccessStatus />
+            </div>
+          )}
+          <Customize
+            state={features}
+            admin={admin}
+            serverOnly
+            onChange={onFeaturesChanged}
+          />
+          <a className="button secondary" href="#experimental">
+            Experimental administration settings
+          </a>
+        </section>
       )}
       <section className="panel">
         <h2>Alpha capabilities</h2>

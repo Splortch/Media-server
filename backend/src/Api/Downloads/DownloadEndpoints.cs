@@ -3,6 +3,7 @@ using System.Security.Claims;
 using System.Text.Json;
 using MediaServer.Core;
 using MediaServer.Infrastructure;
+using MediaServer.Media;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.EntityFrameworkCore;
 
@@ -13,7 +14,8 @@ public record DownloadInput(
     string Url,
     long BudgetBytes,
     string? Sha256,
-    int Priority = 0
+    int Priority = 0,
+    DownloadImportPlan? ImportPlan = null
 );
 
 public record DownloadAction(string Action, long ExpectedRevision, int? Priority = null);
@@ -290,6 +292,8 @@ public static class DownloadEndpoints
                         DownloadInput input,
                         MediaDb db,
                         DownloadStorage storage,
+                        IDownloadSpace space,
+                        PathPolicy paths,
                         DownloadControl control,
                         IDataProtectionProvider protection,
                         ClaimsPrincipal user,
@@ -323,6 +327,16 @@ public static class DownloadEndpoints
                                 ExpectedHash = input.Sha256?.ToLowerInvariant(),
                                 Priority = input.Priority,
                             };
+                            if (input.ImportPlan is not null)
+                                await DownloadApprovals.Plan(
+                                    db,
+                                    storage,
+                                    space,
+                                    paths,
+                                    job,
+                                    input.ImportPlan,
+                                    ct
+                                );
                             storage.Admit((await DownloadWorker.Budgets(db, ct)).Append(job));
                             db.Downloads.Add(job);
                             await db.SaveChangesAsync(ct);
