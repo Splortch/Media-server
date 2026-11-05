@@ -42,6 +42,7 @@ it('requires explicit administrator source, library, rating and budget approval'
         url: 'https://source.example/movie?key=synthetic',
         budgetBytes: 50 * 1024 * 1024,
         sha256: null,
+        transferClient: 'builtin',
         priority: 0,
       },
       plan: {

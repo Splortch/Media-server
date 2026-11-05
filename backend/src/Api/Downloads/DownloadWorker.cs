@@ -15,6 +15,7 @@ public sealed class DownloadWorker(
     DownloadControl control,
     DownloadStorage storage,
     IDownloadTransport transport,
+    ExternalDownloads external,
     IDataProtectionProvider protection,
     DownloadImporter importer,
     ILogger<DownloadWorker> logger
@@ -33,6 +34,7 @@ public sealed class DownloadWorker(
             {
                 Id = x.Id,
                 State = x.State,
+                TransferClient = x.TransferClient,
                 MaxBytes = x.MaxBytes,
                 ReceivedBytes = x.ReceivedBytes,
                 TotalBytes = x.TotalBytes,
@@ -189,7 +191,8 @@ public sealed class DownloadWorker(
                 );
             return;
         }
-        using var client = transport.Create(hosts);
+        using var client =
+            job.TransferClient == "aria2" ? external.Create(job, hosts) : transport.Create(hosts);
         await using (var file = storage.OpenWrite(id))
         {
             var offset = file.Length;
@@ -382,7 +385,7 @@ public sealed class DownloadWorker(
         }
     }
 
-    private static async Task<(HttpResponseMessage Response, string Identity)> Response(
+    internal static async Task<(HttpResponseMessage Response, string Identity)> Response(
         HttpClient client,
         Uri uri,
         string[] hosts,

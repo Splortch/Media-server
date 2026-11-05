@@ -2975,6 +2975,8 @@ export interface components {
              */
             priority: number;
             importPlan?: null | components["schemas"]["DownloadImportPlan"];
+            /** @default builtin */
+            transferClient: string;
         };
         DownloadMatchInput: {
             /** Format: int64 */
@@ -3017,6 +3019,7 @@ export interface components {
             revision: number;
             canResume: boolean;
             import: null | components["schemas"]["DownloadImportView"];
+            transferClient: string;
         };
         EncoderCapability: {
             encoder: string;

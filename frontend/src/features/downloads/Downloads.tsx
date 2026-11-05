@@ -158,6 +158,22 @@ function AdminDownloads() {
   const [delivery, setDelivery] = useState('staging');
   const [downloadName, setDownloadName] = useState('');
   const [filter, setFilter] = useState('all');
+  const [transferClient, setTransferClient] = useState('builtin');
+  const [externalAvailable, setExternalAvailable] = useState(false);
+  useEffect(() => {
+    let active = true;
+    void api<{ id: string; configured: boolean }[]>('/downloads/clients')
+      .then((rows) => {
+        if (active && Array.isArray(rows))
+          setExternalAvailable(
+            rows.some((row) => row.id === 'aria2' && row.configured),
+          );
+      })
+      .catch(() => {});
+    return () => {
+      active = false;
+    };
+  }, []);
   const [search, setSearch] = useState('');
   const [jobs, setJobs] = useState<Job[]>([]);
   const [error, setError] = useState('');
@@ -224,6 +240,7 @@ function AdminDownloads() {
         url: input.get('url'),
         budgetBytes: Math.floor(Number(input.get('budget')) * mib),
         sha256: input.get('checksum') || null,
+        transferClient,
         priority: Number(input.get('priority')),
         ...(delivery === 'library' ? { importPlan: importPlan(input) } : {}),
       });
@@ -315,6 +332,20 @@ function AdminDownloads() {
               />
             </fieldset>
           )}
+          {externalAvailable && (
+            <label>
+              Transfer client
+              <select
+                value={transferClient}
+                onChange={(event) => setTransferClient(event.target.value)}
+              >
+                <option value="builtin">Built-in downloader</option>
+                <option value="aria2">
+                  aria2 (SHA-256 required; resume re-fetches)
+                </option>
+              </select>
+            </label>
+          )}
           <label>
             HTTPS source URL
             <input
@@ -351,9 +382,18 @@ function AdminDownloads() {
               />
             </label>
             <label>
-              SHA-256 checksum (optional)
+              SHA-256 checksum{' '}
+              {transferClient === 'aria2'
+                ? '(required for aria2)'
+                : '(optional)'}
               <input
                 name="checksum"
+                required={transferClient === 'aria2'}
+                onInvalid={(event) =>
+                  event.currentTarget
+                    .closest('details')
+                    ?.setAttribute('open', '')
+                }
                 pattern="[a-fA-F0-9]{64}"
                 maxLength={64}
                 autoComplete="off"

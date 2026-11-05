@@ -25,6 +25,7 @@ public sealed class DownloadJob
     public int? ImportScanId { get; set; }
     public int UserId { get; set; }
     public string Name { get; set; } = "";
+    public string TransferClient { get; set; } = "builtin";
     public string SourceHost { get; set; } = "";
     public string ProtectedUrl { get; set; } = "";
     public string State { get; set; } = "queued";
