@@ -16,7 +16,7 @@ import {
 import Player from './components/Player';
 import ThemePicker from './components/ThemePicker';
 import Icon from './components/Icon';
-import TitleDetails from './components/TitleDetails';
+import IdentifiedTitle from './components/IdentifiedTitle';
 import {
   featureVisible,
   loadFeatures,
@@ -734,7 +734,9 @@ export default function App() {
                   <Icon name="back" /> Back to collection
                 </a>
                 {playFrom === undefined ? (
-                  <TitleDetails
+                  <IdentifiedTitle
+                    key={item.id}
+                    admin={user?.role === 'Admin'}
                     item={item}
                     headingRef={detailHeading}
                     tracks={detailTracks}
