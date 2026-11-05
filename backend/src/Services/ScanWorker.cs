@@ -175,7 +175,13 @@ public sealed class ScanWorker(
                             metadata.Tracks ?? []
                         );
                         item.ColorJson = metadata.ColorJson;
-                        if (item.ImportJobId is null)
+                        if (
+                            item.ImportJobId is null
+                            && !await db.Metadata.AnyAsync(
+                                x => x.MediaItemId == item.Id,
+                                stoppingToken
+                            )
+                        )
                             item.Title = Path.GetFileNameWithoutExtension(path);
                         item.SearchTitle = item.Title.ToLowerInvariant();
                         item.IsMissing = false;
