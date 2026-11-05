@@ -15,8 +15,15 @@ export default function TitleDetails({
   bookmarks = false,
   onBookmark,
   bookmarkRequest,
+  tracks,
 }: {
   item: Media;
+  tracks?: {
+    type: string;
+    codec: string;
+    language?: string | null;
+    title?: string | null;
+  }[];
   bookmarks?: boolean;
   onBookmark?: (seconds: number) => void;
   bookmarkRequest?: BookmarkRequest;
@@ -65,6 +72,18 @@ export default function TitleDetails({
         </div>
         <dl className="title-facts">
           <div>
+            <dt>Year</dt>
+            <dd>Not available</dd>
+          </div>
+          <div>
+            <dt>Genres</dt>
+            <dd>Not available</dd>
+          </div>
+          <div>
+            <dt>Cast</dt>
+            <dd>Not available</dd>
+          </div>
+          <div>
             <dt>Video</dt>
             <dd>{item.videoCodec.toUpperCase() || 'Unknown'}</dd>
           </div>
@@ -78,6 +97,22 @@ export default function TitleDetails({
           </div>
         </dl>
       </div>
+      <details className="panel">
+        <summary>File and track details</summary>
+        {tracks?.length ? (
+          <ul>
+            {tracks.map((track, index) => (
+              <li key={index}>
+                {track.type} · {track.codec || 'Unknown codec'} ·{' '}
+                {track.language || 'Language unknown'}
+                {track.title ? ` · ${track.title}` : ''}
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p className="muted">Track information is not available.</p>
+        )}
+      </details>
       {bookmarks && onBookmark && (
         <Bookmarks
           key={item.id}

@@ -49,6 +49,12 @@ beforeEach(() => {
     if (path.startsWith('/media-page'))
       return { items: [media], nextCursor: null };
     if (path === '/media/7') return media;
+    if (path === '/v1/media/7/tracks')
+      return {
+        tracks: [
+          { type: 'audio', codec: 'opus', language: 'sv', title: 'Swedish' },
+        ],
+      };
     if (path.startsWith('/progress'))
       return [
         {
@@ -85,6 +91,13 @@ async function details(query = '') {
 it('opens honest details without mounting a player, preserves filters and restores the card on back', async () => {
   await details('Own');
   expect(document.querySelector('video')).toBeNull();
+  expect(HTMLMediaElement.prototype.play).not.toHaveBeenCalled();
+  expect(screen.getByRole('heading', { name: 'Own video' })).toHaveFocus();
+  fireEvent.click(screen.getByText('File and track details'));
+  expect(await screen.findByText('audio · opus · sv · Swedish')).toBeVisible();
+  expect(
+    vi.mocked(api).mock.calls.some(([path]) => /stream|playback/.test(path)),
+  ).toBe(false);
   expect(
     screen.getByText(
       /Synopsis, artwork and series information are not available/,
@@ -117,4 +130,21 @@ it.each([
   expect(
     screen.getByRole('group', { name: 'Playback controls' }),
   ).toHaveFocus();
+});
+
+it('keeps explicit playback available when track metadata cannot be loaded', async () => {
+  const implementation = vi.mocked(api).getMockImplementation()!;
+  vi.mocked(api).mockImplementation((path, ...args) => {
+    if (path === '/v1/media/7/tracks')
+      return Promise.reject(new Error('Unavailable'));
+    return implementation(path, ...args);
+  });
+  await details();
+  fireEvent.click(screen.getByText('File and track details'));
+  expect(
+    await screen.findByText('Track information is not available.'),
+  ).toBeVisible();
+  expect(document.querySelector('video')).toBeNull();
+  fireEvent.click(screen.getByRole('button', { name: 'Play from beginning' }));
+  expect(await screen.findByLabelText('Own video')).toBeInTheDocument();
 });

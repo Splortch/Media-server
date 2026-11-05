@@ -52,6 +52,9 @@ export default function App() {
     scroll: 0,
   });
   const restoreList = useRef(false);
+  const detailHeading = useRef<HTMLHeadingElement>(null);
+  const [detailTracks, setDetailTracks] =
+    useState<Parameters<typeof TitleDetails>[0]['tracks']>();
   const focusedRoute = useRef('');
   const requestEpoch = useRef(0);
   const [watching, setWatching] = useState<Media[]>([]);
@@ -161,6 +164,7 @@ export default function App() {
     setItems([]);
     setProgress([]);
     setItem(undefined);
+    setDetailTracks(undefined);
     setPlayFrom(undefined);
     setPlayBusy(false);
     setReturnTo({ route: 'library', mediaId: 0, scroll: 0 });
@@ -184,6 +188,7 @@ export default function App() {
       setLoading(true);
       setError('');
       setItem(undefined);
+      setDetailTracks(undefined);
       setPlayFrom(undefined);
       setPlayBusy(false);
     };
@@ -236,6 +241,7 @@ export default function App() {
           setWatching(w);
           setItems(visible);
           setItem(detail);
+          setDetailTracks(undefined);
           setNextCursor(next);
           setProgress(p);
         }
@@ -251,6 +257,22 @@ export default function App() {
     // The URL builder uses only these query inputs.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [phase, route, debouncedQuery, collection]);
+  useEffect(() => {
+    if (!item) return;
+    let active = true;
+    api<{ tracks: NonNullable<Parameters<typeof TitleDetails>[0]['tracks']> }>(
+      `/v1/media/${item.id}/tracks`,
+    )
+      .then((catalog) => {
+        if (active) setDetailTracks(catalog.tracks);
+      })
+      .catch(() => {
+        /* Missing track metadata must not block Play. */
+      });
+    return () => {
+      active = false;
+    };
+  }, [item]);
   async function loadMore() {
     if (!nextCursor || moreBusy) return;
     const epoch = requestEpoch.current;
@@ -290,7 +312,7 @@ export default function App() {
             behavior: 'instant',
           });
           restoreList.current = false;
-        } else mainRef.current?.focus();
+        } else (detailHeading.current ?? mainRef.current)?.focus();
         focusedRoute.current = key;
       }
       document.title = `${route === 'requests' ? 'Movie requests' : route === 'experimental' ? 'Experimental' : route === 'settings' || route.startsWith('settings/') ? 'Settings' : route === 'history' ? 'Watch history' : item?.title || (route === 'library' ? 'Library' : 'Home')} · Media Server`;
@@ -714,6 +736,8 @@ export default function App() {
                 {playFrom === undefined ? (
                   <TitleDetails
                     item={item}
+                    headingRef={detailHeading}
+                    tracks={detailTracks}
                     bookmarks={user?.role !== 'Guest'}
                     onBookmark={(seconds) => void beginPlayback(false, seconds)}
                     resume={

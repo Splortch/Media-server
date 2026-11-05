@@ -149,6 +149,8 @@ it('opens title details before requesting a playback URL and resumes only after 
   await screen.findByRole('region', { name: 'Title information' });
   expect(document.querySelector('video')).toBeNull();
   expect(bridge.api.transport.streamUrl).not.toHaveBeenCalled();
+  fireEvent.click(screen.getByText('File and track details'));
+  expect(screen.getByText('Track information is not available.')).toBeVisible();
   await waitFor(() =>
     expect(screen.getByRole('heading', { name: 'Own video' })).toHaveFocus(),
   );
