@@ -54,7 +54,7 @@ export default function App() {
   const restoreList = useRef(false);
   const detailHeading = useRef<HTMLHeadingElement>(null);
   const [detailTracks, setDetailTracks] =
-    useState<Parameters<typeof TitleDetails>[0]['tracks']>();
+    useState<Parameters<typeof IdentifiedTitle>[0]['tracks']>();
   const focusedRoute = useRef('');
   const requestEpoch = useRef(0);
   const [watching, setWatching] = useState<Media[]>([]);
@@ -260,9 +260,9 @@ export default function App() {
   useEffect(() => {
     if (!item) return;
     let active = true;
-    api<{ tracks: NonNullable<Parameters<typeof TitleDetails>[0]['tracks']> }>(
-      `/v1/media/${item.id}/tracks`,
-    )
+    api<{
+      tracks: NonNullable<Parameters<typeof IdentifiedTitle>[0]['tracks']>;
+    }>(`/v1/media/${item.id}/tracks`)
       .then((catalog) => {
         if (active) setDetailTracks(catalog.tracks);
       })

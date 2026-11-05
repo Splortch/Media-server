@@ -49,7 +49,7 @@ it('shows saved metadata without starting playback or querying a cloud provider'
   );
   await screen.findByRole('heading', { name: 'Identified title' });
   expect(screen.getByText('Cached synopsis')).toBeInTheDocument();
-  expect(screen.getByText('Cast: Local actor')).toBeInTheDocument();
+  expect(screen.getByText('Local actor')).toBeInTheDocument();
   expect(api).toHaveBeenCalledExactlyOnceWith('/media/1/metadata');
   expect(play).not.toHaveBeenCalled();
   expect(

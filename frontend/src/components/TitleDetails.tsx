@@ -16,6 +16,7 @@ export default function TitleDetails({
   onBookmark,
   bookmarkRequest,
   tracks,
+  metadata,
 }: {
   item: Media;
   tracks?: {
@@ -24,9 +25,6 @@ export default function TitleDetails({
     language?: string | null;
     title?: string | null;
   }[];
-  metadata,
-}: {
-  item: Media;
   metadata?: {
     details: {
       year: number | null;
@@ -95,10 +93,6 @@ export default function TitleDetails({
                 .filter((x) => x !== null && x !== '')
                 .join(' · ')}
             </p>
-            <p>{metadata.details.genres.join(' · ')}</p>
-            {metadata.details.cast.length > 0 && (
-              <p>Cast: {metadata.details.cast.join(', ')}</p>
-            )}
             <p className="muted">{metadata.details.attribution}</p>
             {metadata.backdropUrl && (
               <img
@@ -127,15 +121,15 @@ export default function TitleDetails({
         <dl className="title-facts">
           <div>
             <dt>Year</dt>
-            <dd>Not available</dd>
+            <dd>{metadata?.details.year ?? 'Not available'}</dd>
           </div>
           <div>
             <dt>Genres</dt>
-            <dd>Not available</dd>
+            <dd>{metadata?.details.genres.join(' · ') || 'Not available'}</dd>
           </div>
           <div>
             <dt>Cast</dt>
-            <dd>Not available</dd>
+            <dd>{metadata?.details.cast.join(', ') || 'Not available'}</dd>
           </div>
           <div>
             <dt>Video</dt>
