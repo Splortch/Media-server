@@ -327,6 +327,30 @@ namespace Infrastructure.Migrations
                     b.ToTable("Items");
                 });
 
+            modelBuilder.Entity("MediaServer.Core.MediaMetadata", b =>
+                {
+                    b.Property<int>("MediaItemId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("BackdropKey")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("DocumentJson")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("PosterKey")
+                        .HasColumnType("TEXT");
+
+                    b.Property<long>("Revision")
+                        .IsConcurrencyToken()
+                        .HasColumnType("INTEGER");
+
+                    b.HasKey("MediaItemId");
+
+                    b.ToTable("Metadata");
+                });
+
             modelBuilder.Entity("MediaServer.Core.MovieRequest", b =>
                 {
                     b.Property<int>("Id")
@@ -705,6 +729,15 @@ namespace Infrastructure.Migrations
                     b.HasOne("MediaServer.Core.Library", null)
                         .WithMany()
                         .HasForeignKey("LibraryId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("MediaServer.Core.MediaMetadata", b =>
+                {
+                    b.HasOne("MediaServer.Core.MediaItem", null)
+                        .WithOne()
+                        .HasForeignKey("MediaServer.Core.MediaMetadata", "MediaItemId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
                 });
