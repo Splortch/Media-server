@@ -5,7 +5,7 @@ The native Kotlin application lives in `clients/android`: a reusable `core` Andr
 ## Install and connect, step by step
 
 1. Install and start the server using [First run](../GETTING-STARTED.md). Finish administrator setup in the browser, configure a media directory, and scan a small, legally obtained test video. Verify it appears in the web library first.
-2. Open the **Android client** workflow in the repository's Actions tab. Choose a successful run for the Android PR/commit and download the `android-build` artifact. Extract the ZIP and locate `apk/debug/app-debug.apk`. After merge, successful main builds publish an independent `client-android/v0.1.0-alpha.N` prerelease with clearly named debug APK/unsigned APK/AAB files and checksums. Release publishing is separate from PR artifacts; do not install the instrumentation APK.
+2. Open the **Android client** workflow in the repository's Actions tab. Choose a successful run for the Android PR/commit and download the `android-build` artifact. Extract the ZIP and locate `apk/debug/app-debug.apk`. After merge, the Automatic prereleases workflow validates Android again and includes clearly named debug APK/unsigned APK/AAB files in the combined `v0.2.0-alpha.N` release with the other platforms. The Android component uses version `0.1.0-alpha.N` with the shared build counter. Release publishing is separate from PR artifacts; do not install the instrumentation APK.
 3. Transfer `app-debug.apk` to your Android phone (Android 8.0/API 26 or newer). Open it and allow installation from that specific file-manager/browser source when Android asks. This is an alpha development build, not a Play Store release.
 4. Connect to the server using either a trusted HTTPS origin (`https://media.example.com`) or the private USB test route below. `localhost` on the phone means the phone, not your computer. Enter an origin only, without `/api`, credentials, query or fragment.
 5. Tap **Connect**. If setup is incomplete or API version 1/prefix search is unavailable, the app explains what to update. Sign in with your existing server username/password. **Remember this session** stores encrypted session cookies; the password is never saved.
@@ -44,7 +44,7 @@ Set `ANDROID_HOME` to your SDK, or set `sdk.dir` in an untracked `clients/androi
 ./gradlew -PandroidBuildNumber=2 :app:assembleRelease :app:bundleRelease
 ```
 
-`androidBuildNumber` is an independent Android version code, 1–65535; the displayed version is `0.1.0-alpha.N`. Release outputs are `app-release-unsigned.apk` and `app-release.aab`. **The unsigned APK cannot be installed.** An AAB is a distribution bundle, not a directly installable APK.
+`androidBuildNumber` is the Android version code, 1–65535, supplied by the shared release counter for published builds; the displayed version is `0.1.0-alpha.N`. Release outputs are `app-release-unsigned.apk` and `app-release.aab`. **The unsigned APK cannot be installed.** An AAB is a distribution bundle, not a directly installable APK.
 
 ### Release signing
 

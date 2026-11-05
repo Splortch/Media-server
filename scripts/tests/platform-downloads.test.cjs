@@ -58,3 +58,19 @@ test('sync includes Android and preserves assets and release flags; repeats caus
   await syncReleaseNotes({github, context});
   assert.equal(writes.length, count);
 });
+test('combined notes link every actual platform asset and sync without replacing the table with historical links', async()=>{
+  const {unifiedNotes} = require('../release-notes.cjs');
+  const files = require('../release-targets.cjs').targets('0.2.0-alpha.50','0.1.0-alpha.50').flatMap(t=>t.files);
+  const body = unifiedNotes('0.2.0-alpha.50','0.1.0-alpha.50',sha,'owner/repo',files);
+  for (const file of files) assert.ok(body.includes(`/releases/download/v0.2.0-alpha.50/${file})`));
+  assert.doesNotMatch(body,/platform-downloads:start|\/releases\/tag\/client-/);
+  assert.match(body,/unsigned developer artifacts/);
+  const r = {id:100,tag_name:'v0.2.0-alpha.50',target_commitish:sha,prerelease:true,draft:false,body,assets:files.map(name=>({name}))};
+  const writes=[];
+  const github={paginate:async()=>[r],rest:{repos:{listReleases(){},updateRelease:async p=>writes.push(p)}}};
+  await syncReleaseNotes({github,context:{repo:{owner:'owner',repo:'repo'}}});
+  assert.equal(writes.length,0);
+  r.assets=r.assets.filter(a=>!a.name.endsWith('.dmg'));r.body='old';
+  await syncReleaseNotes({github,context:{repo:{owner:'owner',repo:'repo'}}});
+  assert.equal(writes.length,1);assert.doesNotMatch(writes[0].body,/\.dmg\)/);
+});

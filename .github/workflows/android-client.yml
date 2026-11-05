@@ -6,10 +6,15 @@ on:
   pull_request:
     paths: ['clients/android/**', 'shared/api/**', 'backend/**', 'scripts/*android*', 'scripts/tests/android-*', '.github/workflows/android-client.yml', 'global.json', 'Directory.Build.props']
   workflow_dispatch:
+  workflow_call:
+    inputs:
+      build_number:
+        required: true
+        type: string
 permissions:
   contents: read
 concurrency:
-  group: android-${{ github.ref }}
+  group: android-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 jobs:
   build:
@@ -36,7 +41,7 @@ jobs:
         run: python3 scripts/generate-android-models.py --check
       - name: Build APKs and bundle; run JVM tests and Android lint
         working-directory: clients/android
-        run: ./gradlew --no-daemon -PandroidBuildNumber=${{ github.run_number }} :app:assembleDebug :app:assembleDebugAndroidTest :core:testDebugUnitTest :app:assembleRelease :app:bundleRelease :app:lint
+        run: ./gradlew --no-daemon -PandroidBuildNumber=${{ inputs.build_number || github.run_number }} :app:assembleDebug :app:assembleDebugAndroidTest :core:testDebugUnitTest :app:assembleRelease :app:bundleRelease :app:lint
       - uses: actions/upload-artifact@v7
         with:
           name: android-build
@@ -92,12 +97,10 @@ jobs:
           disable-animations: true
           emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim
           script: python3 scripts/test-android-backend.py
-  release:
+  package:
     needs: [build, device]
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    if: inputs.build_number != ''
     runs-on: ubuntu-24.04
-    permissions:
-      contents: write
     steps:
       - uses: actions/checkout@v7
         with:
@@ -106,12 +109,13 @@ jobs:
         with:
           name: android-build
           path: clients/android/app/build/outputs
-      - name: Package validated Android outputs with checksums
+      - name: Package validated Android outputs
         env:
-          ANDROID_BUILD_NUMBER: ${{ github.run_number }}
+          ANDROID_BUILD_NUMBER: ${{ inputs.build_number }}
           SOURCE_SHA: ${{ github.sha }}
         run: python3 scripts/package-android.py
-      - name: Publish a separate Android prerelease
-        uses: actions/github-script@v9
+      - uses: actions/upload-artifact@v7
         with:
-          script: await require('./scripts/publish-android.cjs')({github, context})
+          name: release-android
+          path: artifacts/android/MediaServer-Android-*
+          if-no-files-found: error

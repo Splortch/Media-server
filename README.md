@@ -24,7 +24,7 @@ The [client ecosystem](docs/clients/README.md) adds a shared Tauri desktop clien
 | SQLite schema migrations | Implemented | Versioned EF Core migration, applied at startup |
 | REST/OpenAPI and scan status | Implemented | Protected OpenAPI; scan polling and SignalR event transport |
 | Automated quality checks | Implemented configuration | Backend, frontend, browser integration, audits and Docker build |
-| Native alpha releases | Implemented workflow | Self-contained Windows/Linux/macOS servers, native desktop packages, bundled web UI, separate automatic alpha releases |
+| Native alpha releases | Implemented workflow | Self-contained Windows/Linux/macOS servers, native desktop packages, bundled web UI, one automatic alpha release for all platforms |
 | HLS conversion / quality / audio / text subtitles | Implemented alpha | Bounded full-video preparation; FFmpeg required; Auto/manual quality in web, desktop and Android clients |
 | Hardware encoders / HDR | Partial alpha | Opt-in NVENC/QSV/VAAPI/AMF adapters and software fallback; explicit SDR tone mapping; physical GPU/HDR validation pending |
 | Artwork / online metadata / TV matching | Implemented alpha (web) | [Local NFO, manual corrections and explicit opt-in TMDB matching](docs/architecture/METADATA.md); bounded offline artwork cache; native editor pending |

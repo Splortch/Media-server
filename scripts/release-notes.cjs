@@ -50,8 +50,19 @@ function platformNotes(target, sha, repository, image, {serverInstaller = false,
   return '# ' + target.name + ' ' + target.version + '\n\n' + text[target.id].join('\n\n') + common;
 }
 function combinedNotes(server, client, sha, repository) {
-  return '# Combined alpha download archive\n\nThis earlier release contains several platforms together. Choose the download that matches what you want to run. Future releases list each platform separately.\n\n' +
+  return '# Combined alpha download archive\n\nThis earlier release contains several platforms together. Choose the download that matches what you want to run. New releases also combine validated platform downloads.\n\n' +
     targets(server, client).filter(t=>['server-windows','server-linux','client-windows','docker'].includes(t.id)).map(t=>platformNotes(t,sha,repository,'ghcr.io/'+repository.toLowerCase()+':v'+server)).join('\n\n---\n\n');
+}
+// Describe only assets actually attached to this version, never another build's files.
+function unifiedNotes(server, client, sha, repository, files) {
+  if (!/^[a-f0-9]{40}$/.test(sha) || !/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(repository)) throw new Error('Invalid release description identity.');
+  const tag = `v${server}`, root = `https://github.com/${repository}`;
+  const available = new Set(files);
+  const platforms = targets(server, client).filter(t=>t.files.some(f=>available.has(f)));
+  const rows = platforms.map(t=>`| ${t.name} | ${t.version} | ${t.files.filter(f=>available.has(f)).map(f=>`[${f}](${root}/releases/download/${tag}/${f})`).join(' · ')} |`);
+  return `# Media Server ${server}\n\nOne release for all validated platforms. Choose a server to host your library, or a client to connect to it.\n\n| Platform | Component version | Downloads |\n| --- | --- | --- |\n${rows.join('\n')}\n\n` +
+    platforms.map(t=>`### ${t.name}\n\n${t.instructions}`).join('\n\n') +
+    `\n\n### Web browser\n\nThe web interface is included with every server. Android TV and iOS are planned.\n\n### Verification and setup\n\n[SHA256SUMS](${root}/releases/download/${tag}/SHA256SUMS) covers every download and [release.json](${root}/releases/download/${tag}/release.json), which records component versions and source provenance. Builds are unsigned alpha builds; back up server data before upgrading. GitHub source archives are source code, not installers.\n\n[Server and desktop setup](${root}/blob/${sha}/docs/deployment/RELEASES.md) · [Android setup](${root}/blob/${sha}/docs/clients/ANDROID.md) · [Source commit](${root}/commit/${sha})`;
 }
 async function syncReleaseNotes({github, context}) {
   const releases = await github.paginate(github.rest.repos.listReleases,{...context.repo,per_page:100});
@@ -70,9 +81,14 @@ async function syncReleaseNotes({github, context}) {
     if ((id?.startsWith('client-') ? minor !== '1' : minor !== '2')) continue;
     const server = '0.2.0-alpha.'+number, client='0.1.0-alpha.'+number;
     const target = targets(server,client).find(t=>t.id===id);
-    const description = id ? platformNotes(target,release.target_commitish,repository,'ghcr.io/'+repository.toLowerCase()+':v'+server,{serverInstaller:(release.assets||[]).some(a=>a.name===`MediaServer-v${server}-win-x64-setup.exe`),unixInstallers:(release.assets||[]).some(a=>a.name.endsWith('-linux-x64.deb'))}) : combinedNotes(server,client,release.target_commitish,repository);
+    if (!id) {
+      const body = unifiedNotes(server,client,release.target_commitish,repository,(release.assets || []).map(a=>a.name));
+      if (release.body !== body) await github.rest.repos.updateRelease({...context.repo,release_id:release.id,body});
+      continue;
+    }
+    const description = platformNotes(target,release.target_commitish,repository,'ghcr.io/'+repository.toLowerCase()+':v'+server,{serverInstaller:(release.assets||[]).some(a=>a.name===`MediaServer-v${server}-win-x64-setup.exe`),unixInstallers:(release.assets||[]).some(a=>a.name.endsWith('-linux-x64.deb'))});
     const body = withDownloads(description, table);
     if (release.body !== body) await github.rest.repos.updateRelease({...context.repo,release_id:release.id,body});
   }
 }
-module.exports = {platformNotes,combinedNotes,syncReleaseNotes};
+module.exports = {platformNotes,combinedNotes,unifiedNotes,syncReleaseNotes};

@@ -86,3 +86,23 @@ test('publication writes generated files only to downloads, with no force update
     }
   } finally { fs.rmSync(directory,{recursive:true}); }
 });
+test('one combined release provides eight categories without mixing server and client installers', () => {
+  const tag = 'v0.2.0-alpha.50';
+  const files = require('../release-targets.cjs').targets('0.2.0-alpha.50','0.1.0-alpha.50').flatMap(t=>t.files);
+  const combined = {tag_name:tag, draft:false, assets:files.map(name=>({name,browser_download_url:`https://github.com/${repo}/releases/download/${tag}/${name}`}))};
+  const platforms = catalog(repo,[...fixtures(),combined]);
+  assert.equal(platforms.length,8);
+  for (const p of platforms) {
+    assert.equal(p.latest.tag,tag);
+    assert.equal(p.latest.version,`0.${p.id.startsWith('client-')?'1':'2'}.0-alpha.50`);
+    assert.ok(p.latest.download.includes('/download/'+tag+'/'));
+  }
+  assert.match(platforms.find(p=>p.id==='server-windows').latest.download,/\/MediaServer-v/);
+  assert.match(platforms.find(p=>p.id==='client-windows').latest.download,/\/MediaServer-Windows-Client-v/);
+  assert.match(platforms.find(p=>p.id==='client-linux').latest.download,/\/MediaServer-Desktop-Client-v/);
+  assert.match(platforms.find(p=>p.id==='client-android').latest.download,/-debug\.apk$/);
+  assert.ok(platforms.find(p=>p.id==='server-windows').older.length);
+  const serverOnly = {...combined,assets:combined.assets.filter(a=>a.name.startsWith('MediaServer-v'))};
+  const isolated = catalog(repo,[serverOnly]);
+  for (const p of isolated.filter(p=>p.group==='clients')) assert.equal(p.latest,undefined);
+});

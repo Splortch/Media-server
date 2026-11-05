@@ -9,6 +9,9 @@ on:
       - '.github/workflows/release.yml'
       - '.github/workflows/windows-client.yml'
       - '.github/workflows/desktop-clients.yml'
+      - '.github/workflows/android-client.yml'
+      - 'scripts/package-android.py'
+      - 'scripts/platform-downloads.cjs'
       - 'scripts/*unix*installer*'
       - 'scripts/*desktop*'
       - 'scripts/build-macos-client.py'
@@ -51,6 +54,7 @@ jobs:
       client: ${{ steps.plan.outputs.client }}
       msi: ${{ steps.plan.outputs.msi }}
       tag: ${{ steps.plan.outputs.tag }}
+      number: ${{ steps.plan.outputs.number }}
     steps:
       # workflow_run always loads trusted default-branch code. No upstream artifacts
       # or fork/PR code are executed in a privileged job.
@@ -205,6 +209,12 @@ jobs:
       source_sha: ${{ github.sha }}
       client_version: ${{ needs.plan.outputs.client }}
       msi_version: ${{ needs.plan.outputs.msi }}
+  android:
+    needs: plan
+    if: needs.plan.outputs.build == 'true'
+    uses: ./.github/workflows/android-client.yml
+    with:
+      build_number: ${{ needs.plan.outputs.number }}
   docker:
     needs: plan
     if: needs.plan.outputs.build == 'true'
@@ -250,7 +260,7 @@ jobs:
           compression-level: 1
   assemble:
     name: Release packages
-    needs: [plan, server, windows-client, desktop-clients, docker]
+    needs: [plan, server, windows-client, desktop-clients, android, docker]
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
