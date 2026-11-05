@@ -145,3 +145,14 @@ Web, desktop and Android support saved dark/light appearance. Dark is the defaul
 Administrators can opt into the authorized-URL download manager. See the [download center guide](docs/architecture/DOWNLOADS.md) for setup, security limits, staging behavior and the remaining integration roadmap.
 
 Family members can request media; administrators approve authorized sources and explicit Movies/TV matches. Read the [family approval and managed import guide](docs/architecture/DOWNLOAD-IMPORTS.md) for permissions, storage, inbox matching and recovery.
+
+### Embedded movie metadata
+
+Library scans read embedded titles, descriptions (including synopsis/summary/comment tags),
+release dates, genres, directors and chapter timestamps through FFprobe. The movie information
+page displays available details and lets you start playback at a chapter. Untagged movies keep
+filename titles and an explicit description fallback. Imported titles selected during matching
+are preserved. Rescan existing libraries after upgrading to populate these details; the database
+migration preserves existing items and playback history. Dates are displayed as supplied by the
+file. Chapters with invalid timestamps are ignored and chapter ends are limited to runtime.
+No external metadata account is required; missing descriptions or chapters are not generated.

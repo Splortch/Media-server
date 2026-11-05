@@ -86,9 +86,7 @@ it('opens honest details without mounting a player, preserves filters and restor
   await details('Own');
   expect(document.querySelector('video')).toBeNull();
   expect(
-    screen.getByText(
-      /Synopsis, artwork and series information are not available/,
-    ),
+    screen.getByText(/No description is embedded in this file/),
   ).toBeVisible();
   expect(
     screen.getByRole('button', { name: 'Resume from 32 sec' }),

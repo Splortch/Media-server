@@ -175,8 +175,9 @@ public sealed class ScanWorker(
                             metadata.Tracks ?? []
                         );
                         item.ColorJson = metadata.ColorJson;
+                        item.MetadataJson = System.Text.Json.JsonSerializer.Serialize(metadata.Metadata);
                         if (item.ImportJobId is null)
-                            item.Title = Path.GetFileNameWithoutExtension(path);
+                            item.Title = metadata.Metadata?.Title ?? Path.GetFileNameWithoutExtension(path);
                         item.SearchTitle = item.Title.ToLowerInvariant();
                         item.IsMissing = false;
                         item.Fingerprint = fingerprint;

@@ -49,7 +49,7 @@ public sealed class Ffprobe(string executable) : IMediaProbe
                         : Array.Empty<string>()
                 ),
                 "-show_entries",
-                "format=duration,format_name:stream=index,codec_type,codec_name,width,height,channels,channel_layout,bits_per_raw_sample,pix_fmt,color_primaries,color_transfer,color_space:stream_tags=language,title:stream_disposition=default,forced:stream_side_data",
+                "format=duration,format_name:format_tags:chapter=start_time,end_time:chapter_tags=title:stream=index,codec_type,codec_name,width,height,channels,channel_layout,bits_per_raw_sample,pix_fmt,color_primaries,color_transfer,color_space:stream_tags=language,title:stream_disposition=default,forced:stream_side_data",
                 "-of",
                 "json",
                 path,
@@ -159,7 +159,52 @@ public sealed class Ffprobe(string executable) : IMediaProbe
                     Disposition(x, "forced")
                 ))
                 .ToArray(),
-            JsonSerializer.Serialize(color)
+            JsonSerializer.Serialize(color),
+            ReadMetadata(doc.RootElement, double.IsFinite(duration) ? duration : 0)
+        );
+    }
+
+    public static MovieMetadata ReadMetadata(JsonElement root, double duration)
+    {
+        var format = root.GetProperty("format");
+        string? TagValue(params string[] names)
+        {
+            if (!format.TryGetProperty("tags", out var tags))
+                return null;
+            foreach (var name in names)
+                foreach (var tag in tags.EnumerateObject())
+                    if (string.Equals(tag.Name, name, StringComparison.OrdinalIgnoreCase)
+                        && tag.Value.ValueKind == JsonValueKind.String
+                        && !string.IsNullOrWhiteSpace(tag.Value.GetString()))
+                        return tag.Value.GetString()!.Trim();
+            return null;
+        }
+        var chapters = new List<MediaChapter>();
+        if (root.TryGetProperty("chapters", out var entries))
+            foreach (var chapter in entries.EnumerateArray())
+            {
+                double Time(string name) =>
+                    chapter.TryGetProperty(name, out var value)
+                    && double.TryParse(value.ToString(), CultureInfo.InvariantCulture, out var seconds)
+                    && double.IsFinite(seconds) ? seconds : -1;
+                var start = Time("start_time");
+                var end = Time("end_time");
+                if (start < 0 || end <= start || (duration > 0 && start >= duration))
+                    continue;
+                var title = Tag(chapter, "title");
+                chapters.Add(new MediaChapter(
+                    string.IsNullOrWhiteSpace(title) ? $"Chapter {chapters.Count + 1}" : title.Trim(),
+                    start,
+                    duration > 0 ? Math.Min(end, duration) : end
+                ));
+            }
+        return new MovieMetadata(
+            TagValue("title"),
+            TagValue("description", "synopsis", "summary", "comment"),
+            TagValue("date", "date_released", "year"),
+            TagValue("genre"),
+            TagValue("director"),
+            chapters.OrderBy(x => x.Start).ToArray()
         );
     }
 

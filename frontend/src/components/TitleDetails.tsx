@@ -46,8 +46,8 @@ export default function TitleDetails({
           {item.container.split(',')[0].toUpperCase()}
         </p>
         <p className="muted">
-          Synopsis, artwork and series information are not available for this
-          file yet.
+          {item.metadata?.description ||
+            'No description is embedded in this file.'}
         </p>
         <div className="action-group title-actions" aria-busy={busy}>
           {resume > 0 && (
@@ -64,6 +64,20 @@ export default function TitleDetails({
           </button>
         </div>
         <dl className="title-facts">
+          {(
+            [
+              ['Release date', item.metadata?.releaseDate],
+              ['Genre', item.metadata?.genre],
+              ['Director', item.metadata?.director],
+            ] as const
+          ).map(([label, value]) =>
+            value ? (
+              <div key={label}>
+                <dt>{label}</dt>
+                <dd>{value}</dd>
+              </div>
+            ) : null,
+          )}
           <div>
             <dt>Video</dt>
             <dd>{item.videoCodec.toUpperCase() || 'Unknown'}</dd>
@@ -78,6 +92,23 @@ export default function TitleDetails({
           </div>
         </dl>
       </div>
+      {!!item.metadata?.chapters.length && (
+        <section aria-label="Chapters">
+          <h2>Chapters</h2>
+          <ol>
+            {item.metadata.chapters.map((chapter, index) => (
+              <li key={index}>
+                <button
+                  disabled={busy || !onBookmark}
+                  onClick={() => begin(() => onBookmark?.(chapter.start))}
+                >
+                  {duration(chapter.start)} · {chapter.title}
+                </button>
+              </li>
+            ))}
+          </ol>
+        </section>
+      )}
       {bookmarks && onBookmark && (
         <Bookmarks
           key={item.id}

@@ -34,6 +34,7 @@ public class MediaItem
     public string AudioCodec { get; set; } = "";
     public double Duration { get; set; }
     public long Size { get; set; }
+    public string MetadataJson { get; set; } = "null";
     public string ColorJson { get; set; } = "null";
     public string TracksJson { get; set; } = "[]";
     public int ContentRating { get; set; }
@@ -91,7 +92,8 @@ public record ProbeResult(
     string VideoCodec,
     string AudioCodec,
     IReadOnlyList<MediaTrack>? Tracks = null,
-    string ColorJson = "null"
+    string ColorJson = "null",
+    MovieMetadata? Metadata = null
 );
 
 public interface IMediaProbe
@@ -180,3 +182,13 @@ public class FeatureVisibility
     public int UserId { get; set; }
     public string Key { get; set; } = "";
 }
+
+public record MediaChapter(string Title, double Start, double End);
+public record MovieMetadata(
+    string? Title,
+    string? Description,
+    string? ReleaseDate,
+    string? Genre,
+    string? Director,
+    IReadOnlyList<MediaChapter> Chapters
+);
