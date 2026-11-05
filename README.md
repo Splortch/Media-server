@@ -219,15 +219,16 @@ Windows · x64 — Connect a Windows PC to your server.
 
 Android · 8.0+ — Install the debug APK on Android 8.0+.
 
-**Latest: v0.1.0-alpha.130**
+**Latest: v0.1.0-alpha.135**
 
-[Download test APK](https://github.com/Splortch/Media-server/releases/download/client-android/v0.1.0-alpha.130/MediaServer-Android-v0.1.0-alpha.130-debug.apk) · [Release notes](https://github.com/Splortch/Media-server/releases/tag/client-android/v0.1.0-alpha.130)
+[Download test APK](https://github.com/Splortch/Media-server/releases/download/client-android/v0.1.0-alpha.135/MediaServer-Android-v0.1.0-alpha.135-debug.apk) · [Release notes](https://github.com/Splortch/Media-server/releases/tag/client-android/v0.1.0-alpha.135)
 
 The debug APK is the installable testing build. Unsigned release APK/AAB files need signing. Updates between debug builds may require reinstalling.
 
 <details>
-<summary>Older Android phone client versions (19)</summary>
+<summary>Older Android phone client versions (20)</summary>
 
+- [v0.1.0-alpha.130](https://github.com/Splortch/Media-server/releases/tag/client-android/v0.1.0-alpha.130)
 - [v0.1.0-alpha.111](https://github.com/Splortch/Media-server/releases/tag/client-android/v0.1.0-alpha.111)
 - [v0.1.0-alpha.107](https://github.com/Splortch/Media-server/releases/tag/client-android/v0.1.0-alpha.107)
 - [v0.1.0-alpha.103](https://github.com/Splortch/Media-server/releases/tag/client-android/v0.1.0-alpha.103)
