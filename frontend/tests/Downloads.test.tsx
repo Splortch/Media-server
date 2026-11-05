@@ -39,6 +39,7 @@ it('submits a real source request and clears the secret input after acceptance',
       budgetBytes: 1073741824,
       priority: 0,
       sha256: null,
+      transferClient: 'builtin',
     }),
   );
   await waitFor(() =>
@@ -210,4 +211,40 @@ it('finds downloads by destination library and separates paused transfers', asyn
   expect(
     screen.getByText('No downloads match your search and category.'),
   ).toBeInTheDocument();
+});
+
+it('offers only the configured external client and requires a checksum for it', async () => {
+  vi.mocked(api).mockImplementation(
+    async (path) =>
+      (path === '/downloads/clients'
+        ? [{ id: 'aria2', configured: true }]
+        : []) as never,
+  );
+  render(<Downloads admin />);
+  await screen.findByText('No downloads yet.');
+  fireEvent.change(await screen.findByLabelText('Transfer client'), {
+    target: { value: 'aria2' },
+  });
+  const checksum = screen.getByLabelText(
+    'SHA-256 checksum (required for aria2)',
+  );
+  expect(checksum).toBeRequired();
+  fireEvent.change(screen.getByLabelText('Download name'), {
+    target: { value: 'External fixture' },
+  });
+  fireEvent.change(screen.getByLabelText('HTTPS source URL'), {
+    target: { value: 'https://media.example/file' },
+  });
+  fireEvent.change(checksum, { target: { value: 'a'.repeat(64) } });
+  fireEvent.click(screen.getByRole('button', { name: 'Add download' }));
+  await waitFor(() =>
+    expect(api).toHaveBeenCalledWith(
+      '/downloads',
+      'POST',
+      expect.objectContaining({
+        transferClient: 'aria2',
+        sha256: 'a'.repeat(64),
+      }),
+    ),
+  );
 });

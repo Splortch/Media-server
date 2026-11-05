@@ -59,10 +59,14 @@ public sealed class Server : WebApplicationFactory<Program>
         });
     }
 
-    public async Task<HttpClient> Admin()
+    public async Task<HttpClient> Admin(Uri? address = null)
     {
         var client = CreateClient(
-            new WebApplicationFactoryClientOptions { AllowAutoRedirect = false }
+            new WebApplicationFactoryClientOptions
+            {
+                AllowAutoRedirect = false,
+                BaseAddress = address ?? new Uri("http://localhost"),
+            }
         );
         await Csrf(client);
         var setup = await client.PostAsJsonAsync(

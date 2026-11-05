@@ -174,6 +174,22 @@ export function ApproveDownload({
   onApproved: () => void;
 }) {
   const { libraries, error: libraryError } = useLibraries();
+  const [transferClient, setTransferClient] = useState('builtin');
+  const [externalAvailable, setExternalAvailable] = useState(false);
+  useEffect(() => {
+    let active = true;
+    void api<{ id: string; configured: boolean }[]>('/downloads/clients')
+      .then((rows) => {
+        if (active && Array.isArray(rows))
+          setExternalAvailable(
+            rows.some((row) => row.id === 'aria2' && row.configured),
+          );
+      })
+      .catch(() => {});
+    return () => {
+      active = false;
+    };
+  }, []);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   async function approve(event: FormEvent<HTMLFormElement>) {
@@ -190,6 +206,7 @@ export function ApproveDownload({
           url: data.get('url'),
           budgetBytes: Math.floor(Number(data.get('budget')) * 1024 * 1024),
           sha256: data.get('checksum') || null,
+          transferClient,
           priority: 0,
         },
         plan: importPlan(data),
@@ -213,6 +230,20 @@ export function ApproveDownload({
       {libraries.length > 0 && (
         <form onSubmit={approve} className="download-form">
           <fieldset disabled={busy}>
+            {externalAvailable && (
+              <label>
+                Transfer client
+                <select
+                  value={transferClient}
+                  onChange={(event) => setTransferClient(event.target.value)}
+                >
+                  <option value="builtin">Built-in downloader</option>
+                  <option value="aria2">
+                    aria2 (SHA-256 required; resume re-fetches)
+                  </option>
+                </select>
+              </label>
+            )}
             <label>
               Authorized HTTPS source
               <input
@@ -235,8 +266,16 @@ export function ApproveDownload({
               />
             </label>
             <label>
-              Publisher SHA-256 (optional)
-              <input name="checksum" maxLength={64} pattern="[a-fA-F0-9]{64}" />
+              Publisher SHA-256{' '}
+              {transferClient === 'aria2'
+                ? '(required for aria2)'
+                : '(optional)'}
+              <input
+                name="checksum"
+                required={transferClient === 'aria2'}
+                maxLength={64}
+                pattern="[a-fA-F0-9]{64}"
+              />
             </label>
             <ImportFields
               libraries={libraries}

@@ -3114,6 +3114,10 @@
                 "$ref": "#/components/schemas/DownloadImportPlan"
               }
             ]
+          },
+          "transferClient": {
+            "type": "string",
+            "default": "builtin"
           }
         }
       },
@@ -3210,7 +3214,8 @@
           "error",
           "revision",
           "canResume",
-          "import"
+          "import",
+          "transferClient"
         ],
         "type": "object",
         "properties": {
@@ -3276,6 +3281,9 @@
                 "$ref": "#/components/schemas/DownloadImportView"
               }
             ]
+          },
+          "transferClient": {
+            "type": "string"
           }
         }
       },

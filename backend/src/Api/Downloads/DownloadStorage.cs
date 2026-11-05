@@ -79,14 +79,44 @@ public sealed class DownloadStorage(string data, IDownloadSpace space)
     public static long Remaining(DownloadJob job) =>
         Math.Max(0, (job.TotalBytes ?? job.MaxBytes) - job.ReceivedBytes);
 
+    private long ExternalRetained(IEnumerable<DownloadJob> jobs)
+    {
+        var root = Path.Combine(Path.GetDirectoryName(Root)!, "external-downloads");
+        if (!Directory.Exists(root))
+            return 0;
+        PathPolicy.RejectLinks(root);
+        var reserved = jobs.Where(x =>
+                x.TransferClient == "aria2" && x.State is "queued" or "running" or "paused"
+            )
+            .Select(x => x.Id)
+            .ToHashSet(StringComparer.Ordinal);
+        long total = 0;
+        foreach (var directory in Directory.EnumerateDirectories(root))
+        {
+            var id = Path.GetFileName(directory);
+            if (!Guid.TryParseExact(id, "N", out _))
+                throw new DownloadFault("external-staging-cleanup-required");
+            PathPolicy.RejectLinks(directory);
+            if (reserved.Contains(id) || !File.Exists(Path.Combine(directory, "payload")))
+                continue;
+            using var file = new PathPolicy([root]).OpenRead(directory, "payload");
+            total = checked(total + file.Length);
+        }
+        return total;
+    }
+
     public void Admit(IEnumerable<DownloadJob> jobs)
     {
         var rows = jobs.ToArray();
         var reserved = rows.Where(x => x.State is "queued" or "running" or "paused").Sum(Remaining);
         var importReserved = rows.Sum(DownloadAccess.ImportRemaining);
+        reserved += rows.Where(x =>
+                x.TransferClient == "aria2" && x.State is "queued" or "running" or "paused"
+            )
+            .Sum(x => x.MaxBytes);
         if (
             Free() - Margin < reserved + importReserved
-            || rows.Sum(x => x.ReceivedBytes) + reserved > TotalLimit
+            || rows.Sum(x => x.ReceivedBytes) + reserved + ExternalRetained(rows) > TotalLimit
         )
             throw new DownloadFault("insufficient-storage");
     }
