@@ -16,7 +16,8 @@ public record DownloadInput(
     string? Sha256,
     int Priority = 0,
     DownloadImportPlan? ImportPlan = null,
-    string TransferClient = "builtin"
+    string TransferClient = "builtin",
+    string? CatalogToken = null
 );
 
 public record DownloadAction(string Action, long ExpectedRevision, int? Priority = null);
@@ -38,7 +39,8 @@ public record DownloadView(
     long Revision,
     bool CanResume,
     DownloadImportView? Import,
-    string TransferClient
+    string TransferClient,
+    string? CatalogAttribution
 );
 
 public record DownloadSettingsView(
@@ -89,7 +91,8 @@ public static class DownloadEndpoints
             x.Revision,
             x.ReceivedBytes == 0 || x.ETag != null || x.TotalBytes == x.ReceivedBytes,
             DownloadApprovals.View(x),
-            x.TransferClient
+            x.TransferClient,
+            x.CatalogAttribution
         );
 
     private static readonly Expression<Func<DownloadJob, DownloadView>> Projection = x =>
@@ -125,7 +128,8 @@ public static class DownloadEndpoints
                     x.ImportedMediaId,
                     x.ImportCopiedBytes
                 ),
-            x.TransferClient
+            x.TransferClient,
+            x.CatalogAttribution
         );
 
     public static async Task<DownloadSettingsView> Settings(
@@ -302,6 +306,7 @@ public static class DownloadEndpoints
                         DownloadStorage storage,
                         IDownloadSpace space,
                         ExternalDownloads external,
+                        CatalogApproval catalog,
                         PathPolicy paths,
                         DownloadControl control,
                         IDataProtectionProvider protection,
@@ -309,6 +314,10 @@ public static class DownloadEndpoints
                         CancellationToken ct
                     ) =>
                     {
+                        if (input.CatalogToken is not null && !await DownloadWorker.Enabled(db, ct))
+                            return Results.Forbid();
+                        var catalogSource = await catalog.Prepare(input, ct);
+                        input = catalogSource.Input;
                         Validate(input);
                         if (input.TransferClient == "aria2" && !external.Capabilities.Configured)
                             throw new ArgumentException(
@@ -330,6 +339,8 @@ public static class DownloadEndpoints
                             );
                             var job = new DownloadJob
                             {
+                                ExpectedSha1 = catalogSource.Sha1,
+                                CatalogAttribution = catalogSource.Attribution,
                                 TransferClient = input.TransferClient,
                                 UserId = Operations.Uid(user),
                                 Name = input.Name.Trim(),

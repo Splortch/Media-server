@@ -36,6 +36,8 @@ public sealed class DownloadJob
     public long? TotalBytes { get; set; }
     public string? SourceIdentity { get; set; }
     public string? ETag { get; set; }
+    public string? CatalogAttribution { get; set; }
+    public string? ExpectedSha1 { get; set; }
     public string? ExpectedHash { get; set; }
     public string? ContentHash { get; set; }
     public string? Error { get; set; }

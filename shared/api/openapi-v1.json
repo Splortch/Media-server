@@ -3118,6 +3118,12 @@
           "transferClient": {
             "type": "string",
             "default": "builtin"
+          },
+          "catalogToken": {
+            "type": [
+              "null",
+              "string"
+            ]
           }
         }
       },
@@ -3215,7 +3221,8 @@
           "revision",
           "canResume",
           "import",
-          "transferClient"
+          "transferClient",
+          "catalogAttribution"
         ],
         "type": "object",
         "properties": {
@@ -3284,6 +3291,12 @@
           },
           "transferClient": {
             "type": "string"
+          },
+          "catalogAttribution": {
+            "type": [
+              "null",
+              "string"
+            ]
           }
         }
       },

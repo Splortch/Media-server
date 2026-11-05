@@ -2977,6 +2977,7 @@ export interface components {
             importPlan?: null | components["schemas"]["DownloadImportPlan"];
             /** @default builtin */
             transferClient: string;
+            catalogToken?: null | string;
         };
         DownloadMatchInput: {
             /** Format: int64 */
@@ -3020,6 +3021,7 @@ export interface components {
             canResume: boolean;
             import: null | components["schemas"]["DownloadImportView"];
             transferClient: string;
+            catalogAttribution: null | string;
         };
         EncoderCapability: {
             encoder: string;

@@ -154,6 +154,8 @@ builder.Services.AddSingleton(sp => new DownloadStorage(
 builder.Services.AddSingleton<IDownloadTransport, DownloadNetwork>();
 builder.Services.AddSingleton<IExternalDownloadClient, Aria2Client>();
 builder.Services.AddSingleton<ExternalDownloads>();
+builder.Services.AddSingleton<IDownloadCatalog, CommonsCatalog>();
+builder.Services.AddSingleton<CatalogApproval>();
 builder.Services.AddHostedService<DownloadWorker>();
 builder.Services.AddScoped<IUserContext, RequestUser>();
 builder.Services.AddDbContext<MediaDb>(o =>
@@ -435,6 +437,7 @@ app.MapOperations(credentialGate);
 app.MapFeatures();
 remoteAccess.Map(app);
 app.MapMovieRequests();
+app.MapDownloadCatalog();
 app.MapExternalDownloads();
 app.MapDownloads();
 app.MapDownloadApprovals();

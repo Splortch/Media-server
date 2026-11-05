@@ -22,6 +22,9 @@ namespace Infrastructure.Migrations
                     b.Property<string>("Id")
                         .HasColumnType("TEXT");
 
+                    b.Property<string>("CatalogAttribution")
+                        .HasColumnType("TEXT");
+
                     b.Property<string>("Classification")
                         .HasColumnType("TEXT");
 
@@ -45,6 +48,9 @@ namespace Infrastructure.Migrations
                         .HasColumnType("TEXT");
 
                     b.Property<string>("ExpectedHash")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("ExpectedSha1")
                         .HasColumnType("TEXT");
 
                     b.Property<long>("ImportCopiedBytes")

@@ -1,3 +1,7 @@
+import CatalogPicker, {
+  CatalogEvidence,
+  type CatalogChoice,
+} from './CatalogPicker';
 import ImportForm, {
   ImportFields,
   importPlan,
@@ -158,6 +162,8 @@ function AdminDownloads() {
   const [delivery, setDelivery] = useState('staging');
   const [downloadName, setDownloadName] = useState('');
   const [filter, setFilter] = useState('all');
+  const [catalogChoice, setCatalogChoice] = useState<CatalogChoice>();
+  const [sourceUrl, setSourceUrl] = useState('');
   const [transferClient, setTransferClient] = useState('builtin');
   const [externalAvailable, setExternalAvailable] = useState(false);
   useEffect(() => {
@@ -238,6 +244,7 @@ function AdminDownloads() {
       await api('/downloads', 'POST', {
         name: input.get('name'),
         url: input.get('url'),
+        ...(catalogChoice ? { catalogToken: catalogChoice.approvalToken } : {}),
         budgetBytes: Math.floor(Number(input.get('budget')) * mib),
         sha256: input.get('checksum') || null,
         transferClient,
@@ -247,6 +254,8 @@ function AdminDownloads() {
       form.reset();
       setDelivery('staging');
       setDownloadName('');
+      setSourceUrl('');
+      setCatalogChoice(undefined);
     });
   }
   const matches = (job: Job) =>
@@ -291,8 +300,16 @@ function AdminDownloads() {
           </a>
         </div>
       </section>
+      <CatalogPicker
+        onSelect={(item) => {
+          setCatalogChoice(item);
+          setSourceUrl(item.url);
+          setDownloadName(item.title);
+        }}
+      />
       <section className="panel">
         <h2>Add an authorized URL</h2>
+        {catalogChoice && <CatalogEvidence item={catalogChoice} />}
         <form className="download-form" onSubmit={create} aria-busy={busy}>
           <label>
             Download name
@@ -350,6 +367,11 @@ function AdminDownloads() {
             HTTPS source URL
             <input
               name="url"
+              value={sourceUrl}
+              onChange={(event) => {
+                setSourceUrl(event.target.value);
+                setCatalogChoice(undefined);
+              }}
               type="password"
               autoComplete="off"
               required
@@ -461,6 +483,9 @@ function AdminDownloads() {
                   ? `${bytes(job.budgetBytes)} budget (size unknown)`
                   : bytes(job.totalBytes)}
               </p>
+              {job.catalogAttribution && (
+                <p className="muted">{job.catalogAttribution}</p>
+              )}
               {job.error && (
                 <p className="muted" role="status">
                   {job.error.replaceAll('-', ' ')}
