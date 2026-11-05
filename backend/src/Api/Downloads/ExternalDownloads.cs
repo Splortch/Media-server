@@ -500,9 +500,12 @@ public sealed class ExternalDownloads(
         }
         catch (Exception ex)
         {
+            var safeJobId = id
+                .Replace("\r", string.Empty)
+                .Replace("\n", string.Empty);
             logger.LogWarning(
                 "External relay {JobId} stopped ({ErrorCode})",
-                id,
+                safeJobId,
                 ex is DownloadFault fault ? fault.Code : ex.GetType().Name
             );
             context.Abort();
