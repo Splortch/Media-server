@@ -1,3 +1,7 @@
+import CatalogPicker, {
+  CatalogEvidence,
+  type CatalogChoice,
+} from './CatalogPicker';
 import { useEffect, useState, type FormEvent } from 'react';
 import { api } from '../../services/api';
 import type { components } from '../../../../shared/api/src/generated';
@@ -174,6 +178,8 @@ export function ApproveDownload({
   onApproved: () => void;
 }) {
   const { libraries, error: libraryError } = useLibraries();
+  const [catalogChoice, setCatalogChoice] = useState<CatalogChoice>();
+  const [sourceUrl, setSourceUrl] = useState('');
   const [transferClient, setTransferClient] = useState('builtin');
   const [externalAvailable, setExternalAvailable] = useState(false);
   useEffect(() => {
@@ -204,6 +210,9 @@ export function ApproveDownload({
         source: {
           name: request.title.slice(0, 80),
           url: data.get('url'),
+          ...(catalogChoice
+            ? { catalogToken: catalogChoice.approvalToken }
+            : {}),
           budgetBytes: Math.floor(Number(data.get('budget')) * 1024 * 1024),
           sha256: data.get('checksum') || null,
           transferClient,
@@ -212,6 +221,8 @@ export function ApproveDownload({
         plan: importPlan(data),
       });
       form.reset();
+      setSourceUrl('');
+      setCatalogChoice(undefined);
       onApproved();
     } catch (e) {
       setError((e as Error).message);
@@ -227,6 +238,13 @@ export function ApproveDownload({
         destination, classification, rating and size before continuing.
       </p>
       {(error || libraryError) && <p role="alert">{error || libraryError}</p>}
+      <CatalogPicker
+        onSelect={(item) => {
+          setCatalogChoice(item);
+          setSourceUrl(item.url);
+        }}
+      />
+      {catalogChoice && <CatalogEvidence item={catalogChoice} />}
       {libraries.length > 0 && (
         <form onSubmit={approve} className="download-form">
           <fieldset disabled={busy}>
@@ -248,6 +266,11 @@ export function ApproveDownload({
               Authorized HTTPS source
               <input
                 name="url"
+                value={sourceUrl}
+                onChange={(event) => {
+                  setSourceUrl(event.target.value);
+                  setCatalogChoice(undefined);
+                }}
                 type="password"
                 autoComplete="off"
                 required

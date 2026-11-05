@@ -7,6 +7,7 @@ public class MediaDb(DbContextOptions<MediaDb> options, IUserContext? context = 
     : DbContext(options)
 {
     private int? CurrentUserId => context?.UserId;
+    public DbSet<MediaMetadata> Metadata => Set<MediaMetadata>();
     public DbSet<DownloadJob> Downloads => Set<DownloadJob>();
     public DbSet<DownloadPolicy> DownloadPolicies => Set<DownloadPolicy>();
     public DbSet<PlaybackBookmark> Bookmarks => Set<PlaybackBookmark>();
@@ -30,6 +31,13 @@ public class MediaDb(DbContextOptions<MediaDb> options, IUserContext? context = 
 
     protected override void OnModelCreating(ModelBuilder b)
     {
+        b.Entity<MediaMetadata>().HasKey(x => x.MediaItemId);
+        b.Entity<MediaMetadata>().Property(x => x.Revision).IsConcurrencyToken();
+        b.Entity<MediaMetadata>()
+            .HasOne<MediaItem>()
+            .WithOne()
+            .HasForeignKey<MediaMetadata>(x => x.MediaItemId)
+            .OnDelete(DeleteBehavior.Cascade);
         b.Entity<DownloadJob>().HasIndex(x => x.RequestId).IsUnique();
         b.Entity<DownloadJob>().HasOne<User>().WithMany().HasForeignKey(x => x.UserId);
         b.Entity<DownloadJob>()

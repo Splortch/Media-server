@@ -63,3 +63,9 @@ Backend integration tests run the real API, database, worker, protected URL pers
 ## Optional external client
 
 See [aria2 setup and supported operations](EXTERNAL-DOWNLOADS.md). The adapter is optional and does not require installing a client for built-in downloads.
+
+## Reviewed public-domain source catalog
+
+The optional [reviewed Commons CC0 catalog](DOWNLOAD-CATALOG.md) provides source
+and dedication evidence before explicit approval. It is disabled by default and
+does not enable unrelated catalogs or movie metadata providers.

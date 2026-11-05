@@ -306,6 +306,15 @@ public sealed class DownloadWorker(
                 .Downloads.Where(x => x.Id == id)
                 .ExecuteUpdateAsync(s => s.SetProperty(x => x.TotalBytes, (long?)file.Length), ct);
             await Check(db, job, file.Length, ct);
+            if (job.ExpectedSha1 is not null)
+            {
+                file.Position = 0;
+                if (
+                    Convert.ToHexString(await SHA1.HashDataAsync(file, ct)).ToLowerInvariant()
+                    != job.ExpectedSha1
+                )
+                    throw new DownloadFault("catalog-content-changed");
+            }
             file.Position = 0;
             var hash = Convert.ToHexString(await SHA256.HashDataAsync(file, ct)).ToLowerInvariant();
             if (job.ExpectedHash != null && hash != job.ExpectedHash)
@@ -391,14 +400,15 @@ public sealed class DownloadWorker(
         string[] hosts,
         long offset,
         string? etag,
-        CancellationToken ct
+        CancellationToken ct,
+        string userAgent = "MediaServer-DownloadCenter/0.1"
     )
     {
         for (var redirects = 0; redirects <= 3; redirects++)
         {
             DownloadNetwork.Url(uri.AbsoluteUri, hosts);
             using var request = new HttpRequestMessage(HttpMethod.Get, uri);
-            request.Headers.UserAgent.ParseAdd("MediaServer-DownloadCenter/0.1");
+            request.Headers.UserAgent.ParseAdd(userAgent);
             request.Headers.AcceptEncoding.ParseAdd("identity");
             if (offset > 0)
             {
