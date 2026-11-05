@@ -11,7 +11,7 @@ val buildNumber =
 
 android {
     namespace = "org.splortch.mediaserver.android"
-    compileSdk = 36
+    compileSdk = 37
     defaultConfig {
         applicationId = "org.splortch.mediaserver.android"
         minSdk = 26
