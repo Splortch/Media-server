@@ -17,7 +17,7 @@ The [client ecosystem](docs/clients/README.md) adds a shared Tauri desktop clien
 | First-run setup and login | Implemented | One local administrator; Argon2id, password change/local recovery, session revocation, consumed setup token, CSRF |
 | Libraries and scanning | Implemented | Explicit allowed roots, background jobs, FFprobe metadata, idempotent updates, admin-only scan failure references |
 | Media browsing | Implemented | Responsive React UI, search, technical details, honest empty states |
-| Title information before playback | Implemented alpha | Web/desktop cards open details without a player or stream request; explicit Play/Resume; rich movie/series metadata remains planned |
+| Title information before playback | Implemented alpha | Web/desktop cards open details without a player or stream request; explicit Play/Resume; web local NFO/manual identification and optional TMDB matching |
 | Direct Play | Implemented | Authenticated byte ranges through validated handles on Windows/Linux/macOS; controls, resume and playback diagnostics |
 | Optional features | Implemented alpha | Web Settings → Customize; per-account visibility and admin smart-collection policy; saved data retained |
 | Continue Watching | Implemented | Per-user persisted position; completed titles excluded |
@@ -27,7 +27,7 @@ The [client ecosystem](docs/clients/README.md) adds a shared Tauri desktop clien
 | Native alpha releases | Implemented workflow | Self-contained Windows/Linux/macOS servers, native desktop packages, bundled web UI, separate automatic alpha releases |
 | HLS conversion / quality / audio / text subtitles | Implemented alpha | Bounded full-video preparation; FFmpeg required; Auto/manual quality in web, desktop and Android clients |
 | Hardware encoders / HDR | Partial alpha | Opt-in NVENC/QSV/VAAPI/AMF adapters and software fallback; explicit SDR tone mapping; physical GPU/HDR validation pending |
-| Artwork / online metadata / TV matching | Planned | Current titles derive from filenames; no fabricated posters |
+| Artwork / online metadata / TV matching | Implemented alpha (web) | [Local NFO, manual corrections and explicit opt-in TMDB matching](docs/architecture/METADATA.md); bounded offline artwork cache; native editor pending |
 | Accounts / permissions / ratings | Implemented alpha | Admin-managed accounts, library grants, explicit content ratings; unknown ratings denied to restricted viewers |
 | Library watching / reconciliation | Implemented alpha | Opt-in watching, missing-entry tombstones and optional hash-based move/duplicate detection |
 | Indexed browsing / smart collections | Implemented alpha | Prefix search, bounded keyset pages, per-user typed rules |

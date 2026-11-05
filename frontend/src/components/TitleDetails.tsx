@@ -15,8 +15,23 @@ export default function TitleDetails({
   bookmarks = false,
   onBookmark,
   bookmarkRequest,
+  metadata,
 }: {
   item: Media;
+  metadata?: {
+    details: {
+      year: number | null;
+      synopsis: string;
+      genres: string[];
+      cast: string[];
+      series: string | null;
+      season: number | null;
+      episode: number | null;
+      attribution: string;
+    };
+    posterUrl: string | null;
+    backdropUrl: string | null;
+  } | null;
   bookmarks?: boolean;
   onBookmark?: (seconds: number) => void;
   bookmarkRequest?: BookmarkRequest;
@@ -34,7 +49,13 @@ export default function TitleDetails({
   return (
     <section className="title-overview" aria-label="Title information">
       <div ref={artwork} className="cover title-art tone-0" aria-hidden="true">
-        <span className="monogram">{item.title.slice(0, 1).toUpperCase()}</span>
+        {metadata?.posterUrl ? (
+          <img src={metadata.posterUrl} alt="" className="metadata-poster" />
+        ) : (
+          <span className="monogram">
+            {item.title.slice(0, 1).toUpperCase()}
+          </span>
+        )}
       </div>
       <div className="title-copy">
         <p className="eyebrow">FROM YOUR COLLECTION</p>
@@ -46,9 +67,41 @@ export default function TitleDetails({
           {item.container.split(',')[0].toUpperCase()}
         </p>
         <p className="muted">
-          {item.metadata?.description ||
+          {metadata?.details.synopsis ||
+            item.metadata?.description ||
             'No description is embedded in this file.'}
         </p>
+        {metadata && (
+          <>
+            <p>
+              {[
+                metadata.details.year,
+                metadata.details.series,
+                metadata.details.season !== null
+                  ? `Season ${metadata.details.season}`
+                  : null,
+                metadata.details.episode !== null
+                  ? `Episode ${metadata.details.episode}`
+                  : null,
+              ]
+                .filter((x) => x !== null && x !== '')
+                .join(' · ')}
+            </p>
+            <p>{metadata.details.genres.join(' · ')}</p>
+            {metadata.details.cast.length > 0 && (
+              <p>Cast: {metadata.details.cast.join(', ')}</p>
+            )}
+            <p className="muted">{metadata.details.attribution}</p>
+            {metadata.backdropUrl && (
+              <img
+                className="metadata-backdrop"
+                src={metadata.backdropUrl}
+                alt=""
+                loading="lazy"
+              />
+            )}
+          </>
+        )}
         <div className="action-group title-actions" aria-busy={busy}>
           {resume > 0 && (
             <button disabled={busy} onClick={() => begin(onResume)}>

@@ -35,3 +35,40 @@ it('displays embedded movie details and starts a selected chapter', () => {
   fireEvent.click(screen.getByRole('button', { name: /Finale/ }));
   expect(seek).toHaveBeenCalledWith(60);
 });
+
+it('preserves matched metadata when embedded descriptions are also present', () => {
+  render(
+    <TitleDetails
+      item={{
+        id: 1,
+        title: 'Matched movie',
+        duration: 120,
+        container: 'matroska',
+        videoCodec: 'h264',
+        audioCodec: 'aac',
+        size: 100,
+        metadata: { description: 'Embedded description', chapters: [] },
+      }}
+      metadata={{
+        details: {
+          year: 2025,
+          synopsis: 'Matched description',
+          genres: ['Drama'],
+          cast: ['An Actor'],
+          series: null,
+          season: null,
+          episode: null,
+          attribution: 'Metadata provider',
+        },
+        posterUrl: null,
+        backdropUrl: null,
+      }}
+      resume={0}
+      onPlay={vi.fn()}
+      onResume={vi.fn()}
+    />,
+  );
+  expect(screen.getByText('Matched description')).toBeInTheDocument();
+  expect(screen.queryByText('Embedded description')).not.toBeInTheDocument();
+  expect(screen.getByText('Cast: An Actor')).toBeInTheDocument();
+});

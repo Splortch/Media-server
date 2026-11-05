@@ -176,7 +176,13 @@ public sealed class ScanWorker(
                         );
                         item.ColorJson = metadata.ColorJson;
                         item.MetadataJson = System.Text.Json.JsonSerializer.Serialize(metadata.Metadata);
-                        if (item.ImportJobId is null)
+                        if (
+                            item.ImportJobId is null
+                            && !await db.Metadata.AnyAsync(
+                                x => x.MediaItemId == item.Id,
+                                stoppingToken
+                            )
+                        )
                             item.Title = metadata.Metadata?.Title ?? Path.GetFileNameWithoutExtension(path);
                         item.SearchTitle = item.Title.ToLowerInvariant();
                         item.IsMissing = false;
