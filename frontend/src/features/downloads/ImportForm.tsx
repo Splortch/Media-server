@@ -1,15 +1,19 @@
+import CatalogPicker, {
+  CatalogEvidence,
+  type CatalogChoice,
+} from './CatalogPicker';
 import { useEffect, useState, type FormEvent } from 'react';
 import { api } from '../../services/api';
 import type { components } from '../../../../shared/api/src/generated';
 type Plan = components['schemas']['DownloadImportPlan'];
 type Job = components['schemas']['DownloadView'];
-type Library = { id: number; name: string; kind: string };
+export type ImportLibrary = { id: number; name: string; kind: string };
 export function ImportFields({
   libraries,
   initial,
   requestLibrary,
 }: {
-  libraries: Library[];
+  libraries: ImportLibrary[];
   initial?: Partial<Plan>;
   requestLibrary?: number;
 }) {
@@ -142,12 +146,12 @@ export function importPlan(data: FormData): Plan {
     episode: optional('episode'),
   };
 }
-function useLibraries() {
-  const [libraries, setLibraries] = useState<Library[]>([]);
+export function useLibraries() {
+  const [libraries, setLibraries] = useState<ImportLibrary[]>([]);
   const [error, setError] = useState('');
   useEffect(() => {
     let active = true;
-    void api<Library[]>('/browse-libraries')
+    void api<ImportLibrary[]>('/browse-libraries')
       .then((rows) => {
         if (active) setLibraries(rows);
       })
@@ -174,6 +178,24 @@ export function ApproveDownload({
   onApproved: () => void;
 }) {
   const { libraries, error: libraryError } = useLibraries();
+  const [catalogChoice, setCatalogChoice] = useState<CatalogChoice>();
+  const [sourceUrl, setSourceUrl] = useState('');
+  const [transferClient, setTransferClient] = useState('builtin');
+  const [externalAvailable, setExternalAvailable] = useState(false);
+  useEffect(() => {
+    let active = true;
+    void api<{ id: string; configured: boolean }[]>('/downloads/clients')
+      .then((rows) => {
+        if (active && Array.isArray(rows))
+          setExternalAvailable(
+            rows.some((row) => row.id === 'aria2' && row.configured),
+          );
+      })
+      .catch(() => {});
+    return () => {
+      active = false;
+    };
+  }, []);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   async function approve(event: FormEvent<HTMLFormElement>) {
@@ -188,13 +210,19 @@ export function ApproveDownload({
         source: {
           name: request.title.slice(0, 80),
           url: data.get('url'),
+          ...(catalogChoice
+            ? { catalogToken: catalogChoice.approvalToken }
+            : {}),
           budgetBytes: Math.floor(Number(data.get('budget')) * 1024 * 1024),
           sha256: data.get('checksum') || null,
+          transferClient,
           priority: 0,
         },
         plan: importPlan(data),
       });
       form.reset();
+      setSourceUrl('');
+      setCatalogChoice(undefined);
       onApproved();
     } catch (e) {
       setError((e as Error).message);
@@ -210,13 +238,39 @@ export function ApproveDownload({
         destination, classification, rating and size before continuing.
       </p>
       {(error || libraryError) && <p role="alert">{error || libraryError}</p>}
+      <CatalogPicker
+        onSelect={(item) => {
+          setCatalogChoice(item);
+          setSourceUrl(item.url);
+        }}
+      />
+      {catalogChoice && <CatalogEvidence item={catalogChoice} />}
       {libraries.length > 0 && (
         <form onSubmit={approve} className="download-form">
           <fieldset disabled={busy}>
+            {externalAvailable && (
+              <label>
+                Transfer client
+                <select
+                  value={transferClient}
+                  onChange={(event) => setTransferClient(event.target.value)}
+                >
+                  <option value="builtin">Built-in downloader</option>
+                  <option value="aria2">
+                    aria2 (SHA-256 required; resume re-fetches)
+                  </option>
+                </select>
+              </label>
+            )}
             <label>
               Authorized HTTPS source
               <input
                 name="url"
+                value={sourceUrl}
+                onChange={(event) => {
+                  setSourceUrl(event.target.value);
+                  setCatalogChoice(undefined);
+                }}
                 type="password"
                 autoComplete="off"
                 required
@@ -235,8 +289,16 @@ export function ApproveDownload({
               />
             </label>
             <label>
-              Publisher SHA-256 (optional)
-              <input name="checksum" maxLength={64} pattern="[a-fA-F0-9]{64}" />
+              Publisher SHA-256{' '}
+              {transferClient === 'aria2'
+                ? '(required for aria2)'
+                : '(optional)'}
+              <input
+                name="checksum"
+                required={transferClient === 'aria2'}
+                maxLength={64}
+                pattern="[a-fA-F0-9]{64}"
+              />
             </label>
             <ImportFields
               libraries={libraries}
@@ -289,6 +351,13 @@ export default function ImportForm({
     <details>
       <summary>Match and organize {job.name}</summary>
       {error && <p role="alert">{error}</p>}
+      {!error && libraries.length === 0 && (
+        <p>
+          No libraries are configured.{' '}
+          <a href="#settings/libraries">Add a media library</a> before
+          organizing this download.
+        </p>
+      )}
       {libraries.length > 0 && (
         <form
           className="download-form"

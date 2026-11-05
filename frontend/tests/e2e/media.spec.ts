@@ -48,7 +48,7 @@ test('setup, accounts, collections, diagnostics, stream ranges and persist resum
   await page.getByRole('button', { name: 'Sign in', exact: true }).click();
   await page.getByRole('link', { name: 'Settings', exact: true }).click();
   await expect(
-    page.getByRole('heading', { name: 'Server settings' }),
+    page.getByRole('heading', { name: 'Settings', exact: true }),
   ).toBeVisible();
   await accessible(page);
   await page
@@ -86,6 +86,7 @@ test('setup, accounts, collections, diagnostics, stream ranges and persist resum
       'https://raw.githubusercontent.com/Splortch/Media-server/721a610c3b4eec3194fbfa3f35d5ad29a376cad8/LICENSE',
     );
   await page.getByLabel('Maximum size (MiB)').fill('1');
+  await page.getByText('Advanced download options', { exact: true }).click();
   const license = await readFile(path.resolve('../LICENSE'));
   await page
     .getByLabel('SHA-256 checksum (optional)')
@@ -660,6 +661,57 @@ test('setup, accounts, collections, diagnostics, stream ranges and persist resum
   );
   expect(importedBytes.status()).toBe(206);
   expect(await importedBytes.body()).toEqual(downloadFixture.subarray(0, 100));
+  await page.getByRole('link', { name: 'Downloads', exact: true }).click();
+  await page
+    .getByLabel('Download name', { exact: true })
+    .fill('Automatic library movie');
+  await page.getByLabel('After downloading').selectOption('library');
+  await expect(page.getByLabel('Confirmed title')).toHaveValue(
+    'Automatic library movie',
+  );
+  await page
+    .getByLabel('HTTPS source URL')
+    .fill(
+      'https://raw.githubusercontent.com/Splortch/Media-server/1773f135fa760e60bd6696fc4756c15a72d2d359/tests/fixtures/download.webm',
+    );
+  await page.getByLabel('Maximum size (MiB)').fill('1');
+  await page.getByLabel('Actual media container').selectOption('.webm');
+  await page.getByLabel('Approved content rating').selectOption('10');
+  await page.getByText('Advanced download options', { exact: true }).click();
+  await expect(page.getByLabel('SHA-256 checksum (optional)')).toBeVisible();
+  await page
+    .getByLabel('SHA-256 checksum (optional)')
+    .fill(createHash('sha256').update(downloadFixture).digest('hex'));
+  await page.getByRole('button', { name: 'Add download', exact: true }).click();
+  const automatic = page.locator('article').filter({
+    has: page.getByRole('heading', {
+      name: 'Automatic library movie',
+      exact: true,
+    }),
+  });
+  await expect(
+    automatic.getByRole('link', { name: 'Open imported title', exact: true }),
+  ).toBeVisible({ timeout: 60000 });
+  await page.getByLabel('Show downloads').selectOption('imported');
+  await expect(automatic).toBeVisible();
+  await accessible(page);
+  await page.screenshot({
+    path: 'test-results/visual/download-library-integration.png',
+    fullPage: true,
+  });
+  await page
+    .getByRole('link', { name: 'Download settings', exact: true })
+    .click();
+  await expect(page).toHaveURL(/#settings\/downloads$/);
+  await expect(
+    page.getByRole('navigation', { name: 'Settings categories' }),
+  ).toContainText('Administration');
+  await expect(page.locator('#settings-downloads')).toBeVisible();
+  await accessible(page);
+  await page.screenshot({
+    path: 'test-results/visual/settings-categories.png',
+    fullPage: true,
+  });
   await page.goto('/' + requestReturnHash);
   await expect(
     page.getByRole('region', { name: 'Title information' }),

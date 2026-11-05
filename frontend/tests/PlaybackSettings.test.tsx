@@ -91,7 +91,7 @@ it('removes a library only after explicit confirmation and reports server refusa
       return [{ id: 4, name: 'Movies', path: '/media/movies' }];
     return [];
   });
-  render(<Settings />);
+  render(<Settings admin />);
   fireEvent.click(
     await screen.findByRole('button', { name: 'Remove library Movies' }),
   );
@@ -161,7 +161,7 @@ it('settings shortcuts move keyboard focus and respect reduced motion without ch
     vi.fn(() => ({ matches: true })),
   );
   location.hash = '#settings';
-  render(<Settings />);
+  render(<Settings admin />);
   await waitFor(() => expect(api).toHaveBeenCalledWith('/libraries'));
   const target = document.getElementById('settings-account')!;
   target.scrollIntoView = scroll;
@@ -169,4 +169,23 @@ it('settings shortcuts move keyboard focus and respect reduced motion without ch
   expect(target).toHaveFocus();
   expect(scroll).toHaveBeenCalledWith({ behavior: 'auto', block: 'start' });
   expect(location.hash).toBe('#settings');
+});
+
+it('groups settings and never renders administration controls for members', () => {
+  vi.mocked(api).mockResolvedValue([]);
+  render(<Settings />);
+  expect(
+    screen.getByRole('navigation', { name: 'Settings categories' }),
+  ).toHaveTextContent('Personal');
+  expect(
+    screen.queryByRole('heading', { name: 'Administration' }),
+  ).not.toBeInTheDocument();
+  expect(
+    screen.queryByRole('button', { name: 'Downloads' }),
+  ).not.toBeInTheDocument();
+  expect(
+    screen.queryByRole('heading', { name: 'Library experience' }),
+  ).not.toBeInTheDocument();
+  expect(api).not.toHaveBeenCalledWith('/libraries');
+  expect(api).not.toHaveBeenCalledWith('/downloads/settings');
 });

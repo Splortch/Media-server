@@ -4,6 +4,9 @@ Every successful main commit can publish separate platform **prereleases** autom
 GitHub's built-in repository token publishes Releases and the GHCR container image.
 Organization policy must permit repository Actions to write Releases and Packages.
 
+Maintainers can assign Beta or Stable status to an existing build without
+rebuilding packages: see [GitHub release promotion](RELEASE-PROMOTION.md).
+
 ## Download and run
 
 New users: follow [Your first Media Server setup](../GETTING-STARTED.md) for numbered instructions, expected results and troubleshooting. The [project review](../development/PROJECT-REVIEW.md) distinguishes automated evidence from hands-on testing still required.

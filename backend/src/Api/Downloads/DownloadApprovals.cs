@@ -331,7 +331,25 @@ public static class DownloadApprovals
                         CancellationToken ct
                     ) =>
                     {
+                        if (
+                            !await DownloadWorker.Enabled(db, ct)
+                            || !await Features.Enabled(db, "movie-requests")
+                        )
+                            return Results.Forbid();
+                        var catalogSource = await app
+                            .Services.GetRequiredService<CatalogApproval>()
+                            .Prepare(input.Source, ct);
+                        input = input with { Source = catalogSource.Input };
                         DownloadEndpoints.Validate(input.Source);
+                        if (
+                            input.Source.TransferClient == "aria2"
+                            && !app
+                                .Services.GetRequiredService<ExternalDownloads>()
+                                .Capabilities.Configured
+                        )
+                            throw new ArgumentException(
+                                "The operator must configure aria2 before selecting it."
+                            );
                         ArgumentNullException.ThrowIfNull(input.Plan);
                         await control.Gate.WaitAsync(ct);
                         try
@@ -379,6 +397,9 @@ public static class DownloadApprovals
                             );
                             var job = new DownloadJob
                             {
+                                ExpectedSha1 = catalogSource.Sha1,
+                                CatalogAttribution = catalogSource.Attribution,
+                                TransferClient = input.Source.TransferClient,
                                 UserId = Operations.Uid(user),
                                 Name = input.Source.Name.Trim(),
                                 ProtectedUrl = protection

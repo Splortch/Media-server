@@ -1791,6 +1791,229 @@
         }
       }
     },
+    "/api/v1/media/{id}/metadata": {
+      "get": {
+        "tags": [
+          "Api"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MetadataView"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "Api"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MetadataCorrection"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MetadataView"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/media/{id}/artwork/{kind}": {
+      "get": {
+        "tags": [
+          "Api"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "kind",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/v1/metadata/providers": {
+      "get": {
+        "tags": [
+          "Api"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/v1/metadata/search": {
+      "post": {
+        "tags": [
+          "Api"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MetadataSearch"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/MetadataCandidate"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/media/{id}/metadata/local": {
+      "post": {
+        "tags": [
+          "Api"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MetadataRevision"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MetadataView"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/media/{id}/metadata/tmdb": {
+      "post": {
+        "tags": [
+          "Api"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MetadataMatch"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MetadataView"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/downloads/settings": {
       "get": {
         "tags": [
@@ -3104,6 +3327,26 @@
             "type": "integer",
             "format": "int32",
             "default": 0
+          },
+          "importPlan": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/DownloadImportPlan"
+              }
+            ]
+          },
+          "transferClient": {
+            "type": "string",
+            "default": "builtin"
+          },
+          "catalogToken": {
+            "type": [
+              "null",
+              "string"
+            ]
           }
         }
       },
@@ -3200,7 +3443,9 @@
           "error",
           "revision",
           "canResume",
-          "import"
+          "import",
+          "transferClient",
+          "catalogAttribution"
         ],
         "type": "object",
         "properties": {
@@ -3265,6 +3510,15 @@
               {
                 "$ref": "#/components/schemas/DownloadImportView"
               }
+            ]
+          },
+          "transferClient": {
+            "type": "string"
+          },
+          "catalogAttribution": {
+            "type": [
+              "null",
+              "string"
             ]
           }
         }
@@ -3692,6 +3946,215 @@
           "forced": {
             "type": "boolean",
             "default": false
+          }
+        }
+      },
+      "MetadataCandidate": {
+        "required": [
+          "id",
+          "kind",
+          "title",
+          "year"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "year": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int32"
+          }
+        }
+      },
+      "MetadataCorrection": {
+        "required": [
+          "details",
+          "expectedRevision"
+        ],
+        "type": "object",
+        "properties": {
+          "details": {
+            "$ref": "#/components/schemas/MetadataValue"
+          },
+          "expectedRevision": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
+      "MetadataMatch": {
+        "required": [
+          "id",
+          "kind",
+          "expectedRevision"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string"
+          },
+          "expectedRevision": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "season": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int32"
+          },
+          "episode": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int32"
+          }
+        }
+      },
+      "MetadataRevision": {
+        "required": [
+          "expectedRevision"
+        ],
+        "type": "object",
+        "properties": {
+          "expectedRevision": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
+      "MetadataSearch": {
+        "required": [
+          "query",
+          "kind"
+        ],
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string"
+          }
+        }
+      },
+      "MetadataValue": {
+        "required": [
+          "title",
+          "year",
+          "synopsis",
+          "genres",
+          "cast",
+          "series",
+          "season",
+          "episode",
+          "provider",
+          "providerId",
+          "attribution"
+        ],
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string"
+          },
+          "year": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int32"
+          },
+          "synopsis": {
+            "type": "string"
+          },
+          "genres": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "cast": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "series": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "season": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int32"
+          },
+          "episode": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int32"
+          },
+          "provider": {
+            "type": "string"
+          },
+          "providerId": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "attribution": {
+            "type": "string"
+          }
+        }
+      },
+      "MetadataView": {
+        "required": [
+          "details",
+          "posterUrl",
+          "backdropUrl",
+          "revision"
+        ],
+        "type": "object",
+        "properties": {
+          "details": {
+            "$ref": "#/components/schemas/MetadataValue"
+          },
+          "posterUrl": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "backdropUrl": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "revision": {
+            "type": "integer",
+            "format": "int64"
           }
         }
       },

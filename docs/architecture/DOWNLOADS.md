@@ -19,7 +19,7 @@ The parent roadmap is [#107](https://github.com/Splortch/Media-server/issues/107
 ## Step by step
 
 1. Update the server normally and sign in as an administrator. SQLite migrations run at startup.
-2. Open **Settings → Download center**. Check the available space. Staging uses the server **data-directory filesystem**, which may differ from your media-library disks.
+2. Open **Settings → Administration → Download center**. Check the available space. Staging uses the server **data-directory filesystem**, which may differ from your media-library disks.
 3. Enter exact public source hostnames, one per line (no URL, port or wildcard). Include every host used by authorized redirects. Only approve sources you trust and are authorized to download from.
 4. Check **Enable download center**, then **Save download settings**. Saving any policy change pauses existing active/queued jobs, so an old host policy cannot keep running in pooled connections.
 5. Open **Downloads** in the sidebar. Give the transfer a name, paste its HTTPS URL, choose a maximum size in MiB, and optionally supply the publisher's SHA-256. Query tokens are hidden in the form, encrypted at rest, and excluded from queue responses.
@@ -41,7 +41,7 @@ The worker enforces a six-hour attempt limit, ten-second connection limit, thirt
 
 All routes exist under `/api/downloads` and `/api/v1/downloads`, require the existing administrator authorization policy, and retain existing cookie/session and CSRF protections. The versioned OpenAPI and generated TypeScript describe queue/settings/control models. Web UI uses the actual backend; native Android/desktop downloader screens are not implemented.
 
-Production transport uses `SocketsHttpHandler.ConnectCallback` to resolve and validate all DNS answers, rejects local/private/link-local/reserved addresses and pins the connection to a verified public IP. Original hostname/TLS verification remains enabled. Proxy, cookies, automatic decompression and implicit redirects are disabled. Every redirect is independently revalidated against the exact host allowlist. Private-network external clients need a separate future trust model, not an exemption here.
+Production transport uses `SocketsHttpHandler.ConnectCallback` to resolve and validate all DNS answers, rejects local/private/link-local/reserved addresses and pins the connection to a verified public IP. Original hostname/TLS verification remains enabled. Proxy, cookies, automatic decompression and implicit redirects are disabled. Every redirect is independently revalidated against the exact host allowlist. The optional [aria2 adapter](EXTERNAL-DOWNLOADS.md) uses separate explicit operator trust; source URLs never receive a private-network exemption.
 
 Source URLs are protected with an isolated ASP.NET Data Protection purpose. Persisted final-URI hashes, ETags and encrypted source URLs are internal and absent from queue DTOs. Controlled tests replace only the remote transport; production never accepts a test certificate or private source override.
 
@@ -58,3 +58,14 @@ A staged SHA-256 is always calculated; it verifies publisher content only when y
 ## Validation
 
 Backend integration tests run the real API, database, worker, protected URL persistence and file staging against a controlled HTTP source. They cover authentication, CSRF, default-off behavior, pause/resume/cancel, source changes/ignored ranges, priority, restart recovery, unknown length, budget/space failures, disconnection, range retrieval and cleanup. Filesystem tests exercise secure writes and hard-link refusal on CI platforms; macOS additionally checks the SDK ABI. Browser CI downloads this repository's Apache license over real public HTTPS, verifies its digest/content, checks the queue UI with axe, and removes the staged file. Build success is not physical-device validation.
+
+
+## Optional external client
+
+See [aria2 setup and supported operations](EXTERNAL-DOWNLOADS.md). The adapter is optional and does not require installing a client for built-in downloads.
+
+## Reviewed public-domain source catalog
+
+The optional [reviewed Commons CC0 catalog](DOWNLOAD-CATALOG.md) provides source
+and dedication evidence before explicit approval. It is disabled by default and
+does not enable unrelated catalogs or movie metadata providers.

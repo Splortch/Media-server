@@ -1,0 +1,58 @@
+name: Promote existing GitHub release
+on:
+  workflow_dispatch:
+    inputs:
+      source_tag:
+        description: 'Existing published Alpha/Beta tag, including platform prefix'
+        required: true
+        type: string
+      target_tag:
+        description: 'New same-platform Beta/Stable tag (e.g. server-windows/v0.2.0-beta.1)'
+        required: true
+        type: string
+  pull_request:
+    paths:
+      - '.github/workflows/promote-release.yml'
+      - 'scripts/promote-release.cjs'
+      - 'scripts/tests/release-promotion.test.cjs'
+permissions:
+  contents: read
+concurrency:
+  group: github-release-promotion
+  cancel-in-progress: false
+jobs:
+  test:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+      - run: node --test scripts/tests/release-promotion.test.cjs scripts/tests/release-plan.test.cjs
+  promote:
+    needs: test
+    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: write
+      actions: read
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/github-script@v9
+        env:
+          SOURCE_TAG: ${{ inputs.source_tag }}
+          TARGET_TAG: ${{ inputs.target_tag }}
+        with:
+          script: |
+            const {promote} = require('./scripts/promote-release.cjs');
+            const release = await promote({github,context,
+              sourceTag:process.env.SOURCE_TAG,targetTag:process.env.TARGET_TAG});
+            core.summary.addLink('Promoted GitHub release', release.html_url);
+            await core.summary.write();

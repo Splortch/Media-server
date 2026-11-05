@@ -15,6 +15,7 @@ public sealed class DownloadWorker(
     DownloadControl control,
     DownloadStorage storage,
     IDownloadTransport transport,
+    ExternalDownloads external,
     IDataProtectionProvider protection,
     DownloadImporter importer,
     ILogger<DownloadWorker> logger
@@ -33,6 +34,7 @@ public sealed class DownloadWorker(
             {
                 Id = x.Id,
                 State = x.State,
+                TransferClient = x.TransferClient,
                 MaxBytes = x.MaxBytes,
                 ReceivedBytes = x.ReceivedBytes,
                 TotalBytes = x.TotalBytes,
@@ -189,7 +191,8 @@ public sealed class DownloadWorker(
                 );
             return;
         }
-        using var client = transport.Create(hosts);
+        using var client =
+            job.TransferClient == "aria2" ? external.Create(job, hosts) : transport.Create(hosts);
         await using (var file = storage.OpenWrite(id))
         {
             var offset = file.Length;
@@ -303,6 +306,15 @@ public sealed class DownloadWorker(
                 .Downloads.Where(x => x.Id == id)
                 .ExecuteUpdateAsync(s => s.SetProperty(x => x.TotalBytes, (long?)file.Length), ct);
             await Check(db, job, file.Length, ct);
+            if (job.ExpectedSha1 is not null)
+            {
+                file.Position = 0;
+                if (
+                    Convert.ToHexString(await SHA1.HashDataAsync(file, ct)).ToLowerInvariant()
+                    != job.ExpectedSha1
+                )
+                    throw new DownloadFault("catalog-content-changed");
+            }
             file.Position = 0;
             var hash = Convert.ToHexString(await SHA256.HashDataAsync(file, ct)).ToLowerInvariant();
             if (job.ExpectedHash != null && hash != job.ExpectedHash)
@@ -382,20 +394,21 @@ public sealed class DownloadWorker(
         }
     }
 
-    private static async Task<(HttpResponseMessage Response, string Identity)> Response(
+    internal static async Task<(HttpResponseMessage Response, string Identity)> Response(
         HttpClient client,
         Uri uri,
         string[] hosts,
         long offset,
         string? etag,
-        CancellationToken ct
+        CancellationToken ct,
+        string userAgent = "MediaServer-DownloadCenter/0.1"
     )
     {
         for (var redirects = 0; redirects <= 3; redirects++)
         {
             DownloadNetwork.Url(uri.AbsoluteUri, hosts);
             using var request = new HttpRequestMessage(HttpMethod.Get, uri);
-            request.Headers.UserAgent.ParseAdd("MediaServer-DownloadCenter/0.1");
+            request.Headers.UserAgent.ParseAdd(userAgent);
             request.Headers.AcceptEncoding.ParseAdd("identity");
             if (offset > 0)
             {

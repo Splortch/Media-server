@@ -1,4 +1,12 @@
-import ImportForm from './ImportForm';
+import CatalogPicker, {
+  CatalogEvidence,
+  type CatalogChoice,
+} from './CatalogPicker';
+import ImportForm, {
+  ImportFields,
+  importPlan,
+  useLibraries,
+} from './ImportForm';
 import {
   useCallback,
   useEffect,
@@ -16,6 +24,23 @@ const bytes = (value: number) =>
   value >= mib * 1024
     ? `${(value / mib / 1024).toFixed(1)} GiB`
     : `${(value / mib).toFixed(1)} MiB`;
+function inCategory(job: Job, filter: string) {
+  if (filter === 'paused') return ['paused', 'failed'].includes(job.state);
+  if (filter === 'imported') return job.import?.state === 'imported';
+  if (filter === 'review')
+    return (
+      job.state === 'completed' &&
+      (!job.import || ['inbox', 'held', 'discarded'].includes(job.import.state))
+    );
+  if (filter === 'active')
+    return (
+      ['queued', 'running', 'finalizing'].includes(job.state) ||
+      ['waiting', 'queued', 'copying', 'scanning'].includes(
+        job.import?.state ?? '',
+      )
+    );
+  return true;
+}
 export function DownloadSettings({
   onChange,
 }: {
@@ -67,8 +92,9 @@ export function DownloadSettings({
     >
       <h2>Download center</h2>
       <p className="muted">
-        Optional administrator tool for authorized public HTTPS URLs. Files stay
-        in separate staging storage until an administrator approves a library
+        Optional administrator tool for authorized public HTTPS URLs. Choose
+        automatic library delivery when adding a download, or keep files in
+        separate staging storage until an administrator approves a library
         match. Family approvals and managed Movies/TV imports are available;
         catalogs and external clients are planned.
       </p>
@@ -124,7 +150,37 @@ export function DownloadSettings({
     </section>
   );
 }
-export default function Downloads() {
+export default function Downloads({ admin = false }: { admin?: boolean }) {
+  return admin ? (
+    <AdminDownloads />
+  ) : (
+    <p>You need an administrator account to open the download center.</p>
+  );
+}
+function AdminDownloads() {
+  const { libraries, error: libraryError } = useLibraries();
+  const [delivery, setDelivery] = useState('staging');
+  const [downloadName, setDownloadName] = useState('');
+  const [filter, setFilter] = useState('all');
+  const [catalogChoice, setCatalogChoice] = useState<CatalogChoice>();
+  const [sourceUrl, setSourceUrl] = useState('');
+  const [transferClient, setTransferClient] = useState('builtin');
+  const [externalAvailable, setExternalAvailable] = useState(false);
+  useEffect(() => {
+    let active = true;
+    void api<{ id: string; configured: boolean }[]>('/downloads/clients')
+      .then((rows) => {
+        if (active && Array.isArray(rows))
+          setExternalAvailable(
+            rows.some((row) => row.id === 'aria2' && row.configured),
+          );
+      })
+      .catch(() => {});
+    return () => {
+      active = false;
+    };
+  }, []);
+  const [search, setSearch] = useState('');
   const [jobs, setJobs] = useState<Job[]>([]);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
@@ -188,23 +244,39 @@ export default function Downloads() {
       await api('/downloads', 'POST', {
         name: input.get('name'),
         url: input.get('url'),
+        ...(catalogChoice ? { catalogToken: catalogChoice.approvalToken } : {}),
         budgetBytes: Math.floor(Number(input.get('budget')) * mib),
         sha256: input.get('checksum') || null,
+        transferClient,
         priority: Number(input.get('priority')),
+        ...(delivery === 'library' ? { importPlan: importPlan(input) } : {}),
       });
       form.reset();
+      setDelivery('staging');
+      setDownloadName('');
+      setSourceUrl('');
+      setCatalogChoice(undefined);
     });
   }
+  const matches = (job: Job) =>
+    inCategory(job, filter) &&
+    [
+      job.name,
+      job.import?.title,
+      libraries.find((library) => library.id === job.import?.libraryId)?.name,
+    ].some((value) =>
+      value?.toLowerCase().includes(search.trim().toLowerCase()),
+    );
   return (
     <>
-      <p className="eyebrow">YOUR SOURCES. YOUR CONTROL.</p>
+      <p className="eyebrow">ADMINISTRATION · DOWNLOADS</p>
       <h1>Download center</h1>
       <p className="muted">
-        Download only content you are authorized to obtain. Completed files are
-        staged for administrator retrieval. Confirm a library match to organize
-        and scan them automatically.
+        Download only content you are authorized to obtain. Choose a destination
+        library to organize and scan completed media automatically, or keep
+        files in staging and confirm a library match later.
       </p>
-      <a href="#settings" className="back-link">
+      <a href="#settings/downloads" className="back-link">
         Download settings
       </a>
       {error && (
@@ -213,16 +285,93 @@ export default function Downloads() {
         </p>
       )}
       <section className="panel">
+        <h2>Library delivery</h2>
+        <p>
+          Choose a library when adding a URL to download, organize and scan the
+          title in one step. Completed staged files can be matched from the
+          queue.
+        </p>
+        <div className="download-actions">
+          <a className="button secondary" href="#settings/libraries">
+            Manage media libraries
+          </a>
+          <a className="button secondary" href="#requests">
+            Review family requests
+          </a>
+        </div>
+      </section>
+      <CatalogPicker
+        onSelect={(item) => {
+          setCatalogChoice(item);
+          setSourceUrl(item.url);
+          setDownloadName(item.title);
+        }}
+      />
+      <section className="panel">
         <h2>Add an authorized URL</h2>
+        {catalogChoice && <CatalogEvidence item={catalogChoice} />}
         <form className="download-form" onSubmit={create} aria-busy={busy}>
           <label>
             Download name
-            <input name="name" required maxLength={80} />
+            <input
+              name="name"
+              required
+              maxLength={80}
+              value={downloadName}
+              onChange={(e) => setDownloadName(e.target.value)}
+            />
           </label>
+          <label>
+            After downloading
+            <select
+              value={delivery}
+              onChange={(e) => setDelivery(e.target.value)}
+            >
+              <option value="staging">Keep in download staging</option>
+              <option value="library" disabled={!libraries.length}>
+                Add to a media library automatically
+              </option>
+            </select>
+          </label>
+          {!libraries.length && (
+            <p className="muted">
+              {libraryError ||
+                'Add a library to enable automatic organization.'}{' '}
+              <a href="#settings/libraries">Manage libraries</a>
+            </p>
+          )}
+          {delivery === 'library' && (
+            <fieldset>
+              <legend>Library destination and movie information</legend>
+              <ImportFields
+                libraries={libraries}
+                initial={{ title: downloadName }}
+              />
+            </fieldset>
+          )}
+          {externalAvailable && (
+            <label>
+              Transfer client
+              <select
+                value={transferClient}
+                onChange={(event) => setTransferClient(event.target.value)}
+              >
+                <option value="builtin">Built-in downloader</option>
+                <option value="aria2">
+                  aria2 (SHA-256 required; resume re-fetches)
+                </option>
+              </select>
+            </label>
+          )}
           <label>
             HTTPS source URL
             <input
               name="url"
+              value={sourceUrl}
+              onChange={(event) => {
+                setSourceUrl(event.target.value);
+                setCatalogChoice(undefined);
+              }}
               type="password"
               autoComplete="off"
               required
@@ -241,31 +390,43 @@ export default function Downloads() {
               defaultValue={1024}
             />
           </label>
-          <label>
-            Priority
-            <input
-              name="priority"
-              type="number"
-              min={-10}
-              max={10}
-              defaultValue={0}
-              required
-            />
-          </label>
-          <label>
-            SHA-256 checksum (optional)
-            <input
-              name="checksum"
-              pattern="[a-fA-F0-9]{64}"
-              maxLength={64}
-              autoComplete="off"
-            />
-          </label>
-          <p className="muted">
-            Higher priority runs first after the current transfer. The size
-            budget reserves space before starting. URL tokens are encrypted on
-            the server.
-          </p>
+          <details>
+            <summary>Advanced download options</summary>
+            <label>
+              Priority
+              <input
+                name="priority"
+                type="number"
+                min={-10}
+                max={10}
+                defaultValue={0}
+                required
+              />
+            </label>
+            <label>
+              SHA-256 checksum{' '}
+              {transferClient === 'aria2'
+                ? '(required for aria2)'
+                : '(optional)'}
+              <input
+                name="checksum"
+                required={transferClient === 'aria2'}
+                onInvalid={(event) =>
+                  event.currentTarget
+                    .closest('details')
+                    ?.setAttribute('open', '')
+                }
+                pattern="[a-fA-F0-9]{64}"
+                maxLength={64}
+                autoComplete="off"
+              />
+            </label>
+            <p className="muted">
+              Higher priority runs first after the current transfer. The size
+              budget reserves space before starting. URL tokens are encrypted on
+              the server.
+            </p>
+          </details>
           <button disabled={busy || !loaded}>
             {busy ? 'Working…' : 'Add download'}
           </button>
@@ -273,13 +434,35 @@ export default function Downloads() {
       </section>
       <section aria-label="Download queue">
         <h2>Queue</h2>
+        <label>
+          Search downloads
+          <input
+            type="search"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Title or library name"
+          />
+        </label>
+        <label>
+          Show downloads
+          <select value={filter} onChange={(e) => setFilter(e.target.value)}>
+            <option value="all">All downloads</option>
+            <option value="active">Downloading and organizing</option>
+            <option value="review">Needs library attention</option>
+            <option value="paused">Paused or failed</option>
+            <option value="imported">Added to library</option>
+          </select>
+        </label>
         {!loaded ? (
           <p role="status">Loading downloads…</p>
         ) : (
           !jobs.length && <p>No downloads yet.</p>
         )}
+        {loaded && jobs.length > 0 && !jobs.some(matches) && (
+          <p>No downloads match your search and category.</p>
+        )}
         <div className="download-queue">
-          {jobs.map((job) => (
+          {jobs.filter(matches).map((job) => (
             <article className="panel download-job" key={job.id}>
               <h3>{job.name}</h3>
               <p className="muted">
@@ -300,6 +483,9 @@ export default function Downloads() {
                   ? `${bytes(job.budgetBytes)} budget (size unknown)`
                   : bytes(job.totalBytes)}
               </p>
+              {job.catalogAttribution && (
+                <p className="muted">{job.catalogAttribution}</p>
+              )}
               {job.error && (
                 <p className="muted" role="status">
                   {job.error.replaceAll('-', ' ')}
@@ -311,8 +497,24 @@ export default function Downloads() {
                   <code className="download-hash">{job.contentHash}</code>
                 </details>
               )}
+              {!job.import && (
+                <p className="muted">
+                  Destination: staging ·{' '}
+                  {job.state === 'completed'
+                    ? 'Ready to match and add to a library'
+                    : 'Choose a library after downloading'}
+                </p>
+              )}
               {job.import && (
                 <div className="import-status">
+                  <p>
+                    Destination:{' '}
+                    {libraries.find(
+                      (library) => library.id === job.import?.libraryId,
+                    )?.name ?? 'Library unavailable'}{' '}
+                    · {job.import.title}
+                    {job.import.year ? ` (${job.import.year})` : ''}
+                  </p>
                   <p>
                     Library import: {job.import.state} ·{' '}
                     {job.import.classification === 'tv' ? 'TV Shows' : 'Movies'}

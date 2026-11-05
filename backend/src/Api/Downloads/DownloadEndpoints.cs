@@ -3,6 +3,7 @@ using System.Security.Claims;
 using System.Text.Json;
 using MediaServer.Core;
 using MediaServer.Infrastructure;
+using MediaServer.Media;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.EntityFrameworkCore;
 
@@ -13,7 +14,10 @@ public record DownloadInput(
     string Url,
     long BudgetBytes,
     string? Sha256,
-    int Priority = 0
+    int Priority = 0,
+    DownloadImportPlan? ImportPlan = null,
+    string TransferClient = "builtin",
+    string? CatalogToken = null
 );
 
 public record DownloadAction(string Action, long ExpectedRevision, int? Priority = null);
@@ -34,7 +38,9 @@ public record DownloadView(
     string? Error,
     long Revision,
     bool CanResume,
-    DownloadImportView? Import
+    DownloadImportView? Import,
+    string TransferClient,
+    string? CatalogAttribution
 );
 
 public record DownloadSettingsView(
@@ -57,13 +63,15 @@ public static class DownloadEndpoints
             || input.Name.Any(char.IsControl)
             || input.BudgetBytes is < 1 or > DownloadStorage.TotalLimit
             || input.Priority is < -10 or > 10
+            || input.TransferClient is not ("builtin" or "aria2")
+            || (input.TransferClient == "aria2" && input.Sha256 is null)
             || (
                 input.Sha256 != null
                 && (input.Sha256.Length != 64 || !input.Sha256.All(Uri.IsHexDigit))
             )
         )
             throw new ArgumentException(
-                "Use a name of 1–80 characters, positive budget up to 100 GiB, priority -10…10 and an optional 64-digit SHA-256."
+                "Use a name of 1–80 characters, positive budget up to 100 GiB, priority -10…10 and a 64-digit SHA-256 (required for aria2). Choose built-in or configured aria2."
             );
     }
 
@@ -82,7 +90,9 @@ public static class DownloadEndpoints
             x.Error,
             x.Revision,
             x.ReceivedBytes == 0 || x.ETag != null || x.TotalBytes == x.ReceivedBytes,
-            DownloadApprovals.View(x)
+            DownloadApprovals.View(x),
+            x.TransferClient,
+            x.CatalogAttribution
         );
 
     private static readonly Expression<Func<DownloadJob, DownloadView>> Projection = x =>
@@ -117,7 +127,9 @@ public static class DownloadEndpoints
                     x.ImportError,
                     x.ImportedMediaId,
                     x.ImportCopiedBytes
-                )
+                ),
+            x.TransferClient,
+            x.CatalogAttribution
         );
 
     public static async Task<DownloadSettingsView> Settings(
@@ -142,7 +154,9 @@ public static class DownloadEndpoints
             JsonSerializer.Deserialize<string[]>(policy?.HostsJson ?? "[]") ?? [],
             free,
             jobs.Where(x => x.State is "queued" or "running" or "paused")
-                .Sum(DownloadStorage.Remaining) + jobs.Sum(DownloadAccess.ImportRemaining),
+                .Sum(x =>
+                    DownloadStorage.Remaining(x) + (x.TransferClient == "aria2" ? x.MaxBytes : 0)
+                ) + jobs.Sum(DownloadAccess.ImportRemaining),
             DownloadStorage.Margin,
             DownloadStorage.TotalLimit
         );
@@ -290,13 +304,25 @@ public static class DownloadEndpoints
                         DownloadInput input,
                         MediaDb db,
                         DownloadStorage storage,
+                        IDownloadSpace space,
+                        ExternalDownloads external,
+                        CatalogApproval catalog,
+                        PathPolicy paths,
                         DownloadControl control,
                         IDataProtectionProvider protection,
                         ClaimsPrincipal user,
                         CancellationToken ct
                     ) =>
                     {
+                        if (input.CatalogToken is not null && !await DownloadWorker.Enabled(db, ct))
+                            return Results.Forbid();
+                        var catalogSource = await catalog.Prepare(input, ct);
+                        input = catalogSource.Input;
                         Validate(input);
+                        if (input.TransferClient == "aria2" && !external.Capabilities.Configured)
+                            throw new ArgumentException(
+                                "The operator must configure aria2 before selecting it."
+                            );
                         await control.Gate.WaitAsync(ct);
                         try
                         {
@@ -313,6 +339,9 @@ public static class DownloadEndpoints
                             );
                             var job = new DownloadJob
                             {
+                                ExpectedSha1 = catalogSource.Sha1,
+                                CatalogAttribution = catalogSource.Attribution,
+                                TransferClient = input.TransferClient,
                                 UserId = Operations.Uid(user),
                                 Name = input.Name.Trim(),
                                 SourceHost = uri.IdnHost,
@@ -323,6 +352,16 @@ public static class DownloadEndpoints
                                 ExpectedHash = input.Sha256?.ToLowerInvariant(),
                                 Priority = input.Priority,
                             };
+                            if (input.ImportPlan is not null)
+                                await DownloadApprovals.Plan(
+                                    db,
+                                    storage,
+                                    space,
+                                    paths,
+                                    job,
+                                    input.ImportPlan,
+                                    ct
+                                );
                             storage.Admit((await DownloadWorker.Budgets(db, ct)).Append(job));
                             db.Downloads.Add(job);
                             await db.SaveChangesAsync(ct);
@@ -341,6 +380,7 @@ public static class DownloadEndpoints
                     async (
                         string id,
                         DownloadAction input,
+                        ExternalDownloads external,
                         MediaDb db,
                         DownloadControl control,
                         DownloadStorage storage,
@@ -401,6 +441,7 @@ public static class DownloadEndpoints
                                     var budget = new DownloadJob
                                     {
                                         State = "queued",
+                                        TransferClient = row.TransferClient,
                                         MaxBytes = row.MaxBytes,
                                         ReceivedBytes =
                                             input.Action == "restart" ? 0 : row.ReceivedBytes,
@@ -410,6 +451,7 @@ public static class DownloadEndpoints
                                     storage.Admit(others.Append(budget));
                                     if (input.Action == "restart")
                                     {
+                                        await external.Stop(row, ct);
                                         storage.Discard(id);
                                         row.ReceivedBytes = 0;
                                         row.TotalBytes = null;
@@ -429,6 +471,7 @@ public static class DownloadEndpoints
                                     row.Desired = "cancel";
                                     if (row.State != "running")
                                     {
+                                        await external.Stop(row, ct);
                                         storage.Discard(id);
                                         row.State = "cancelled";
                                         row.ImportState = "discarded";
@@ -460,6 +503,7 @@ public static class DownloadEndpoints
                 async (
                     string id,
                     long revision,
+                    ExternalDownloads external,
                     MediaDb db,
                     DownloadStorage storage,
                     DownloadControl control,
@@ -497,6 +541,7 @@ public static class DownloadEndpoints
                                 }
                             );
                         storage.Discard(id);
+                        await external.Stop(row, ct);
                         db.Downloads.Remove(row);
                         await db.SaveChangesAsync(ct);
                         return Results.NoContent();

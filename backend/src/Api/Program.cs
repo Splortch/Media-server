@@ -7,6 +7,7 @@ using MediaServer.Core;
 using MediaServer.Downloads;
 using MediaServer.Infrastructure;
 using MediaServer.Media;
+using MediaServer.Metadata;
 using MediaServer.Services;
 using Microsoft.AspNetCore.Antiforgery;
 using Microsoft.AspNetCore.Authentication;
@@ -152,6 +153,14 @@ builder.Services.AddSingleton(sp => new DownloadStorage(
     sp.GetRequiredService<IDownloadSpace>()
 ));
 builder.Services.AddSingleton<IDownloadTransport, DownloadNetwork>();
+builder.Services.AddSingleton<IExternalDownloadClient, Aria2Client>();
+builder.Services.AddSingleton<ExternalDownloads>();
+builder.Services.AddSingleton<IDownloadCatalog, CommonsCatalog>();
+builder.Services.AddSingleton<CatalogApproval>();
+builder.Services.AddSingleton<ArtworkCache>();
+builder.Services.AddSingleton<LocalMetadata>();
+builder.Services.AddSingleton<IMetadataProvider, TmdbProvider>();
+builder.Services.AddSingleton<MetadataService>();
 builder.Services.AddHostedService<DownloadWorker>();
 builder.Services.AddScoped<IUserContext, RequestUser>();
 builder.Services.AddDbContext<MediaDb>(o =>
@@ -433,6 +442,9 @@ app.MapOperations(credentialGate);
 app.MapFeatures();
 remoteAccess.Map(app);
 app.MapMovieRequests();
+app.MapDownloadCatalog();
+app.MapMetadata();
+app.MapExternalDownloads();
 app.MapDownloads();
 app.MapDownloadApprovals();
 app.MapBookmarks();

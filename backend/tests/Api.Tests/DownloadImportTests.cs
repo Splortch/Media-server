@@ -419,6 +419,42 @@ public sealed class DownloadImportTests
     }
 
     [Fact]
+    public async Task InitialDownloadPlanIsValidatedBeforeAJobCanStart()
+    {
+        var source = new Source();
+        using var server = Create(source);
+        using var admin = await server.Admin();
+        await Setup(server, admin, source);
+        var input = Approval(source).Source with { ImportPlan = Plan() };
+        Assert.Equal(
+            HttpStatusCode.BadRequest,
+            (
+                await admin.PostAsJsonAsync(
+                    "/api/downloads",
+                    input with
+                    {
+                        ImportPlan = Plan() with { Title = "../escape" },
+                    }
+                )
+            ).StatusCode
+        );
+        Assert.Equal(0, source.Calls);
+        Assert.Empty((await admin.GetFromJsonAsync<DownloadView[]>("/api/downloads"))!);
+        using var member = await Member(server, admin);
+        Assert.Equal(
+            HttpStatusCode.Forbidden,
+            (await member.PostAsJsonAsync("/api/v1/downloads", input)).StatusCode
+        );
+        Assert.Equal(0, source.Calls);
+        var response = await admin.PostAsJsonAsync("/api/v1/downloads", input);
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var job = (await response.Content.ReadFromJsonAsync<DownloadView>())!;
+        Assert.Equal(1, job.Import!.LibraryId);
+        job = await Wait(admin, job.Id, x => x.Import?.State is "imported" or "held");
+        Assert.True(job.Import!.State == "imported", JsonSerializer.Serialize(job));
+    }
+
+    [Fact]
     public async Task ReferencingPlaylistsAreRejectedBeforeLibraryScan()
     {
         var source = new Source();
