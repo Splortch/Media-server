@@ -500,9 +500,7 @@ public sealed class ExternalDownloads(
         }
         catch (Exception ex)
         {
-            var safeJobId = id
-                .Replace("\r", string.Empty)
-                .Replace("\n", string.Empty);
+            var safeJobId = id.Replace("\r", string.Empty).Replace("\n", string.Empty);
             logger.LogWarning(
                 "External relay {JobId} stopped ({ErrorCode})",
                 safeJobId,
