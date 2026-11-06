@@ -37,3 +37,17 @@ npm run generate --prefix shared/api
 Commit both the OpenAPI snapshot and generated TypeScript when schemas change. CI re-exports from the actual authenticated server and checks for drift. TypeScript consumers use generated schemas; Rust deliberately uses a scoped transport over bounded JSON and exposes only allowlisted operations, with typed response checks in the shared client. Android DTOs are generated from the same contract by `python scripts/generate-android-models.py`; use `--check` to detect drift.
 
 API major versions are independent of server/client product versions. Additive fields may be ignored; breaking semantics require a new version while retaining the supported old version. Wire numbers are strict JSON numbers; malformed numeric strings receive 400.
+
+### Title navigation contract
+
+Library, search and collection selections open title information. Fetching title,
+progress and track JSON is allowed here; mounting the player, requesting a stream
+URL or loading media bytes requires an explicit Play, Resume or bookmark action.
+Both web and desktop show the available technical and track details and label
+missing descriptive metadata without guessing. Track metadata failure must not
+block playback. Focus moves to the title heading, then to playback controls when
+playback starts. The Back action restores the originating list where practical.
+
+Season/episode selection and next-episode actions require identified series from
+#10 and episode progress from #45. Until those contracts exist, clients explicitly
+state that series information is unavailable; they must not infer it from titles.

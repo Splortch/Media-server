@@ -694,6 +694,7 @@ export default function App() {
               {!selection.url && (
                 <TitleDetails
                   item={selection.item}
+                  tracks={selection.tracks.tracks}
                   bookmarks
                   bookmarkRequest={bookmarkRequest}
                   onBookmark={(seconds) => void beginPlayback(false, seconds)}
@@ -736,19 +737,6 @@ export default function App() {
                   }}
                 />
               )}
-              <details className="panel">
-                <summary>File and track details</summary>
-                <ul>
-                  {(Array.isArray(selection.tracks.tracks)
-                    ? selection.tracks.tracks
-                    : []
-                  ).map((t, i) => (
-                    <li key={i}>
-                      {t.type} · {t.codec} · {t.language || 'Language unknown'}
-                    </li>
-                  ))}
-                </ul>
-              </details>
             </>
           ) : view === 'settings' ? (
             <>

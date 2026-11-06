@@ -15,9 +15,16 @@ export default function TitleDetails({
   bookmarks = false,
   onBookmark,
   bookmarkRequest,
+  tracks,
   metadata,
 }: {
   item: Media;
+  tracks?: {
+    type: string;
+    codec: string;
+    language?: string | null;
+    title?: string | null;
+  }[];
   metadata?: {
     details: {
       year: number | null;
@@ -86,10 +93,6 @@ export default function TitleDetails({
                 .filter((x) => x !== null && x !== '')
                 .join(' · ')}
             </p>
-            <p>{metadata.details.genres.join(' · ')}</p>
-            {metadata.details.cast.length > 0 && (
-              <p>Cast: {metadata.details.cast.join(', ')}</p>
-            )}
             <p className="muted">{metadata.details.attribution}</p>
             {metadata.backdropUrl && (
               <img
@@ -117,6 +120,18 @@ export default function TitleDetails({
         </div>
         <dl className="title-facts">
           <div>
+            <dt>Year</dt>
+            <dd>{metadata?.details.year ?? 'Not available'}</dd>
+          </div>
+          <div>
+            <dt>Genres</dt>
+            <dd>{metadata?.details.genres.join(' · ') || 'Not available'}</dd>
+          </div>
+          <div>
+            <dt>Cast</dt>
+            <dd>{metadata?.details.cast.join(', ') || 'Not available'}</dd>
+          </div>
+          <div>
             <dt>Video</dt>
             <dd>{item.videoCodec.toUpperCase() || 'Unknown'}</dd>
           </div>
@@ -130,6 +145,22 @@ export default function TitleDetails({
           </div>
         </dl>
       </div>
+      <details className="panel">
+        <summary>File and track details</summary>
+        {tracks?.length ? (
+          <ul>
+            {tracks.map((track, index) => (
+              <li key={index}>
+                {track.type} · {track.codec || 'Unknown codec'} ·{' '}
+                {track.language || 'Language unknown'}
+                {track.title ? ` · ${track.title}` : ''}
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p className="muted">Track information is not available.</p>
+        )}
+      </details>
       {bookmarks && onBookmark && (
         <Bookmarks
           key={item.id}
