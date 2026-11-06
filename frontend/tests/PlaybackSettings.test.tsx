@@ -84,13 +84,27 @@ it('labels real tracks, disables bitmap captions and exposes only authorized enc
   expect(screen.getByLabelText('Encoder preference').children).toHaveLength(1);
 });
 it('announces the audio and subtitle choices for the prepared session and clears them on Direct Play', async () => {
+  const Hls = (await import('hls.js')).default;
+  vi.spyOn(Hls, 'isSupported').mockReturnValue(true);
   const id = 'b'.repeat(32);
   vi.mocked(api).mockImplementation(async (path, method) => {
     if (path === '/v1/media/1/playback-options')
       return {
         tracks: [
-          { index: 1, type: 'audio', codec: 'aac', language: 'swe', title: 'Swedish' },
-          { index: -1, type: 'subtitle', codec: 'webvtt', language: 'eng', title: 'English' },
+          {
+            index: 1,
+            type: 'audio',
+            codec: 'aac',
+            language: 'swe',
+            title: 'Swedish',
+          },
+          {
+            index: -1,
+            type: 'subtitle',
+            codec: 'webvtt',
+            language: 'eng',
+            title: 'English',
+          },
         ],
         externalWebVtt: true,
         encoders: ['libx264'],
@@ -116,7 +130,9 @@ it('announces the audio and subtitle choices for the prepared session and clears
       onCaption={onCaption}
     />,
   );
-  const details = screen.getByText('Quality, audio and subtitles').closest('details')!;
+  const details = screen
+    .getByText('Quality, audio and subtitles')
+    .closest('details')!;
   details.open = true;
   fireEvent(details, new Event('toggle'));
   await screen.findByRole('option', { name: /Swedish/ });
@@ -146,6 +162,7 @@ it('announces the audio and subtitle choices for the prepared session and clears
   fireEvent.click(screen.getByRole('button', { name: 'Direct Play' }));
   await waitFor(() => expect(screen.queryByRole('status')).toBeNull());
   expect(onCaption).toHaveBeenLastCalledWith('');
+  vi.mocked(Hls.isSupported).mockRestore();
 });
 
 it('removes a library only after explicit confirmation and reports server refusal', async () => {
