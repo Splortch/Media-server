@@ -75,7 +75,7 @@ async function promote({github,context,sourceTag,targetTag}) {
   }
   const assets=await github.paginate(github.rest.repos.listReleaseAssets,
     {...repo,release_id:original.id,per_page:100});
-  if(!hasValidAssets(assets,source))
+  if(!hasValidAssets(assets,parse(original.tag_name)))
     throw new Error('Original release must have complete uploaded assets, manifest, checksums and GitHub SHA-256 digests.');
   const refs=await github.paginate(github.rest.git.listMatchingRefs,{...repo,ref:'tags/',per_page:100});
   for(const ref of refs) {
