@@ -1,7 +1,7 @@
 // GitHub metadata only: reuse published assets; never build or modify packages.
 const {successfulRuns} = require('./release-plan.cjs');
 const {targets} = require('./release-targets.cjs');
-const pattern = /^(?:(server-windows|server-linux|server-macos|client-windows|client-linux|client-macos|client-android|docker)\\/)?v(0|[1-9]\\d*)\\.(0|[1-9]\\d*)\\.(0|[1-9]\\d*)(?:-(alpha|beta)\\.([1-9]\\d*))?$/;
+const pattern = /^(?:(server-windows|server-linux|server-macos|client-windows|client-linux|client-macos|client-android|docker)\/)?v(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-(alpha|beta)\.([1-9]\d*))?$/;
 function parse(tag) {
   const m = pattern.exec(tag);
   if (!m || m.slice(2, 5).concat(m[6] || []).some(n => !Number.isSafeInteger(Number(n))))
@@ -80,7 +80,7 @@ async function promote({github,context,sourceTag,targetTag}) {
   const refs=await github.paginate(github.rest.git.listMatchingRefs,{...repo,ref:'tags/',per_page:100});
   for(const ref of refs) {
     let version;
-    try { version=parse(ref.ref.replace(/^refs\\/tags\\//,'')); } catch { continue; }
+    try { version=parse(ref.ref.replace(/^refs\/tags\//,'')); } catch { continue; }
     if(version.prefix===target.prefix && compare(version,target)>=0)
       throw new Error('Target must be unique and newer than existing tags for this release identity.');
   }
@@ -106,7 +106,7 @@ async function promote({github,context,sourceTag,targetTag}) {
     '[SHA256SUMS]('+root+'/download/'+encodeURIComponent(original.tag_name)+'/SHA256SUMS)',
     '',
     '<!-- release-promotion: '+JSON.stringify({sourceTag:original.tag_name,sha})+' -->'
-  ].join('\\n');
+  ].join('\n');
   // createRef rejects duplicates atomically; no existing tag/release is overwritten.
   await github.rest.git.createRef({...repo,ref:'refs/tags/'+targetTag,sha});
   const draft=(await github.rest.repos.createRelease({...repo,tag_name:targetTag,
