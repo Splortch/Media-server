@@ -1,0 +1,39 @@
+name: iOS client
+on:
+  pull_request:
+    paths: ['clients/ios/**', 'shared/api/**', 'scripts/generate-ios-models.py', '.github/workflows/ios-client.yml']
+  push:
+    branches: [main]
+    paths: ['clients/ios/**', 'shared/api/**', 'scripts/generate-ios-models.py', '.github/workflows/ios-client.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: ios-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  simulator:
+    runs-on: macos-15
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - name: Check generated Swift models
+        run: python3 scripts/generate-ios-models.py --check
+      - name: Test API transport and progress synchronization
+        working-directory: clients/ios
+        run: swift test
+      - name: Generate Xcode project
+        run: |
+          brew install xcodegen
+          cd clients/ios
+          xcodegen generate
+      - name: Build simulator application
+        working-directory: clients/ios
+        run: xcodebuild -project MediaServer.xcodeproj -scheme MediaServer -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' -derivedDataPath build CODE_SIGNING_ALLOWED=NO build
+      - uses: actions/upload-artifact@v7
+        with:
+          name: ios-simulator-app
+          if-no-files-found: error
+          path: clients/ios/build/Build/Products/Debug-iphonesimulator/MediaServer.app

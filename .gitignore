@@ -34,3 +34,12 @@ artifacts/
 
 # Reproducible browser benchmark output
 frontend/benchmark-results/
+
+# Generated iOS project, SwiftPM cache and external signing material
+clients/ios/.build/
+clients/ios/*.xcodeproj/
+*.p12
+*.mobileprovision
+*.xcarchive/
+*.ipa
+clients/ios/App/Info.plist

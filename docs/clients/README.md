@@ -10,7 +10,7 @@ All applications live in this monorepo. The ASP.NET server remains independently
 | Linux/macOS desktops | Shared Tauri implementation; Ubuntu 24.04 x64 DEB and Intel/Apple Silicon macOS DMGs. Memory-only sessions; hosted build/install checks differ from physical playback testing |
 | Android phone | Native Kotlin/Compose phone alpha, Media3 Direct Play/HLS with quality and track controls, encrypted sessions, real-backend emulator test and independent APK/AAB workflow |
 | Android TV | Architecture and focused backlog; no placeholder application |
-| iOS | Architecture and focused backlog; no placeholder application |
+| iOS | SwiftUI/AVPlayer source preview; simulator CI; physical-device/signing validation pending |
 
 Start with [API/authentication](API.md), [Windows development and limitations](WINDOWS.md), [synchronization](SYNC.md), and [Android installation/development](ANDROID.md). Packaging success is distinct from real device playback validation.
 
@@ -21,9 +21,10 @@ Start with [API/authentication](API.md), [Windows development and limitations](W
 - `clients/windows/src/`: dedicated connection/login/library/settings UI, never a remote web-page shortcut.
 - `clients/windows/native/`: Rust transport, cookie session handling, credential-store abstraction, scoped media bridge, unit/integration tests. It can be tested without Tauri/GTK.
 - `clients/windows/src-tauri/`: shared desktop window, permissions, native preferences and OS-specific installer configuration. The historical `windows` directory name is retained to avoid moving working code.
+- `clients/ios/`: SwiftUI application, generated Codable models and URLSession/Keychain core.
 - `clients/android/`: reusable Android networking/security core and native Compose/Media3 phone app.
 - `shared/api/`: exported version-1 OpenAPI, generated models, reusable transport-neutral TypeScript client.
-- `docs/clients/`: future platform decisions and implementation scope. Android TV/iOS directories will be created when functional implementations begin.
+- `docs/clients/`: future platform decisions and implementation scope. Android TV remains a future implementation; `clients/ios` contains the SwiftUI source preview.
 
 ## Two-maintainer split
 
@@ -31,7 +32,7 @@ Maintainer A owns API/schema migrations, native transport, authentication and re
 
 ## Android phone alpha
 
-See the [Android installation and development guide](ANDROID.md) for the native Kotlin/Compose application, APK artifacts, USB setup, signing and validation limits. Server and web operation do not depend on Android. Android TV and iOS remain future applications; no empty projects are added.
+See the [Android installation and development guide](ANDROID.md) for the native Kotlin/Compose application, APK artifacts, USB setup, signing and validation limits. Server and web operation do not depend on Android. Android TV remains future work. The [iOS source preview](IOS.md) adds login, library/details and Direct Play; physical-device validation remains outstanding.
 
 
 See [desktop installers for Windows, Linux and macOS](../deployment/DESKTOP-INSTALLERS.md) for server/client package selection and step-by-step setup.

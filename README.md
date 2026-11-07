@@ -8,7 +8,7 @@ A modern, open-source, self-hosted media server focused on performance, simplici
 
 ## Cross-platform clients (alpha)
 
-The [client ecosystem](docs/clients/README.md) adds a shared Tauri desktop client for Windows, Linux and macOS and a versioned API without requiring any client on the server. [Windows development](docs/clients/WINDOWS.md) covers actual installer builds and limitations. The [Android phone alpha](docs/clients/ANDROID.md) adds a native Compose/Media3 client, with APK builds and real-backend emulator validation. Android TV and iOS remain separately scoped follow-ups in this monorepo. Existing web installation below remains valid.
+The [client ecosystem](docs/clients/README.md) adds a shared Tauri desktop client for Windows, Linux and macOS and a versioned API without requiring any client on the server. [Windows development](docs/clients/WINDOWS.md) covers actual installer builds and limitations. The [Android phone alpha](docs/clients/ANDROID.md) adds a native Compose/Media3 client, with APK builds and real-backend emulator validation. The [iOS source preview](docs/clients/IOS.md) adds SwiftUI/AVPlayer with simulator CI; device validation remains pending. Android TV remains a separately scoped follow-up in this monorepo. Existing web installation below remains valid.
 
 ## What works
 
