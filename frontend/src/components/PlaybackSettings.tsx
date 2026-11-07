@@ -98,6 +98,10 @@ export default function PlaybackSettings({
   const [options, setOptions] = useState<Options>();
   const [audio, setAudio] = useState('');
   const [subtitle, setSubtitle] = useState('');
+  const [selectedTracks, setSelectedTracks] = useState<{
+    audio: string;
+    subtitles: string;
+  }>();
   const [encoder, setEncoder] = useState('libx264');
   const [error, setError] = useState('');
   const [session, setSession] = useState<Session>();
@@ -285,6 +289,26 @@ export default function PlaybackSettings({
         await request(`/v1/playback-sessions/${created.id}`, 'DELETE');
         return;
       }
+      // Snapshot the choices that created this session. Changing the selectors
+      // later must not make a previous conversion appear to use new tracks.
+      const audioTrack = options?.tracks.find(
+        (track) => track.type === 'audio' && String(track.index) === audio,
+      );
+      const subtitleTrack = options?.tracks.find(
+        (track) =>
+          track.type === 'subtitle' && String(track.index) === subtitle,
+      );
+      const description = (track: Track) =>
+        `${track.language || 'Unknown language'} · ${track.title || track.codec}`;
+      setSelectedTracks({
+        audio: audioTrack ? description(audioTrack) : 'Default audio',
+        subtitles:
+          subtitle === ''
+            ? 'Off'
+            : subtitleTrack
+              ? description(subtitleTrack)
+              : 'External WebVTT',
+      });
       setSession(validSession(created));
     } catch (e) {
       setError((e as Error).message);
@@ -333,6 +357,8 @@ export default function PlaybackSettings({
   }, [session, fileUrl, onSource, onCaption, video]);
   async function direct() {
     setSession(undefined);
+    setSelectedTracks(undefined);
+    setError('');
     const previous = current.current;
     current.current = undefined;
     hls.current?.destroy();
@@ -475,11 +501,18 @@ export default function PlaybackSettings({
         Direct Play
       </button>
       {session && (
-        <p role="status">
+        <p role="status" aria-atomic="true">
           Conversion: {session.state} · {session.encoder}
           {session.state === 'ready'
             ? ` · ${session.encodeSeconds.toFixed(1)} seconds`
             : ''}
+          {selectedTracks && (
+            <>
+              {' '}
+              · Selected audio: {selectedTracks.audio} · Selected subtitles:{' '}
+              {selectedTracks.subtitles}
+            </>
+          )}
         </p>
       )}
       {!!levels.length && (

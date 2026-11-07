@@ -92,7 +92,9 @@ it('opens honest details without mounting a player, preserves filters and restor
   await details('Own');
   expect(document.querySelector('video')).toBeNull();
   expect(HTMLMediaElement.prototype.play).not.toHaveBeenCalled();
-  expect(screen.getByRole('heading', { name: 'Own video' })).toHaveFocus();
+  await waitFor(() =>
+    expect(screen.getByRole('heading', { name: 'Own video' })).toHaveFocus(),
+  );
   fireEvent.click(screen.getByText('File and track details'));
   expect(await screen.findByText('audio · opus · sv · Swedish')).toBeVisible();
   expect(
