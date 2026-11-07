@@ -83,6 +83,88 @@ it('labels real tracks, disables bitmap captions and exposes only authorized enc
   expect(document.querySelector('script')).toBeNull();
   expect(screen.getByLabelText('Encoder preference').children).toHaveLength(1);
 });
+it('announces the audio and subtitle choices for the prepared session and clears them on Direct Play', async () => {
+  const Hls = (await import('hls.js')).default;
+  vi.spyOn(Hls, 'isSupported').mockReturnValue(true);
+  const id = 'b'.repeat(32);
+  vi.mocked(api).mockImplementation(async (path, method) => {
+    if (path === '/v1/media/1/playback-options')
+      return {
+        tracks: [
+          {
+            index: 1,
+            type: 'audio',
+            codec: 'aac',
+            language: 'swe',
+            title: 'Swedish',
+          },
+          {
+            index: -1,
+            type: 'subtitle',
+            codec: 'webvtt',
+            language: 'eng',
+            title: 'English',
+          },
+        ],
+        externalWebVtt: true,
+        encoders: ['libx264'],
+        conversionNotice: 'Conversion limits',
+      };
+    if (path === '/v1/media/1/playback-sessions' && method === 'POST')
+      return {
+        id,
+        state: 'ready',
+        encoder: 'libx264',
+        encodeSeconds: 1,
+        manifest: `/api/v1/playback-sessions/${id}/files/master.m3u8`,
+      };
+    return undefined;
+  });
+  const onCaption = vi.fn();
+  render(
+    <PlaybackSettings
+      id={1}
+      video={createRef()}
+      source="/api/media/1/stream"
+      onSource={() => {}}
+      onCaption={onCaption}
+    />,
+  );
+  const details = screen
+    .getByText('Quality, audio and subtitles')
+    .closest('details')!;
+  details.open = true;
+  fireEvent(details, new Event('toggle'));
+  await screen.findByRole('option', { name: /Swedish/ });
+  fireEvent.change(screen.getByRole('combobox', { name: 'Audio track' }), {
+    target: { value: '1' },
+  });
+  fireEvent.change(screen.getByRole('combobox', { name: 'Subtitles' }), {
+    target: { value: '-1' },
+  });
+  fireEvent.click(screen.getByRole('button', { name: 'Prepare HLS playback' }));
+  const status = await screen.findByRole('status');
+  await waitFor(() =>
+    expect(status).toHaveTextContent('Selected audio: swe · Swedish'),
+  );
+  expect(status).toHaveAttribute('aria-atomic', 'true');
+  expect(status).toHaveTextContent('Selected subtitles: eng · English');
+  expect(api).toHaveBeenCalledWith('/v1/media/1/playback-sessions', 'POST', {
+    audioTrack: 1,
+    subtitleTrack: -1,
+    encoder: 'libx264',
+  });
+  // The prepared session must keep its own choices even if the controls change.
+  fireEvent.change(screen.getByRole('combobox', { name: 'Subtitles' }), {
+    target: { value: '' },
+  });
+  expect(status).toHaveTextContent('Selected subtitles: eng · English');
+  fireEvent.click(screen.getByRole('button', { name: 'Direct Play' }));
+  await waitFor(() => expect(screen.queryByRole('status')).toBeNull());
+  expect(onCaption).toHaveBeenLastCalledWith('');
+  vi.mocked(Hls.isSupported).mockRestore();
+});
+
 it('removes a library only after explicit confirmation and reports server refusal', async () => {
   vi.mocked(api).mockImplementation(async (path, method) => {
     if (method === 'DELETE')
