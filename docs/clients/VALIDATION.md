@@ -27,3 +27,14 @@ Observed checks:
 - No physical Android phone, manufacturer decoder matrix, audible output, min-SDK emulator matrix, remote HTTPS deployment or production signing identity has been validated. The test app uses a development signing key; release APK/AAB remain unsigned.
 
 The workflow publishes an independent Android prerelease only on main pushes after both Android jobs pass. PR runs upload artifacts but do not publish a release. Publication itself must be verified after a reviewed merge; no merge or stable release is part of this work.
+
+## iOS source preview (#34)
+
+Added generated Swift models, URLSession transport, Keychain restoration, SwiftUI
+library/details and an authenticated AVURLAsset Direct Play path with guarded
+progress. Local Linux checks cover model regeneration and source formatting only;
+Swift/Xcode are unavailable locally. The new macOS CI performs Swift unit tests and
+a simulator SDK app build. No physical iPhone, signed archive, TestFlight upload,
+real-server AVPlayer stream, HLS segment authorization or codec matrix has been
+validated in this implementation session. Follow IOS.md's acceptance procedure
+before closing #34.
