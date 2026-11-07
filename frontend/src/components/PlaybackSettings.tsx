@@ -295,7 +295,8 @@ export default function PlaybackSettings({
         (track) => track.type === 'audio' && String(track.index) === audio,
       );
       const subtitleTrack = options?.tracks.find(
-        (track) => track.type === 'subtitle' && String(track.index) === subtitle,
+        (track) =>
+          track.type === 'subtitle' && String(track.index) === subtitle,
       );
       const description = (track: Track) =>
         `${track.language || 'Unknown language'} · ${track.title || track.codec}`;
@@ -507,7 +508,8 @@ export default function PlaybackSettings({
             : ''}
           {selectedTracks && (
             <>
-              {' '}· Selected audio: {selectedTracks.audio} · Selected subtitles:{' '}
+              {' '}
+              · Selected audio: {selectedTracks.audio} · Selected subtitles:{' '}
               {selectedTracks.subtitles}
             </>
           )}
