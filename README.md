@@ -17,7 +17,7 @@ Windows · x64 — Host your library on Windows x64.
 [Download setup.exe](https://github.com/Splortch/Media-server/releases/download/server-windows/v0.2.0-alpha.329/MediaServer-v0.2.0-alpha.329-win-x64-setup.exe) · [Release notes](https://github.com/Splortch/Media-server/releases/tag/server-windows/v0.2.0-alpha.329) · [Portable ZIP](https://github.com/Splortch/Media-server/releases/download/server-windows/v0.2.0-alpha.329/MediaServer-v0.2.0-alpha.329-win-x64.zip)
 
 <details>
-<summary>Older Windows server versions (32)</summary>
+<summary>Older Windows server versions (33)</summary>
 
 - [v0.2.0-alpha.306](https://github.com/Splortch/Media-server/releases/tag/server-windows/v0.2.0-alpha.306)
 - [v0.2.0-alpha.295](https://github.com/Splortch/Media-server/releases/tag/server-windows/v0.2.0-alpha.295)
@@ -51,6 +51,7 @@ Windows · x64 — Host your library on Windows x64.
 - [v0.2.0-alpha.49](https://github.com/Splortch/Media-server/releases/tag/server-windows/v0.2.0-alpha.49)
 - [v0.2.0-alpha.45](https://github.com/Splortch/Media-server/releases/tag/server-windows/v0.2.0-alpha.45)
 - [v0.2.0-alpha.43](https://github.com/Splortch/Media-server/releases/tag/server-windows/v0.2.0-alpha.43)
+- [v0.2.0-alpha.40](https://github.com/Splortch/Media-server/releases/tag/v0.2.0-alpha.40)
 
 </details>
 
@@ -63,7 +64,7 @@ Linux · x64 — Host your library on Linux x64.
 [Download DEB installer](https://github.com/Splortch/Media-server/releases/download/server-linux/v0.2.0-alpha.329/MediaServer-v0.2.0-alpha.329-linux-x64.deb) · [Release notes](https://github.com/Splortch/Media-server/releases/tag/server-linux/v0.2.0-alpha.329) · [Portable archive](https://github.com/Splortch/Media-server/releases/download/server-linux/v0.2.0-alpha.329/MediaServer-v0.2.0-alpha.329-linux-x64.tar.gz)
 
 <details>
-<summary>Older Linux server versions (32)</summary>
+<summary>Older Linux server versions (33)</summary>
 
 - [v0.2.0-alpha.306](https://github.com/Splortch/Media-server/releases/tag/server-linux/v0.2.0-alpha.306)
 - [v0.2.0-alpha.295](https://github.com/Splortch/Media-server/releases/tag/server-linux/v0.2.0-alpha.295)
@@ -97,6 +98,7 @@ Linux · x64 — Host your library on Linux x64.
 - [v0.2.0-alpha.49](https://github.com/Splortch/Media-server/releases/tag/server-linux/v0.2.0-alpha.49)
 - [v0.2.0-alpha.45](https://github.com/Splortch/Media-server/releases/tag/server-linux/v0.2.0-alpha.45)
 - [v0.2.0-alpha.43](https://github.com/Splortch/Media-server/releases/tag/server-linux/v0.2.0-alpha.43)
+- [v0.2.0-alpha.40](https://github.com/Splortch/Media-server/releases/tag/v0.2.0-alpha.40)
 
 </details>
 
@@ -109,7 +111,7 @@ Docker · Linux amd64 — Run the Linux amd64 server with Compose.
 [Download Compose setup](https://github.com/Splortch/Media-server/releases/download/docker/v0.2.0-alpha.329/MediaServer-Docker-v0.2.0-alpha.329.zip) · [Release notes](https://github.com/Splortch/Media-server/releases/tag/docker/v0.2.0-alpha.329)
 
 <details>
-<summary>Older Docker server versions (32)</summary>
+<summary>Older Docker server versions (33)</summary>
 
 - [v0.2.0-alpha.306](https://github.com/Splortch/Media-server/releases/tag/docker/v0.2.0-alpha.306)
 - [v0.2.0-alpha.295](https://github.com/Splortch/Media-server/releases/tag/docker/v0.2.0-alpha.295)
@@ -143,6 +145,7 @@ Docker · Linux amd64 — Run the Linux amd64 server with Compose.
 - [v0.2.0-alpha.49](https://github.com/Splortch/Media-server/releases/tag/docker/v0.2.0-alpha.49)
 - [v0.2.0-alpha.45](https://github.com/Splortch/Media-server/releases/tag/docker/v0.2.0-alpha.45)
 - [v0.2.0-alpha.43](https://github.com/Splortch/Media-server/releases/tag/docker/v0.2.0-alpha.43)
+- [v0.2.0-alpha.40](https://github.com/Splortch/Media-server/releases/tag/v0.2.0-alpha.40)
 
 </details>
 
@@ -193,7 +196,7 @@ Windows · x64 — Connect a Windows PC to your server.
 [Download desktop installer](https://github.com/Splortch/Media-server/releases/download/client-windows/v0.1.0-alpha.329/MediaServer-Windows-Client-v0.1.0-alpha.329-win-x64-setup.exe) · [Release notes](https://github.com/Splortch/Media-server/releases/tag/client-windows/v0.1.0-alpha.329) · [MSI installer](https://github.com/Splortch/Media-server/releases/download/client-windows/v0.1.0-alpha.329/MediaServer-Windows-Client-v0.1.0-alpha.329-win-x64.msi)
 
 <details>
-<summary>Older Windows desktop client versions (32)</summary>
+<summary>Older Windows desktop client versions (33)</summary>
 
 - [v0.1.0-alpha.306](https://github.com/Splortch/Media-server/releases/tag/client-windows/v0.1.0-alpha.306)
 - [v0.1.0-alpha.295](https://github.com/Splortch/Media-server/releases/tag/client-windows/v0.1.0-alpha.295)
@@ -227,6 +230,7 @@ Windows · x64 — Connect a Windows PC to your server.
 - [v0.1.0-alpha.49](https://github.com/Splortch/Media-server/releases/tag/client-windows/v0.1.0-alpha.49)
 - [v0.1.0-alpha.45](https://github.com/Splortch/Media-server/releases/tag/client-windows/v0.1.0-alpha.45)
 - [v0.1.0-alpha.43](https://github.com/Splortch/Media-server/releases/tag/client-windows/v0.1.0-alpha.43)
+- [v0.1.0-alpha.40](https://github.com/Splortch/Media-server/releases/tag/v0.2.0-alpha.40)
 
 </details>
 
