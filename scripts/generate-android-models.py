@@ -4,7 +4,7 @@ import json
 from pathlib import Path
 root = Path(__file__).resolve().parents[1]
 schemas = json.loads((root / 'shared/api/openapi-v1.json').read_text())['components']['schemas']
-names = ['ServerInfo', 'LoginRequest', 'UserIdentity', 'MediaSummary', 'MediaDetails', 'MediaPage', 'LibraryBrowse', 'ProgressState', 'ProgressUpdate', 'TrackCatalog', 'MediaTrack', 'PlaybackPlan', 'SessionInfo', 'ClientCapabilities', 'PlaybackError', 'VideoColor', 'Rendition', 'PlaybackOptions', 'PlaybackSelection', 'ConversionState']
+names = ['ServerInfo', 'LoginRequest', 'UserIdentity', 'MediaSummary', 'MediaDetails', 'MediaPage', 'LibraryBrowse', 'ProgressState', 'ProgressUpdate', 'TrackCatalog', 'MediaTrack', 'PlaybackPlan', 'SessionInfo', 'ClientCapabilities', 'PlaybackError', 'VideoColor', 'Rendition', 'PlaybackOptions', 'PlaybackSelection', 'ConversionState', 'MediaChapter', 'MovieMetadata']
 def typ(prop):
     if 'oneOf' in prop:
         choices = prop['oneOf']

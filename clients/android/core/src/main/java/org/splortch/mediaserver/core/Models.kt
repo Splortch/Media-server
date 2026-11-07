@@ -50,7 +50,8 @@ data class MediaDetails(
     val container: String,
     val size: Long,
     val playback: PlaybackPlan,
-    val contentRating: Int = 0
+    val contentRating: Int = 0,
+    val metadata: MovieMetadata? = null
 )
 
 @Serializable
@@ -178,5 +179,22 @@ data class ConversionState(
     val error: String?,
     val encodeSeconds: Double,
     val manifest: String
+)
+
+@Serializable
+data class MediaChapter(
+    val title: String,
+    val start: Double,
+    val end: Double
+)
+
+@Serializable
+data class MovieMetadata(
+    val title: String?,
+    val description: String?,
+    val releaseDate: String?,
+    val genre: String?,
+    val director: String?,
+    val chapters: List<MediaChapter>
 )
 
