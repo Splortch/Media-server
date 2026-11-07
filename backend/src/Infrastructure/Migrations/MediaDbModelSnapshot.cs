@@ -259,6 +259,10 @@ namespace Infrastructure.Migrations
                         .IsRequired()
                         .HasColumnType("TEXT");
 
+                    b.Property<string>("MetadataJson")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
                     b.Property<string>("ColorJson")
                         .IsRequired()
                         .HasColumnType("TEXT");

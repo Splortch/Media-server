@@ -781,7 +781,8 @@ void MapApi(RouteGroupBuilder root)
                             item.Container,
                             item.Size,
                             planner.Plan(item),
-                            item.ContentRating
+                            item.ContentRating,
+                            JsonSerializer.Deserialize<MovieMetadata>(item.MetadataJson)
                         )
                     )
                     : Results.NotFound()

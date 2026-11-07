@@ -75,7 +75,8 @@ export default function TitleDetails({
         </p>
         <p className="muted">
           {metadata?.details.synopsis ||
-            'Synopsis, artwork and series information are not available for this file yet.'}
+            item.metadata?.description ||
+            'No description is embedded in this file.'}
         </p>
         {metadata && (
           <>
@@ -119,6 +120,20 @@ export default function TitleDetails({
           </button>
         </div>
         <dl className="title-facts">
+          {(
+            [
+              ['Release date', item.metadata?.releaseDate],
+              ['Genre', item.metadata?.genre],
+              ['Director', item.metadata?.director],
+            ] as const
+          ).map(([label, value]) =>
+            value ? (
+              <div key={label}>
+                <dt>{label}</dt>
+                <dd>{value}</dd>
+              </div>
+            ) : null,
+          )}
           <div>
             <dt>Year</dt>
             <dd>{metadata?.details.year ?? 'Not available'}</dd>
@@ -145,6 +160,23 @@ export default function TitleDetails({
           </div>
         </dl>
       </div>
+      {!!item.metadata?.chapters.length && (
+        <section aria-label="Chapters">
+          <h2>Chapters</h2>
+          <ol>
+            {item.metadata.chapters.map((chapter, index) => (
+              <li key={index}>
+                <button
+                  disabled={busy || !onBookmark}
+                  onClick={() => begin(() => onBookmark?.(chapter.start))}
+                >
+                  {duration(chapter.start)} · {chapter.title}
+                </button>
+              </li>
+            ))}
+          </ol>
+        </section>
+      )}
       <details className="panel">
         <summary>File and track details</summary>
         {tracks?.length ? (

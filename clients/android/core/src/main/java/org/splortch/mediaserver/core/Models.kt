@@ -50,7 +50,8 @@ data class MediaDetails(
     val container: String,
     val size: Long,
     val playback: PlaybackPlan,
-    val contentRating: Int = 0
+    val contentRating: Int = 0,
+    val metadata: MovieMetadata? = null
 )
 
 @Serializable
