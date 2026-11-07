@@ -30,7 +30,7 @@ final class ClientTests: XCTestCase {
         config.protocolClasses = [MockProtocol.self]
         return APIClient(origin: try ServerOrigin.validate("https://media.example"), configuration: config)
     }
-    @MainActor func testPaginationQueryIsNotPartOfEncodedPath() throws {
+    @MainActor func testPaginationQueryIsNotPartOfEncodedPath() async throws {
         let url = try client().url("media?offset=100&limit=100")
         XCTAssertEqual(url.path, "/api/v1/media")
         XCTAssertEqual(url.query, "offset=100&limit=100")
@@ -53,8 +53,18 @@ final class ClientTests: XCTestCase {
             if request.url!.path.hasSuffix("csrf") { tokens += 1; return (200, #"{"token":"csrf-value"}"#) }
             XCTAssertEqual(request.value(forHTTPHeaderField: "X-CSRF-TOKEN"), "csrf-value")
             XCTAssertEqual(request.httpMethod, "PUT")
-            // URLSession may supply a body stream rather than httpBody to URLProtocol.
-            if let body = request.httpBody { revisions.append(try JSONDecoder().decode(ProgressUpdate.self, from: body).expectedRevision) }
+            var body = request.httpBody ?? Data()
+            if let stream = request.httpBodyStream {
+                stream.open()
+                defer { stream.close() }
+                var buffer = [UInt8](repeating: 0, count: 1024)
+                while stream.hasBytesAvailable {
+                    let count = stream.read(&buffer, maxLength: buffer.count)
+                    if count <= 0 { break }
+                    body.append(contentsOf: buffer.prefix(count))
+                }
+            }
+            revisions.append(try JSONDecoder().decode(ProgressUpdate.self, from: body).expectedRevision)
             return (200, "{\"mediaItemId\":1,\"seconds\":12,\"completed\":false,\"revision\":\(tokens + 4),\"updatedAt\":null}")
         }
         let writer = ProgressWriter(api: api, state: ProgressState(mediaItemId: 1, seconds: 0, completed: false, revision: 4, updatedAt: nil))
@@ -63,7 +73,7 @@ final class ClientTests: XCTestCase {
         try await writer.save(seconds: 13)
         XCTAssertEqual(writer.state.revision, 6)
         XCTAssertEqual(tokens, 2)
-        if !revisions.isEmpty { XCTAssertEqual(revisions, [4, 5]) }
+        XCTAssertEqual(revisions, [4, 5])
     }
     @MainActor func testConflictAndUncertainFailuresStopFutureWrites() async throws {
         for status in [409, 503] {
