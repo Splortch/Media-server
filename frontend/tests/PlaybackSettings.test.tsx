@@ -149,11 +149,11 @@ it('announces the audio and subtitle choices for the prepared session and clears
   );
   expect(status).toHaveAttribute('aria-atomic', 'true');
   expect(status).toHaveTextContent('Selected subtitles: eng · English');
-  expect(api).toHaveBeenCalledWith(
-    '/v1/media/1/playback-sessions',
-    'POST',
-    { audioTrack: 1, subtitleTrack: -1, encoder: 'libx264' },
-  );
+  expect(api).toHaveBeenCalledWith('/v1/media/1/playback-sessions', 'POST', {
+    audioTrack: 1,
+    subtitleTrack: -1,
+    encoder: 'libx264',
+  });
   // The prepared session must keep its own choices even if the controls change.
   fireEvent.change(screen.getByRole('combobox', { name: 'Subtitles' }), {
     target: { value: '' },
