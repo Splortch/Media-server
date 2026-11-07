@@ -16,17 +16,20 @@ targets:
     type: application
     platform: iOS
     sources: [App]
+    info:
+      path: App/Info.plist
+      properties:
+        CFBundleDisplayName: Media Server
+        UILaunchScreen: {}
+        NSLocalNetworkUsageDescription: Connect to your selected media server on your local network.
+        NSAppTransportSecurity:
+          NSAllowsLocalNetworking: true
     dependencies:
       - package: MediaCore
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: org.splortch.mediaserver.ios
         TARGETED_DEVICE_FAMILY: '1,2'
-        GENERATE_INFOPLIST_FILE: YES
-        INFOPLIST_KEY_CFBundleDisplayName: Media Server
-        INFOPLIST_KEY_UILaunchScreen_Generation: YES
-        INFOPLIST_KEY_NSLocalNetworkUsageDescription: Connect to your selected media server on your local network.
-        INFOPLIST_KEY_NSAppTransportSecurity_NSAllowsLocalNetworking: YES
 schemes:
   MediaServer:
     build:

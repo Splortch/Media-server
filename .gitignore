@@ -42,3 +42,4 @@ clients/ios/*.xcodeproj/
 *.mobileprovision
 *.xcarchive/
 *.ipa
+clients/ios/App/Info.plist
