@@ -34,7 +34,8 @@ Added generated Swift models, URLSession transport, Keychain restoration, SwiftU
 library/details and an authenticated AVURLAsset Direct Play path with guarded
 progress. Local Linux checks cover model regeneration and source formatting only;
 Swift/Xcode are unavailable locally. The new macOS CI performs Swift unit tests and
-a simulator SDK app build. No physical iPhone, signed archive, TestFlight upload,
+a simulator SDK app build. All seven Swift tests and the simulator app build passed
+on macOS CI on 2026-11-07 (PR #142; commit 75e61ca). No physical iPhone, signed archive, TestFlight upload,
 real-server AVPlayer stream, HLS segment authorization or codec matrix has been
 validated in this implementation session. Follow IOS.md's acceptance procedure
 before closing #34.

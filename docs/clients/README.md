@@ -9,7 +9,7 @@ All applications live in this monorepo. The ASP.NET server remains independently
 | Windows | Tauri/Rust host with a locally bundled React UI, authenticated networking and local streaming bridge; Windows CI builds EXE/MSI |
 | Linux/macOS desktops | Shared Tauri implementation; Ubuntu 24.04 x64 DEB and Intel/Apple Silicon macOS DMGs. Memory-only sessions; hosted build/install checks differ from physical playback testing |
 | Android phone | Native Kotlin/Compose phone alpha, Media3 Direct Play/HLS with quality and track controls, encrypted sessions, real-backend emulator test and independent APK/AAB workflow |
-| Android TV | SwiftUI/AVPlayer source preview; simulator CI; physical-device/signing validation pending |
+| Android TV | Architecture and focused backlog; no placeholder application |
 | iOS | SwiftUI/AVPlayer source preview; simulator CI; physical-device/signing validation pending |
 
 Start with [API/authentication](API.md), [Windows development and limitations](WINDOWS.md), [synchronization](SYNC.md), and [Android installation/development](ANDROID.md). Packaging success is distinct from real device playback validation.
@@ -21,6 +21,7 @@ Start with [API/authentication](API.md), [Windows development and limitations](W
 - `clients/windows/src/`: dedicated connection/login/library/settings UI, never a remote web-page shortcut.
 - `clients/windows/native/`: Rust transport, cookie session handling, credential-store abstraction, scoped media bridge, unit/integration tests. It can be tested without Tauri/GTK.
 - `clients/windows/src-tauri/`: shared desktop window, permissions, native preferences and OS-specific installer configuration. The historical `windows` directory name is retained to avoid moving working code.
+- `clients/ios/`: SwiftUI application, generated Codable models and URLSession/Keychain core.
 - `clients/android/`: reusable Android networking/security core and native Compose/Media3 phone app.
 - `shared/api/`: exported version-1 OpenAPI, generated models, reusable transport-neutral TypeScript client.
 - `docs/clients/`: future platform decisions and implementation scope. Android TV remains a future implementation; `clients/ios` contains the SwiftUI source preview.
