@@ -61,12 +61,16 @@ class ReleasePackagesTests(unittest.TestCase):
             container.mkdir()
             for name in ('CONTAINER-PACKAGES.txt', 'FFMPEG-LICENSE.txt', 'Container-Corresponding-Source.tar.gz'):
                 (container / name).write_text('test source fixture')
+            android = downloads / 'release-android'
+            android.mkdir()
+            for suffix in ('debug.apk', 'release-unsigned.apk', 'release-unsigned.aab'):
+                (android / f'MediaServer-Android-v0.1.0-alpha.5-{suffix}').write_text('test Android fixture')
             env = dict(SERVER_VERSION='0.2.0-alpha.5', CLIENT_VERSION='0.1.0-alpha.5', SOURCE_SHA='a' * 40, GITHUB_REPOSITORY='Splortch/Media-server', RELEASE_TAG='v0.2.0-alpha.5')
             with patch.object(module, 'ARTIFACTS', artifacts), patch.dict(os.environ, env):
                 module.assemble()
             output = artifacts / 'release'
-            self.assertEqual(len(list(output.iterdir())), 19)
-            self.assertEqual(len((output / 'SHA256SUMS').read_text().splitlines()), 18)
+            self.assertEqual(len(list(output.iterdir())), 22)
+            self.assertEqual(len((output / 'SHA256SUMS').read_text().splitlines()), 21)
             self.assertTrue((output / 'MediaServer-Windows-Client-v0.1.0-alpha.5-win-x64.msi').exists())
             with zipfile.ZipFile(output / 'MediaServer-Docker-v0.2.0-alpha.5.zip') as archive:
                 text = archive.read('MediaServer-Docker-v0.2.0-alpha.5/compose.yaml').decode()

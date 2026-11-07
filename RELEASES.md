@@ -4,7 +4,8 @@
 
 Choose a **server** to host your media, or a **client** to connect to an existing
 server. Every server includes the browser interface. Installing a client does not
-install a server.
+install a server. New versions publish one release containing every validated platform,
+with direct download links in its description.
 
 ## Servers
 

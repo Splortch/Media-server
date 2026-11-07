@@ -105,6 +105,9 @@ def assemble():
     native = downloads / 'release-windows-client'
     shutil.copyfile(one(native, '*-setup.exe'), output / f'MediaServer-Windows-Client-v{client}-win-x64-setup.exe')
     shutil.copyfile(one(native, '*.msi'), output / f'MediaServer-Windows-Client-v{client}-win-x64.msi')
+    for suffix in ('debug.apk', 'release-unsigned.apk', 'release-unsigned.aab'):
+        name = f'MediaServer-Android-v{client}-{suffix}'
+        shutil.copyfile(downloads / 'release-android' / name, output / name)
     # The web UI is already bundled into the server and container. It is not a
     # standalone file:// application, so no misleading browser-only download.
     setup = ARTIFACTS / 'staging' / f'MediaServer-Docker-v{server}'
@@ -130,7 +133,7 @@ volumes:
     archive(setup, output / (setup.name + '.zip'))
     for name in ('CONTAINER-PACKAGES.txt', 'FFMPEG-LICENSE.txt', 'Container-Corresponding-Source.tar.gz'):
         shutil.copyfile(downloads / 'release-container' / name, output / name)
-    manifest = {'commit': sha, 'serverVersion': server, 'windowsClientVersion': client, 'image': image, 'channel': 'alpha', 'signed': False}
+    manifest = {'commit': sha, 'serverVersion': server, 'windowsClientVersion': client, 'androidClientVersion': client, 'desktopClientVersion': client, 'image': image, 'channel': 'alpha', 'signed': False}
     (output / 'release.json').write_text(json.dumps(manifest, indent=2) + '\n', encoding='utf-8')
     sums = []
     for path in sorted(output.iterdir()):
@@ -138,8 +141,8 @@ volumes:
             with path.open('rb') as stream:
                 sums.append(f'{hashlib.file_digest(stream, "sha256").hexdigest()}  {path.name}')
     (output / 'SHA256SUMS').write_text('\n'.join(sums) + '\n', encoding='utf-8')
-    if len(sums) != 18:
-        raise RuntimeError(f'Expected 18 release assets before checksums; found {len(sums)}')
+    if len(sums) != 21:
+        raise RuntimeError(f'Expected 21 release assets before checksums; found {len(sums)}')
 
 
 if __name__ == '__main__':

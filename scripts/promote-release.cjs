@@ -1,5 +1,6 @@
 // GitHub metadata only: reuse published assets; never build or modify packages.
 const {successfulRuns} = require('./release-plan.cjs');
+const {targets} = require('./release-targets.cjs');
 const pattern = /^(?:(server-windows|server-linux|server-macos|client-windows|client-linux|client-macos|client-android|docker)\/)?v(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-(alpha|beta)\.([1-9]\d*))?$/;
 function parse(tag) {
   const m = pattern.exec(tag);
@@ -22,13 +23,28 @@ async function commitForTag(github, repo, tag) {
     throw new Error('Tag must resolve to an immutable commit.');
   return object.sha;
 }
+function hasValidAssets(assets, source) {
+  if(!Array.isArray(assets) || assets.length<3 ||
+    !assets.some(a=>a.name==='release.json') ||
+    !assets.some(a=>a.name==='SHA256SUMS') ||
+    new Set(assets.map(a=>a.name)).size!==assets.length ||
+    assets.some(a=>a.state!=='uploaded' || !/^[A-Za-z0-9._-]+$/.test(a.name) ||
+      !/^sha256:[a-f0-9]{64}$/.test(a.digest || '') || a.size<=0))
+    return false;
+  if(!source.prefix) {
+    const server='0.2.0-alpha.'+source.sequence, client='0.1.0-alpha.'+source.sequence;
+    const expected=[...targets(server,client).flatMap(t=>t.files),'release.json','SHA256SUMS'];
+    return assets.length===expected.length && expected.every(name=>assets.some(a=>a.name===name));
+  }
+  return true;
+}
 async function promote({github,context,sourceTag,targetTag}) {
   if(context.eventName!=='workflow_dispatch' || context.ref!=='refs/heads/main')
     throw new Error('Promotion requires a maintainer dispatch on main.');
   const source=parse(sourceTag),target=parse(targetTag);
   if(source.prefix!==target.prefix || source.base!==target.base ||
     source.channel==='stable' || target.channel==='alpha' || compare(target,source)<=0)
-    throw new Error('Promote within the same platform/base version, from Alpha to Beta/Stable or Beta to a later Beta/Stable.');
+    throw new Error('Promote within the same release identity, from Alpha to Beta/Stable or Beta to a later Beta/Stable.');
   const repo=context.repo, repository=repo.owner+'/'+repo.repo;
   const selected=(await github.rest.repos.getReleaseByTag({...repo,tag:sourceTag})).data;
   if(selected.draft || !selected.prerelease || selected.tag_name!==sourceTag)
@@ -38,12 +54,12 @@ async function promote({github,context,sourceTag,targetTag}) {
   const runs=await github.paginate(github.rest.actions.listWorkflowRunsForRepo,
     {...repo,event:'push',head_sha:sha,per_page:100});
   if(!successfulRuns(runs,sha,repository)) throw new Error('Required exact-commit main CI checks have not passed.');
-  if(source.prefix==='client-android/') {
+  if(!source.prefix || source.prefix==='client-android/') {
     const android=runs.filter(r=>r.path==='.github/workflows/android-client.yml' &&
       r.head_sha===sha && r.event==='push' && r.head_branch==='main' &&
       r.repository?.full_name===repository).sort((a,b)=>b.id-a.id)[0];
     if(android?.status!=='completed' || android.conclusion!=='success')
-      throw new Error('Exact-commit Android CI must pass before Android promotion.');
+      throw new Error('Exact-commit Android CI must pass before promoting a combined release.');
   }
   let original=selected;
   const marker=/<!-- release-promotion: (.+) -->/.exec(selected.body || '');
@@ -59,17 +75,14 @@ async function promote({github,context,sourceTag,targetTag}) {
   }
   const assets=await github.paginate(github.rest.repos.listReleaseAssets,
     {...repo,release_id:original.id,per_page:100});
-  if(assets.length<3 || !assets.some(a=>a.name==='release.json') ||
-    !assets.some(a=>a.name==='SHA256SUMS') || new Set(assets.map(a=>a.name)).size!==assets.length ||
-    assets.some(a=>a.state!=='uploaded' || !/^[A-Za-z0-9._-]+$/.test(a.name) ||
-      !/^sha256:[a-f0-9]{64}$/.test(a.digest || '') || a.size<=0))
-    throw new Error('Original release must have complete uploaded assets, manifest, checksums and SHA-256 digests.');
+  if(!hasValidAssets(assets,parse(original.tag_name)))
+    throw new Error('Original release must have complete uploaded assets, manifest, checksums and GitHub SHA-256 digests.');
   const refs=await github.paginate(github.rest.git.listMatchingRefs,{...repo,ref:'tags/',per_page:100});
   for(const ref of refs) {
     let version;
     try { version=parse(ref.ref.replace(/^refs\/tags\//,'')); } catch { continue; }
     if(version.prefix===target.prefix && compare(version,target)>=0)
-      throw new Error('Target must be unique and newer than existing tags for this platform.');
+      throw new Error('Target must be unique and newer than existing tags for this release identity.');
   }
   if(await commitForTag(github,repo,sourceTag)!==sha ||
     await commitForTag(github,repo,original.tag_name)!==sha)
@@ -77,17 +90,28 @@ async function promote({github,context,sourceTag,targetTag}) {
   const root='https://github.com/'+repository+'/releases';
   const body=[
     '## '+(target.channel==='stable'?'Stable':'Beta')+' approval',
-    '', 'Selected commit: '+sha+'.',
-    '', 'Promoted from ['+sourceTag+']('+root+'/tag/'+encodeURIComponent(sourceTag)+').',
-    '', '## Existing downloads',
-    '', 'These links reuse the original published assets byte-for-byte. No installers, manifests, checksums, container tags or application versions were changed or rebuilt. Embedded versions and filenames retain their original Alpha build identity.',
-    '', ...assets.map(a=>'- ['+a.name+']('+root+'/download/'+encodeURIComponent(original.tag_name)+'/'+encodeURIComponent(a.name)+') — '+a.digest),
-    '', '<!-- release-promotion: '+JSON.stringify({sourceTag:original.tag_name,sha})+' -->'
+    '',
+    'This release promotes the complete multi-platform build from one tested source commit.',
+    '',
+    'Selected commit: '+sha+'.',
+    '',
+    'Promoted from ['+sourceTag+']('+root+'/tag/'+encodeURIComponent(sourceTag)+').',
+    '',
+    '## Existing downloads',
+    '',
+    'These links reuse the original published assets byte-for-byte. No installers, manifests, checksums, container tags or application versions were changed or rebuilt. Component versions and filenames retain their original Alpha build identity.',
+    '',
+    ...assets.filter(a=>a.name!=='SHA256SUMS').map(a=>'- ['+a.name+']('+root+'/download/'+encodeURIComponent(original.tag_name)+'/'+encodeURIComponent(a.name)+') — '+a.digest),
+    '',
+    '[SHA256SUMS]('+root+'/download/'+encodeURIComponent(original.tag_name)+'/SHA256SUMS)',
+    '',
+    '<!-- release-promotion: '+JSON.stringify({sourceTag:original.tag_name,sha})+' -->'
   ].join('\n');
   // createRef rejects duplicates atomically; no existing tag/release is overwritten.
   await github.rest.git.createRef({...repo,ref:'refs/tags/'+targetTag,sha});
   const draft=(await github.rest.repos.createRelease({...repo,tag_name:targetTag,
-    target_commitish:sha,name:targetTag,body,draft:true,prerelease:target.channel!=='stable',make_latest:'false'})).data;
+    target_commitish:sha,name:'Media Server '+targetTag,body,draft:true,
+    prerelease:target.channel!=='stable',make_latest:'false'})).data;
   if(await commitForTag(github,repo,targetTag)!==sha ||
     await commitForTag(github,repo,sourceTag)!==sha ||
     await commitForTag(github,repo,original.tag_name)!==sha)
@@ -95,4 +119,4 @@ async function promote({github,context,sourceTag,targetTag}) {
   return (await github.rest.repos.updateRelease({...repo,release_id:draft.id,draft:false,
     prerelease:target.channel!=='stable',make_latest:'false'})).data;
 }
-module.exports={parse,compare,promote,commitForTag};
+module.exports={parse,compare,promote,commitForTag,hasValidAssets};

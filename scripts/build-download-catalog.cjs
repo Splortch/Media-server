@@ -1,6 +1,6 @@
 const fs = require('node:fs');
 const path = require('node:path');
-const {latestPlatforms} = require('./platform-downloads.cjs');
+const {latestPlatforms, platformAssets, platformVersion} = require('./platform-downloads.cjs');
 const kinds = {
   'server-windows': {group: 'servers', badge: 'WS', os: 'Windows · x64', primary: /-win-x64-setup\.exe$/, fallback: /-win-x64\.zip$/, label: 'Download setup.exe', alt: /-win-x64\.zip$/},
   'server-linux': {group: 'servers', badge: 'LX', os: 'Linux · x64', primary: /-linux-x64\.deb$/, fallback: /-linux-x64\.tar\.gz$/, label: 'Download DEB installer', fallbackLabel: 'Download server archive', alt: /-linux-x64\.tar\.gz$/, altLabel: 'Portable archive'},
@@ -32,12 +32,12 @@ function catalog(repository, releases) {
   return latestPlatforms(releases).map(platform => {
     const kind = kinds[platform.id];
     const history = platform.releases.map(selected => {
-      const assets = selected.assets.filter(a => assetUrl(repository, selected, a));
+      const assets = platformAssets(platform.id, selected.assets).filter(a => assetUrl(repository, selected, a));
       const primary = assets.find(a => kind.primary.test(a.name)) || assets.find(a => kind.fallback?.test(a.name));
       if (!primary) return null;
       const alternate = assets.find(a => kind.alt?.test(a.name) && a.name !== primary.name);
       return {
-        tag: selected.tag_name, version: selected.tag_name.slice(platform.id.length + 2),
+        tag: selected.tag_name, version: platformVersion(selected, platform.id),
         notes: `https://github.com/${repository}/releases/tag/${selected.tag_name}`,
         download: assetUrl(repository, selected, primary),
         downloadLabel: kind.primary.test(primary.name) ? kind.label : (kind.fallbackLabel || (platform.id === 'server-windows' ? 'Download portable ZIP' : 'Download MSI installer')),
