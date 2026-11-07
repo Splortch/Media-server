@@ -371,5 +371,6 @@ public record MediaDetails(
     string Container,
     long Size,
     PlaybackPlan Playback,
-    int ContentRating = 0
+    int ContentRating = 0,
+    MovieMetadata? Metadata = null
 );

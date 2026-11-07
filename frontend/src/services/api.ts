@@ -7,6 +7,14 @@ export type Media = {
   audioCodec: string;
   size: number;
   contentRating?: number;
+  metadata?: {
+    title?: string | null;
+    description?: string | null;
+    releaseDate?: string | null;
+    genre?: string | null;
+    director?: string | null;
+    chapters: { title: string; start: number; end: number }[];
+  } | null;
   playback?: { mode: string; mimeType: string; warning?: string | null };
 };
 export type Progress = {

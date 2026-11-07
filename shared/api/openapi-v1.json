@@ -3783,6 +3783,27 @@
           }
         }
       },
+      "MediaChapter": {
+        "required": [
+          "title",
+          "start",
+          "end"
+        ],
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string"
+          },
+          "start": {
+            "type": "number",
+            "format": "double"
+          },
+          "end": {
+            "type": "number",
+            "format": "double"
+          }
+        }
+      },
       "MediaDetails": {
         "required": [
           "id",
@@ -3827,6 +3848,16 @@
             "type": "integer",
             "format": "int32",
             "default": 0
+          },
+          "metadata": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/MovieMetadata"
+              }
+            ]
           }
         }
       },
@@ -4155,6 +4186,55 @@
           "revision": {
             "type": "integer",
             "format": "int64"
+          }
+        }
+      },
+      "MovieMetadata": {
+        "required": [
+          "title",
+          "description",
+          "releaseDate",
+          "genre",
+          "director",
+          "chapters"
+        ],
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "description": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "releaseDate": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "genre": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "director": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "chapters": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MediaChapter"
+            }
           }
         }
       },

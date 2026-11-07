@@ -3346,6 +3346,13 @@ export interface components {
             password: string;
             deviceName?: null | string;
         };
+        MediaChapter: {
+            title: string;
+            /** Format: double */
+            start: number;
+            /** Format: double */
+            end: number;
+        };
         MediaDetails: {
             /** Format: int32 */
             id: number;
@@ -3363,6 +3370,7 @@ export interface components {
              * @default 0
              */
             contentRating: number;
+            metadata?: null | components["schemas"]["MovieMetadata"];
         };
         MediaPage: {
             items: components["schemas"]["MediaSummary"][];
@@ -3449,6 +3457,14 @@ export interface components {
             backdropUrl: null | string;
             /** Format: int64 */
             revision: number;
+        };
+        MovieMetadata: {
+            title: null | string;
+            description: null | string;
+            releaseDate: null | string;
+            genre: null | string;
+            director: null | string;
+            chapters: components["schemas"]["MediaChapter"][];
         };
         MovieRequestInput: {
             /** Format: int32 */
