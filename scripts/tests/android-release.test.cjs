@@ -6,6 +6,19 @@ const path = require('node:path');
 const crypto = require('node:crypto');
 const publish = require('../publish-android.cjs');
 const sha = 'a'.repeat(40);
+test('Android preview SDK is installed from the preview channel before the build', () => {
+  const root = path.resolve(__dirname, '../..');
+  const workflow = fs.readFileSync(path.join(root, '.github/workflows/android-client.yml'), 'utf8');
+  const packages = workflow.match(/^\s+packages: (.+)$/m)[1];
+  assert.doesNotMatch(packages, /platforms;android-37(?:\s|$)/);
+  const previewInstall = workflow.indexOf('sdkmanager --install --channel=3 "platforms;android-37.0"');
+  assert.ok(previewInstall > 0);
+  assert.ok(previewInstall < workflow.indexOf('run: ./gradlew'));
+  for (const module of ['app', 'core']) {
+    const build = fs.readFileSync(path.join(root, 'clients/android', module, 'build.gradle.kts'), 'utf8');
+    assert.match(build, /compileSdk = 37/);
+  }
+});
 function fixture() {
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'android-release-'));
   const version = '0.1.0-alpha.1';
