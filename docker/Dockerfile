@@ -14,7 +14,7 @@ RUN dotnet publish backend/src/Api/Api.csproj -c Release -r linux-x64 --no-self-
 COPY --from=web /source/frontend/dist /app/wwwroot
 FROM mcr.microsoft.com/dotnet/aspnet:10.0.14-noble@sha256:de0ee358cdd672f7017a003bed21e9ac9ed48a27c922a59b18175b6e82fa7fee AS runtime-base
 USER root
-RUN apt-get update && apt-get install -y --no-install-recommends ffmpeg curl && rm -rf /var/lib/apt/lists/* && mkdir -p /data && chown app:app /data
+RUN apt-get update && apt-get install -y --no-install-recommends apt ffmpeg curl && rm -rf /var/lib/apt/lists/* && mkdir -p /data && chown app:app /data
 WORKDIR /app
 COPY --from=build --chown=app:app /app ./
 COPY --chown=app:app LICENSE NOTICE /app/licenses/
