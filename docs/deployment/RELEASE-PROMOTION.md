@@ -1,70 +1,65 @@
-# GitHub release approval: Alpha, Beta and Stable
+# GitHub release promotion: Alpha, Beta and Stable
 
-Automatic Alpha builds are unchanged: the existing release pipeline publishes
-platform prereleases after the required main checks pass. Promotion only assigns
-a new GitHub tag and release classification to an already released commit.
+Every validated main commit publishes one combined Alpha prerelease with the
+available Windows, Linux, macOS, Android, desktop-client and Docker downloads.
+Promoting a release creates a new GitHub release entry for the same exact
+commit. It reuses the tested Alpha downloads; it does not rebuild or relabel
+application binaries.
 
-| Status | Example | GitHub classification |
+| Stage | Example tag | GitHub status |
 | --- | --- | --- |
-| Alpha | `server-windows/v0.2.0-alpha.284` | Prerelease, automatic |
-| Beta | `server-windows/v0.2.0-beta.1` | Prerelease, maintainer approval |
-| Stable | `server-windows/v0.2.0` | Normal release, maintainer approval |
+| Alpha | `v0.2.0-alpha.284` | Automatic prerelease |
+| Beta | `v0.2.0-beta.1` | Maintainer-approved prerelease |
+| Stable | `v0.2.0` | Maintainer-approved normal release |
 
-The repository publishes each platform separately. Keep the source platform
-prefix (`server-windows`, `server-linux`, `server-macos`, `client-windows`,
-`client-linux`, `client-macos`, `client-android`, or `docker`). Client versions
-currently use base `0.1.0`; server versions use `0.2.0`. Unprefixed tags such as
-`v0.2.0-beta.1` are accepted only when the source release is also unprefixed.
+The tag belongs to the combined release, so promote it once for all platforms.
+Existing platform-specific releases remain available as historical releases.
 
-## Promote an existing build
+## Promote a combined release
 
-1. In GitHub Releases, select the published Alpha or Beta for the platform you
-   have tested. Copy its full tag. This can be an older commit; it does not need
-   to be the current main head.
+1. In GitHub Releases, choose the published combined Alpha you tested and copy
+   its full tag, for example `v0.2.0-alpha.284`.
 2. Open **Actions → Promote existing GitHub release → Run workflow**, select
-   **main**, and enter the source tag and desired target tag. For example,
-   promote `server-windows/v0.2.0-alpha.284` to
-   `server-windows/v0.2.0-beta.1`, then promote that Beta to
-   `server-windows/v0.2.0` after approval. Alpha can also be promoted directly to
-   Stable. Repeat per platform as needed.
-3. Check the workflow summary for the resulting release. Beta is a prerelease;
-   Stable is a normal release. The workflow does not change GitHub's Latest
-   selection, publish container aliases, or deploy software.
+   **main**, and enter the source and target tags. For Beta, use
+   `v0.2.0-beta.1`. After Beta approval, promote that tag to `v0.2.0`.
+   Alpha can also be promoted directly to Stable.
+3. Review the workflow summary and the resulting release description. It lists
+   the original downloads for every platform and links to the original
+   checksums. Stable is a normal GitHub release; Alpha and Beta remain marked
+   as prereleases.
 
-The target must keep the platform and base version, and be newer than all
-existing tags for that platform. Counters are numeric: Beta 10 follows Beta 9.
-Leading zeros, duplicate tags, backward promotions and build-metadata suffixes
-are rejected. Once a Stable tag exists, it cannot be replaced by another build.
-A future base-version change belongs to the normal version planning process.
+Promotion is manual and only runs from `main`. It requires all required main
+CI workflows and the Android workflow to have passed on the exact commit. The
+workflow verifies the tag's commit, complete combined asset set, manifest,
+checksums and GitHub asset digests before creating the new release.
 
-## Downloads and exact source
+## What promotion changes
 
-The new release description links directly to the original platform assets and
-lists their GitHub SHA-256 digests. They are **not copied, renamed, replaced or
-rebuilt**. Use the **Existing downloads** links in the description; the promoted
-release does not contain duplicate attachments. GitHub's generated source
-archives refer to the exact promoted commit. Original Alpha releases must stay
-published so those download links remain available.
+The new Beta or Stable release entry points to the original Alpha assets
+byte-for-byte. It does not copy or rebuild packages, change embedded component
+versions, edit checksums, push a Docker alias, or deploy software. The
+downloads retain their Alpha build identity; the release status communicates
+that maintainers approved that exact tested build.
 
-Installers, embedded application versions, filenames, `release.json`,
-`SHA256SUMS`, Docker tags, and download formats keep their original build
-identity. Beta/Stable describes the official approval/testing status of those
-same bytes; it does not create another app edition or an update channel. Later
-promotion of a Beta keeps links to the original Alpha downloads.
+When promoting Beta to Stable, the stable description continues linking to the
+original Alpha downloads and checksums. Keep the original Alpha release
+published so those links continue to work.
 
-The workflow resolves lightweight or annotated source tags to a commit, checks
-that the release records that exact SHA, and requires the latest attempts of all
-existing required main CI workflows to have passed on that SHA. Android also
-requires its own exact-commit Android workflow. The source must have published
-assets, a manifest, checksums and GitHub SHA-256 digests. Missing/expired CI
-history or missing digests fail closed; do not bypass the check by selecting
-newer main code or relabeling unverified files.
+## Version and tag rules
 
-Only a manual dispatch on main may write. PR runs only execute tests. Inputs go
-through environment variables, never shell interpolation. The workflow never
-checks out or runs code from the selected release commit.
+Promotion stays within the same base version and advances maturity:
+Alpha → Beta or Stable; Beta → a later Beta or Stable. Beta counters are
+numeric, so Beta 10 follows Beta 9. Duplicate targets, older versions, leading
+zeroes and build-metadata suffixes are rejected. Published tags are never
+moved or overwritten.
 
-Duplicate targets are rejected atomically. Failed publication can leave a tag
-or draft; it never overwrites a published release. Inspect the run and source
-SHA before manually removing an unpublished draft/tag and retrying. Do not move
-or delete published tags to reuse a version.
+The workflow creates a draft first and publishes it only after rechecking the
+source tags. If publication fails, inspect the run and draft before retrying.
+Do not delete or move a published tag to reuse its version.
+
+## Historical platform releases
+
+Older releases may use platform-prefixed tags such as
+`server-windows/v0.2.0-alpha.284`. Those can still be promoted using the same
+platform prefix on the target tag. New combined releases use the unprefixed
+tags shown above and need only one promotion for all platform downloads.
