@@ -67,19 +67,19 @@ test('publisher verifies every byte before creating a release and keeps failed u
 
 test('automatic versions use the source Windows counter, not the coordinator counter',async()=>{const f=fixture();f.context.runNumber=70000;assert.equal((await f.run()).tag,'v0.2.0-alpha.50');});
 
-test('planner retries a partial platform release set',async()=>{
+test('planner retries a same-source combined draft',async()=>{
  const f=fixture();
- // The fixture returns one common existing value; a draft means the set is incomplete.
+ // A combined draft is incomplete until every upload has succeeded.
  f.state.existing={target_commitish:sha,draft:true};
  assert.equal((await f.run()).build,true);
 });
 test('platform release tags are unique and contain only relevant downloads',()=>{
  const all=require('../release-targets.cjs').targets('0.2.0-alpha.50','0.1.0-alpha.50');
- assert.deepEqual(all.map(t=>t.tag),['server-windows/v0.2.0-alpha.50','server-linux/v0.2.0-alpha.50','client-windows/v0.1.0-alpha.50','docker/v0.2.0-alpha.50','server-macos/v0.2.0-alpha.50','client-linux/v0.1.0-alpha.50','client-macos/v0.1.0-alpha.50']);
- assert.equal(new Set(all.flatMap(t=>t.files)).size,17);
+ assert.deepEqual(all.map(t=>t.tag),['server-windows/v0.2.0-alpha.50','server-linux/v0.2.0-alpha.50','client-windows/v0.1.0-alpha.50','docker/v0.2.0-alpha.50','server-macos/v0.2.0-alpha.50','client-linux/v0.1.0-alpha.50','client-macos/v0.1.0-alpha.50','client-android/v0.1.0-alpha.50']);
+ assert.equal(new Set(all.flatMap(t=>t.files)).size,20);
  assert.equal(all[0].files.length,2);assert.equal(all[1].files.length,2);assert.equal(all[2].files.length,2);assert.equal(all[3].files.length,4);
 });
-test('publisher produces seven releases with independent integrity manifests and resumes partial success',async()=>{
+test('publisher uploads all platforms to one draft and safely retries interrupted uploads',async()=>{
  const publish=require('../publish-release.cjs');const crypto=require('node:crypto');
  const temporary=fs.mkdtempSync(path.join(os.tmpdir(),'platform-publish-'));const original=process.cwd();
  const saved={SOURCE_SHA:process.env.SOURCE_SHA,RELEASE_TAG:process.env.RELEASE_TAG};
@@ -92,19 +92,22 @@ test('publisher produces seven releases with independent integrity manifests and
  const github={paginate:async(_fn,p)=>[...(assets.get(p.release_id)||[])].map(([name])=>({id:name,name})),rest:{repos:{
  getBranch:async()=>({data:{commit:{sha}}}),
  getReleaseByTag:async p=>{if(releases.has(p.tag))return{data:releases.get(p.tag)};throw Object.assign(new Error('missing'),{status:404});},
- createRelease:async p=>{const r={id:next++,target_commitish:p.target_commitish,draft:true};releases.set(p.tag_name,r);assets.set(r.id,new Map());return{data:r};},
+ createRelease:async p=>{assert.equal(p.tag_name,'v0.2.0-alpha.50');const r={id:next++,target_commitish:p.target_commitish,draft:true};releases.set(p.tag_name,r);assets.set(r.id,new Map());return{data:r};},
  listReleaseAssets:()=>{},deleteReleaseAsset:async p=>{for(const a of assets.values())a.delete(p.asset_id);},
- uploadReleaseAsset:async p=>{if(p.release_id===2&&fail){fail=false;throw new Error('interrupted second platform');}assets.get(p.release_id).set(p.name,Buffer.from(p.data));},
- updateRelease:async p=>{for(const r of releases.values())if(r.id===p.release_id)r.draft=p.draft;}
+ uploadReleaseAsset:async p=>{if(p.name.endsWith('.msi')&&fail){fail=false;throw new Error('interrupted upload');}assets.get(p.release_id).set(p.name,Buffer.from(p.data));},
+ updateRelease:async p=>{assert.equal(assets.get(p.release_id).size,22);assert.match(p.body,/Android Phone Client/);for(const r of releases.values())if(r.id===p.release_id)r.draft=p.draft;}
  }}};
  try{process.chdir(temporary);process.env.SOURCE_SHA=sha;process.env.RELEASE_TAG='v0.2.0-alpha.50';
- await assert.rejects(publish({github,context:{repo:{owner:'Splortch',repo:'Media-server'}}}),/second platform/);
- assert.equal(releases.get(targets[0].tag).draft,false);assert.equal(releases.get(targets[1].tag).draft,true);
- assert.equal(await publish({github,context:{repo:{owner:'Splortch',repo:'Media-server'}}}),true);assert.equal(releases.size,7);
- for(const target of targets){
-  const r=releases.get(target.tag);assert.equal(r.draft,false);const a=assets.get(r.id);
-  assert.deepEqual([...a.keys()].sort(),[...target.files,'release.json','SHA256SUMS'].sort());
-  assert.equal(JSON.parse(a.get('release.json')).platform,target.id);
+ await assert.rejects(publish({github,context:{repo:{owner:'Splortch',repo:'Media-server'}}}),/interrupted upload/);
+ assert.equal(releases.size,1);assert.equal(releases.get('v0.2.0-alpha.50').draft,true);
+ assert.equal(await publish({github,context:{repo:{owner:'Splortch',repo:'Media-server'}}}),true);assert.equal(releases.size,1);
+ const uploaded=[...assets.get(1).values()];
+ assert.equal(await publish({github,context:{repo:{owner:'Splortch',repo:'Media-server'}}}),true);
+ assert.deepEqual([...assets.get(1).values()],uploaded);
+ {
+  const r=releases.get('v0.2.0-alpha.50');assert.equal(r.draft,false);const a=assets.get(r.id);
+  assert.deepEqual([...a.keys()].sort(),[...targets.flatMap(t=>t.files),'release.json','SHA256SUMS'].sort());
+  assert.equal(JSON.parse(a.get('release.json')).commit,sha);
   for(const line of a.get('SHA256SUMS').toString().trim().split('\n')){
    const [hash,name]=line.split('  ');assert.equal(crypto.createHash('sha256').update(a.get(name)).digest('hex'),hash);
   }
@@ -115,7 +118,7 @@ test('publisher produces seven releases with independent integrity manifests and
 test('release descriptions explain each real platform and only synchronize recognized alpha notes',async()=>{
  const {platformNotes,syncReleaseNotes}=require('../release-notes.cjs');
  const targets=require('../release-targets.cjs').targets('0.2.0-alpha.50','0.1.0-alpha.50');
- const bodies=targets.map(t=>platformNotes(t,sha,'Splortch/Media-server','test-image'));
+ const bodies=targets.filter(t=>t.id!=='client-android').map(t=>platformNotes(t,sha,'Splortch/Media-server','test-image'));
  assert.match(bodies[0],/Start-MediaServer.cmd/);assert.match(bodies[1],/sudo apt install ffmpeg/);
  assert.match(bodies[2],/WebView2/);assert.match(bodies[3],/docker compose up -d/);
  const historical=require('../release-notes.cjs').combinedNotes('0.2.0-alpha.40','0.1.0-alpha.40',sha,'Splortch/Media-server');
@@ -123,7 +126,7 @@ test('release descriptions explain each real platform and only synchronize recog
  const changed=[];
  const releases=[
  {id:1,tag_name:'v0.2.0-alpha.40',target_commitish:sha,prerelease:true,draft:false},
- ...targets.map((t,i)=>({id:i+2,tag_name:t.tag,target_commitish:sha,prerelease:true,draft:false})),
+ ...targets.filter(t=>t.id!=='client-android').map((t,i)=>({id:i+2,tag_name:t.tag,target_commitish:sha,prerelease:true,draft:false})),
  {id:6,tag_name:'server-linux/v0.2.0-alpha.50',target_commitish:sha,prerelease:true,draft:true},
  {id:7,tag_name:'server-linux/v0.2.0-alpha.50',target_commitish:sha,prerelease:false,draft:false},
  {id:8,tag_name:'unrelated',target_commitish:sha,prerelease:true,draft:false}
@@ -131,7 +134,7 @@ test('release descriptions explain each real platform and only synchronize recog
  const github={paginate:async()=>releases,rest:{repos:{listReleases:()=>{},updateRelease:async p=>changed.push(p)}}};
  await syncReleaseNotes({github,context:{repo:{owner:'Splortch',repo:'Media-server'}}});
  assert.deepEqual(changed.map(p=>p.release_id),[1,2,3,4,5,6,7,8]);
- for(const p of changed){assert.deepEqual(Object.keys(p).sort(),['body','owner','release_id','repo']);assert.match(p.body,/Get started/);}
+ for(const p of changed){assert.deepEqual(Object.keys(p).sort(),['body','owner','release_id','repo']);assert.match(p.body,/Get started|Verification and setup/);}
 });
 
 test('server installer notes are limited to releases containing that actual asset',()=>{

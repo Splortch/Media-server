@@ -1,4 +1,4 @@
-// Stable release identities shared by the CI gate and publisher.
+// Component file inventories for the combined publisher and historical platform notes.
 function targets(server, client) {
   if (!/^0\.2\.0-alpha\.[1-9][0-9]{0,4}$/.test(server) || !/^0\.1\.0-alpha\.[1-9][0-9]{0,4}$/.test(client)) throw new Error('Invalid platform versions.');
   return [
@@ -9,6 +9,7 @@ function targets(server, client) {
     ,{id:'server-macos', name:'Media Server for macOS', version:server, files:['osx-arm64','osx-x64'].flatMap(rid=>[`MediaServer-v${server}-${rid}.pkg`,`MediaServer-v${server}-${rid}.tar.gz`]), instructions:'Install the PKG for Apple Silicon or Intel, then open /Applications/MediaServer/Start-MediaServer.command. Install FFprobe separately; the web UI is included.'}
     ,{id:'client-linux', name:'Media Server Linux Desktop Client', version:client, files:[`MediaServer-Desktop-Client-v${client}-linux-x64.deb`], instructions:'Install the DEB with apt, then open Media Server Client and connect to your server. Ubuntu 24.04 x64 baseline.'}
     ,{id:'client-macos', name:'Media Server macOS Desktop Client', version:client, files:['osx-arm64','osx-x64'].map(rid=>`MediaServer-Desktop-Client-v${client}-${rid}.dmg`), instructions:'Open the DMG for Apple Silicon or Intel and drag Media Server Client into Applications. Connect to your existing server.'}
+    ,{id:'client-android', name:'Media Server Android Phone Client', version:client, files:['debug.apk','release-unsigned.apk','release-unsigned.aab'].map(suffix=>`MediaServer-Android-v${client}-${suffix}`), instructions:'Install the debug APK for testing on Android 8.0+. Release APK/AAB files are unsigned developer artifacts; sign them before distribution. Debug updates may require uninstalling the previous build.'}
   ].map(target => ({...target, tag:`${target.id}/v${target.version}`}));
 }
 module.exports = {targets};

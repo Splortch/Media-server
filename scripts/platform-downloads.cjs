@@ -11,16 +11,28 @@ const definitions = [
   ['client-linux', 'Linux desktop client', 'Connect Ubuntu 24.04 x64 to your server', /-linux-x64\.deb$/],
   ['client-macos', 'macOS desktop client', 'Connect Apple Silicon or Intel macOS to your server', /-osx-(?:arm64|x64)\.dmg$/],
 ];
+// Combined releases contain both server and client installers with similar suffixes.
+function platformAssets(id, assets) {
+  const prefix = id === 'client-android' ? 'MediaServer-Android-' : id === 'client-windows' ? 'MediaServer-Windows-Client-' : id.startsWith('client-') ? 'MediaServer-Desktop-Client-' : id === 'docker' ? 'MediaServer-Docker-' : 'MediaServer-v';
+  const definition = definitions.find(d=>d[0]===id);
+  return assets.filter(a=>a.name?.startsWith(prefix) && definition[3].test(a.name));
+}
+function platformVersion(release, id) {
+  const asset = platformAssets(id, release.assets || [])[0];
+  return asset?.name.match(/-v(\d+\.\d+\.\d+-alpha\.[1-9][0-9]*)-/)?.[1] || release.tag_name.replace(/^(?:[^/]+\/)?v/, '');
+}
 function latestPlatforms(releases) {
-  return definitions.map(([id, name, description, asset]) => {
-    const candidates = releases.filter(r => !r.draft && r.tag_name?.startsWith(id + '/v') &&
-      /^v\d+\.\d+\.\d+-alpha\.[1-9][0-9]*$/.test(r.tag_name.slice(id.length + 1)) &&
-      (r.assets || []).some(a => asset.test(a.name)));
-    const parts = r => r.tag_name.slice(id.length + 2).split(/\.|-alpha\./).map(Number);
+  return definitions.map(([id, name, description]) => {
+    const candidates = releases.filter(r => !r.draft &&
+      (r.tag_name?.startsWith(id + '/v') || /^v\d+\.\d+\.\d+-alpha\.[1-9][0-9]*$/.test(r.tag_name || '')) &&
+      /^v\d+\.\d+\.\d+-alpha\.[1-9][0-9]*$/.test(r.tag_name.replace(/^[^/]+\//, '')) &&
+      platformAssets(id, r.assets || []).length);
+    const parts = r => platformVersion(r, id).split(/\.|-alpha\./).map(Number);
     candidates.sort((a, b) => {
       const av = parts(a), bv = parts(b);
       for (let i = 0; i < av.length; i++) if (av[i] !== bv[i]) return bv[i] - av[i];
-      return 0;
+      // Prefer the unified entry when migrating an identical version.
+      return Number(b.tag_name.startsWith('v')) - Number(a.tag_name.startsWith('v'));
     });
     return {id, name, description, release: candidates[0], releases: candidates};
   });
@@ -33,11 +45,11 @@ function downloadTable(repository, releases) {
     return `| ${p.name} | ${p.description} | ${download} |`;
   });
   rows.push(`| Web browser | Included with Windows, Linux and Docker servers | [Server setup](${root}/blob/main/docs/GETTING-STARTED.md) |`);
-  return `${START}\n## All platform downloads\n\n[Browse by platform — latest builds and collapsed version history](https://github.com/${repository}/blob/downloads/README.md)\n\nEach implemented target has its own versioned alpha release. Choose a server to host media, or a client to connect to an existing server.\n\n| Platform | What to use it for | Download |\n| --- | --- | --- |\n${rows.join('\n')}\n\nAndroid TV and iOS are planned; they do not have installable releases yet. Android release APK/AAB files marked unsigned need signing; the debug APK is the installable testing build.\n${END}`;
+  return `${START}\n## All platform downloads\n\n[Browse by platform — latest builds and collapsed version history](https://github.com/${repository}/blob/downloads/README.md)\n\nNew versions share one alpha release with downloads for all validated platforms. Choose a server to host media, or a client to connect to an existing server.\n\n| Platform | What to use it for | Download |\n| --- | --- | --- |\n${rows.join('\n')}\n\nAndroid TV and iOS are planned; they do not have installable releases yet. Android release APK/AAB files marked unsigned need signing; the debug APK is the installable testing build.\n${END}`;
 }
 function withDownloads(body, table) {
   const existing = body || '';
   const pattern = /<!-- platform-downloads:start -->[\s\S]*?<!-- platform-downloads:end -->\s*/g;
   return table + '\n\n' + existing.replace(pattern, '').trimStart();
 }
-module.exports = {latestPlatforms, downloadTable, withDownloads};
+module.exports = {latestPlatforms, platformAssets, platformVersion, downloadTable, withDownloads};

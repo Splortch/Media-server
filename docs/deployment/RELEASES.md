@@ -1,6 +1,6 @@
 # Automatic alpha releases and easy installation
 
-Every successful main commit can publish separate platform **prereleases** automatically. No release tag, personal token or signing key is needed.
+Every successful main commit can publish one combined **prerelease** automatically. No release tag, personal token or signing key is needed.
 GitHub's built-in repository token publishes Releases and the GHCR container image.
 Organization policy must permit repository Actions to write Releases and Packages.
 
@@ -49,29 +49,30 @@ with a separately installed FFprobe. The server does not require a cloud account
 
 Server packages: Windows x64, Linux x64 DEB/archive, and macOS Intel/Apple Silicon
 PKG/archive. Desktop clients: Windows EXE/MSI, Ubuntu 24.04 x64 DEB, and macOS
-Intel/Apple Silicon DMG. Android phone APK/AAB has its own workflow/release counter.
+Intel/Apple Silicon DMG. Android phone APK/AAB is validated by a reusable build and included in the same release.
 Web is bundled with each server; Docker remains Linux amd64. Availability depends on
 successful CI and a published release containing the actual package. Android TV/iOS,
 Linux ARM and Windows ARM installers are not generated.
 
-## Separate platform releases
+## One release for every platform
 
-Each validated commit creates seven separate GitHub Releases, with independent tags, notes,
-checksums and provenance manifests:
+Each validated commit creates one GitHub Release named **Media Server 0.2.0-alpha.N**,
+with tag `v0.2.0-alpha.N`. Its description links directly to every attached platform download:
 
-| Release | Tag | Downloads |
-| --- | --- | --- |
-| Media Server for Windows | `server-windows/v0.2.0-alpha.N` | Windows x64 server setup.exe and portable ZIP |
-| Media Server for Linux | `server-linux/v0.2.0-alpha.N` | Linux x64 server DEB and tar.gz |
-| Media Server Windows Client | `client-windows/v0.1.0-alpha.N` | EXE and MSI installers |
-| Media Server for macOS | `server-macos/v0.2.0-alpha.N` | Intel and Apple Silicon server PKGs and portable archives |
-| Media Server Linux Desktop Client | `client-linux/v0.1.0-alpha.N` | Ubuntu 24.04 x64 client DEB |
-| Media Server macOS Desktop Client | `client-macos/v0.1.0-alpha.N` | Intel and Apple Silicon DMGs |
-| Media Server Docker | `docker/v0.2.0-alpha.N` | Compose setup ZIP, package/license inventory and corresponding source |
+| Platform | Downloads |
+| --- | --- |
+| Windows server | Windows x64 setup.exe and portable ZIP |
+| Linux server | Linux x64 DEB and tar.gz |
+| Windows desktop client | EXE and MSI alternative installers |
+| macOS server | Intel and Apple Silicon PKGs and portable archives |
+| Linux desktop client | Ubuntu 24.04 x64 DEB |
+| macOS desktop client | Intel and Apple Silicon DMGs |
+| Android phone client | Installable test APK, unsigned release APK and AAB |
+| Docker server | Compose setup ZIP, package/license inventory and corresponding source |
 
-EXE and MSI are alternative installers in the same Windows client release. Web remains bundled
-with the server. Android uses its own `client-android` release identity; TV/iOS remain planned. The earlier combined `v0.2.0-alpha.40` release remains unchanged.
-GitHub adds source archive links to each release automatically; those are not application builds.
+The web client is bundled with each server. Android TV/iOS remain planned. Existing
+platform-specific releases remain in the archive; future builds do not create new ones.
+GitHub adds source archive links automatically; those are not application builds.
 
 ## Publication rules
 
@@ -85,24 +86,24 @@ The Windows CI run number N supplies deterministic versions for the commit: serv
 and its third field increases, allowing MSI to recognize newer alpha installers. The value
 must fit 1..65535; the workflow fails before overflow instead of wrapping. Application config,
 Cargo package/lock metadata, assembly versions and download names are stamped consistently.
-Server and client versions belong to separate platform releases. They currently share a validated
-source commit and build counter; this is not a stable-release process.
+The release uses the server version; desktop and Android clients retain their 0.1.0 component
+versions with the same validated source commit and build counter. This is not a stable-release process.
 
 All release builds and package smoke checks must pass before assembling named downloads and
 SHA256SUMS. Container images are smoke-tested, saved, then the identical image is pushed to
 `ghcr.io/splortch/media-server:v0.2.0-alpha.N`. The `alpha` tag advances only after publication;
 `latest` is never written. Containers do not update themselves on a user's machine.
 
-Each platform's assets are uploaded to its own draft first, then that complete platform release
-is made visible. Published releases are not overwritten. A retry skips completed platforms and
-repairs missing platforms or same-source drafts; another-source tag is an error. All seven must
-exist before the coordinator considers the source commit complete. A network interruption can
-leave some complete platform releases visible while the remainder await retry; it cannot expose
-a half-uploaded platform release. The container alpha channel advances only after all seven finish.
-The Docker image keeps its version tag `v0.2.0-alpha.N` (Git tag prefixes are not Docker tags).
-Source-commit provenance and the platform version are recorded in each release's `release.json`;
-each SHA256SUMS covers only that release's downloads and manifest, and verifies integrity,
-not publisher identity.
+All platform assets upload to one private draft. Only after every upload succeeds and main
+still points to the validated source commit does the publisher make that release visible.
+A retry replaces files only in a same-source draft; published assets are not overwritten.
+Another-source tag is an error. The planner checks the single combined tag to avoid duplicate
+builds. A failed build or upload cannot expose a partially uploaded release. The Docker alpha
+channel advances only after the combined release publishes.
+
+The shared `release.json` records the exact source commit, server/desktop/Android component
+versions and container image. One `SHA256SUMS` covers all downloads and the manifest; it
+verifies integrity, not publisher identity.
 Compiler/package locks improve repeatability, but changing OS packages/hosted images prevent
 claims of bit-for-bit reproducibility. Builds are unsigned and no stable release is published.
 
@@ -141,13 +142,13 @@ in Actions; existing releases/running servers remain unaffected. Do not delete d
 
 ## Independent Android phone prereleases
 
-The Android client workflow builds real APKs/AABs only when Android, shared API, relevant backend or Android automation inputs change (or manually requested). On a push to main, publication waits for APK assembly, lint/JVM tests and real-backend emulator playback. It creates its own `client-android/v0.1.0-alpha.N` prerelease, using the Android workflow run number as its independent monotonically increasing version code. Gaps from PR/failed runs are expected. It does not advance server/Windows versions or publish stable releases.
+The Android client workflow runs independently for Android/API/backend changes and can also be called by `Automatic prereleases`. The coordinator always calls it for the exact release commit, passing the shared build counter to Gradle and packaging. APK assembly, lint/JVM tests and real-backend emulator playback must all pass before the `release-android` artifact can join the other release downloads. Android never publishes a separate release. Debug APKs use an ephemeral testing key; unsigned APK/AAB files require signing. PR/manual artifacts remain available from Actions.
 
 Install the `-debug.apk` for testing. `-release-unsigned.apk` needs a production signature before installation; `-release-unsigned.aab` is not directly installable. Each release includes SHA256SUMS and source identity. Debug signing keys are ephemeral; uninstall may be required between runs. See [Android setup/signing](../clients/ANDROID.md). No signing keys are committed. Publication stages all assets in a draft, checks hashes and current main, then publishes; it never changes an existing published Android release.
 
 ## Find every supported platform
 
-Each platform has its own published release/tag: `server-windows`, `server-linux`, `server-macos`, `docker`, `client-windows`, `client-linux`, `client-macos` and `client-android`. The release descriptions begin with **All platform downloads**, linking to the latest published alpha for each platform. Version ordering is numeric and independent per platform; a newer Android number is not required to match the server's number. Only releases with actual platform build assets appear as downloadable.
+New releases contain a direct download table for their own platform assets. The catalog recognizes both combined releases and historical platform tags, distinguishes server/client installers, and shows each component's actual version. Older platform releases keep navigation to available builds; combined descriptions are refreshed from their attached assets so they never advertise a missing installer.
 
 The web interface is included with the server packages. Android TV and iOS do not yet have installable builds or releases. Android's debug APK is the testing installer; its unsigned release APK/AAB need signing.
 
