@@ -11,6 +11,14 @@ identical evidence for their respective source/runtime:
   files; no dependency code is imported or executed by the generator.
 
 NuGet metadata comes from the exact restored package graph and local nuspecs.
+Self-contained Microsoft.NETCore.App and Microsoft.AspNetCore.App runtime packs
+are additionally identified from the published `Api.runtimeconfig.json` and
+`Api.deps.json`. Their versions, target runtime and restored package identities
+must agree. Both Microsoft's license and upstream third-party notices are copied
+into the evidence directory and included in the SPDX/report component list.
+Missing terms, notices, frameworks or unexpected runtime packs fail packaging.
+These runtime-pack components do not claim a lockfile archive checksum: their
+provenance is the published application's manifests and restored nuspecs.
 Browser metadata comes from the committed npm lock and installed production
 packages; development-only npm packages are excluded. A missing/ambiguous NuGet
 package or mismatched browser identity/version fails publication rather than
@@ -32,8 +40,6 @@ commit identifies the build, not that timestamp.
 
 Issue #2 remains open for a full distribution review:
 
-- Inventory Microsoft framework/runtime packs and their upstream third-party
-  notices, not only the NuGet restore graph and browser runtime dependencies.
 - Add equivalent Android, Rust/Tauri and WebView/native SDK dependency inventories.
 - Review every redistributed license, notice and corresponding-source obligation.
 - Retain the container's exact installed package list, FFmpeg license/build output

@@ -145,7 +145,7 @@ jobs:
           SOURCE_SHA: ${{ needs.plan.outputs.sha }}
           RID: ${{ matrix.rid }}
         shell: bash
-        run: python scripts/release-inventory.py --assets backend/src/Api/obj/project.assets.json --lockfile frontend/package-lock.json --node-modules frontend/node_modules --output artifacts/server/inventory --commit "$SOURCE_SHA" --runtime "$RID"
+        run: python scripts/release-inventory.py --assets backend/src/Api/obj/project.assets.json --lockfile frontend/package-lock.json --node-modules frontend/node_modules --output artifacts/server/inventory --commit "$SOURCE_SHA" --runtime "$RID" --published-dir artifacts/server
       - name: Validate Windows launcher syntax
         if: runner.os == 'Windows'
         shell: pwsh
