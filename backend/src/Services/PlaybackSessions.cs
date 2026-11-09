@@ -186,7 +186,15 @@ public sealed class PlaybackSessions(
                 return existing.Info();
             }
             if (jobs.Count >= 2)
-                return null;
+            {
+                // Failed work must not strand both conversion slots for the
+                // lease's 30-minute lifetime. Keep errors queryable until a new
+                // source needs capacity, then retire only terminal jobs.
+                foreach (var failed in jobs.Values.Where(x => x.State is "failed" or "cancelled"))
+                    await StopAsync(failed);
+                if (jobs.Count >= 2)
+                    return null;
+            }
             var source = policy.OpenRead(library.Path, item.RelativePath);
             try
             {
@@ -294,6 +302,12 @@ public sealed class PlaybackSessions(
         }
         catch (OperationCanceledException) { }
         // Retain admission slot until cleanup completes. Never delete another job's cache.
+        if (DeleteCache(job))
+            jobs.TryRemove(job.Id, out _);
+    }
+
+    private static bool DeleteCache(Job job)
+    {
         try
         {
             Directory.Delete(job.Directory, true);
@@ -301,13 +315,13 @@ public sealed class PlaybackSessions(
         catch (DirectoryNotFoundException) { }
         catch (IOException)
         {
-            return;
+            return false;
         }
         catch (UnauthorizedAccessException)
         {
-            return;
+            return false;
         }
-        jobs.TryRemove(job.Id, out _);
+        return true;
     }
 
     private async Task ConvertAsync(
@@ -468,6 +482,10 @@ public sealed class PlaybackSessions(
             source.Dispose();
             monitorStop.Cancel();
             await quota;
+            // Failed conversions cannot serve assets. Discard staged media and
+            // partial output now, while preserving the safe error for polling.
+            if (job.State == "failed")
+                DeleteCache(job);
         }
     }
 
@@ -641,6 +659,10 @@ public sealed class PlaybackSessions(
         {
             stop.Cancel();
         }
+        catch (UnauthorizedAccessException)
+        {
+            stop.Cancel();
+        }
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -672,8 +694,10 @@ public sealed class PlaybackSessions(
                                 .ToArray()
                         )
                             ((ICollection<KeyValuePair<string, Lease>>)job.Leases).Remove(lease);
-                        if (job.Leases.IsEmpty)
+                        if (job.Leases.IsEmpty || job.State == "cancelled")
                             await StopAsync(job);
+                        else if (job.State == "failed" && job.Work.IsCompleted)
+                            DeleteCache(job);
                     }
                 }
                 finally
