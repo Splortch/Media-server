@@ -248,7 +248,7 @@ static class Benchmark
                     var manifest =
                         sessions.FilePath(state.Id, 1, 1, "benchmark-a", level.Name + ".m3u8")
                         ?? throw new IOException();
-                    var decoded = await probe.ProbeAsync(manifest, deadline.Token);
+                    var decoded = await probe.ProbeGeneratedHlsAsync(manifest, deadline.Token);
                     var color = JsonSerializer.Deserialize<VideoColor>(decoded.ColorJson);
                     if (
                         decoded.VideoCodec != "h264"
