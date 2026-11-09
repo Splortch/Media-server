@@ -1,26 +1,74 @@
 # Android dependency compatibility
 
-The alpha uses Android Gradle Plugin (AGP) 8.13.2, Gradle 8.13, JDK 17, Kotlin 2.2.21 and compile/target SDK 36. Application/library plugins must have the same version; all Kotlin compiler/Compose/serialization plugins must also match. A green version-update PR is required before merging; no compiler-metadata checks, AAR checks or tests are suppressed.
+## SDK 37 toolchain
 
-## Why the October update PRs failed
+The Android modules migrate together, without disabling compiler metadata, AAR
+metadata, dependency-version validation or lint. The selected versions are:
 
-- #67/#68 changed one AGP plugin to 9.5.0 independently. CI reports that version needs Gradle 9.6, while the wrapper is 8.13. A platform migration must also check built-in Kotlin DSL, JDK, R8, packaging and both modules.
-- #64 selected Compose BOM 2026.09.00 and core-ktx 1.19.1. Their resolved AARs require SDK 37 and AGP 9.1+; the project builds SDK 36 with AGP 8.13.2.
-- #65 selected serialization 1.12.0 and coroutines 1.11.0, resolving Kotlin 2.4 metadata which the current compiler cannot consume. Serialization 1.9.0 targets Kotlin 2.2 and is a compatible, separately validated update candidate.
+| Component | Version / policy |
+| --- | --- |
+| JDK | 17 in CI; Java/Kotlin bytecode target 17 |
+| Gradle | 9.7.0, distribution SHA-256 pinned in the wrapper |
+| Android application/library plugins | Both AGP 9.1.1 |
+| Kotlin compiler, Compose compiler and serialization compiler plugins | All 2.4.21 |
+| Compile SDK / SDK package | API 37 / `platforms;android-37.0` |
+| Build tools | 36.0.0 |
+| Target SDK / minimum SDK | 36 / 26; unchanged by this migration |
+| Compose BOM (app and instrumentation tests) | 2026.09.00 |
+| AndroidX core-ktx | 1.19.1 |
+| Kotlinx serialization / coroutines | 1.12.0 / 1.11.0 |
+
+[AGP 9.1 compatibility](https://developer.android.com/build/releases/agp-9-1-0-release-notes)
+supports API 37.0, requires at least Gradle 9.3.1 and uses JDK 17/build-tools 36.0.0.
+[Kotlin's compatibility table](https://kotlinlang.org/docs/gradle-configure-project.html)
+lists Gradle 9.7.0 and AGP 9.3.1 as the upper fully supported versions for Kotlin
+2.4.21. The previous Gradle 9.9 wrapper was outside that published Gradle range;
+the selected wrapper is inside the intersection of both compatibility tables.
+
+Both modules use [AGP's built-in Kotlin](https://developer.android.com/build/migrate-to-built-in-kotlin)
+and the new Android DSL. The standalone `kotlin("android")` plugin and temporary
+`android.builtInKotlin=false` / `android.newDsl=false` switches are removed. An
+explicit Kotlin Gradle plugin classpath selects compiler 2.4.21 above AGP's default,
+as documented in [AGP's runtime dependency guidance](https://developer.android.com/build/releases/agp-9-0-0-release-notes#runtime-dependency-on-kgp).
+Compose and serialization compiler plugins use the same version. JVM target 17 is
+preserved in both modules.
 
 ## Dependabot policy
 
-AGP plugins are grouped to avoid split application/library versions. Kotlin libraries/plugins remain grouped. Temporary Maven version ceilings keep routine updates inside the current platform family: AGP <9, Kotlin compiler <2.3, serialization <1.10, coroutines <1.11, Compose BOM <2026 and core-ktx <1.18. The Compose/core bounds are conservative review boundaries for the validated SDK line, not a claim that every excluded version is vulnerable or incompatible.
+The old ceilings for AGP 8, Kotlin 2.2, SDK 36-era Compose/core and Kotlinx are
+removed. AGP, Kotlin/compiler plugins, Kotlinx, Compose and core-ktx now share one
+`android-platform` update group. Other AndroidX packages remain grouped separately.
+This prevents independent application/library or compiler/library proposals from
+silently diverging; it does not prove a future proposal is compatible.
 
-These ceilings defer version proposals; they do not dismiss vulnerability alerts or prove a dependency safe. A required security fix beyond a ceiling needs a coordinated migration PR and removal/adjustment of the relevant rule. Other dependencies and compatible patch releases remain eligible for updates.
+Every proposed update still needs explicit review of the Gradle wrapper checksum,
+JDK, compiler and SDK compatibility tables. Dependabot's Gradle group does not
+automatically migrate the wrapper or SDK workflow. Keep version/metadata checks
+enabled and require the full build/device checks before merging. A future target
+SDK increase requires a separate Android behavior review.
 
-## Coordinated SDK 37 migration
+## Validation and remaining acceptance (#69)
 
-1. Select a compatible JDK/Gradle/AGP/Kotlin set using official release compatibility tables; update the checksum-pinned wrapper and both modules together.
-2. Migrate AGP/Kotlin build DSL deliberately, without disabling metadata/version verification.
-3. Update compile SDK and CI-installed SDK. Review target-SDK behavior separately from compile SDK and retain the supported minimum Android version unless justified.
-4. Update Compose/core/Kotlinx dependencies together, then remove ceilings whose compatibility is now covered.
-5. Build debug/test/release APK and unsigned AAB; run lint, JVM tests, generated-model checks and the actual-backend emulator test. Exercise authenticated playback, resume, conflicts, recreation, logout/revocation and Keystore storage.
-6. Test both the existing supported emulator and the new API level; verify signing/version-code and independently published Android release assets. Record physical-device testing separately.
+The build job runs debug and instrumentation APK assembly, JVM tests, unsigned
+release APK/AAB assembly and lint. Generated API models and release safety checks
+run before compilation. Release outputs retain the shared version-code range,
+ephemeral debug signing and unsigned-release labeling.
 
-The web end-to-end timeout seen on #64 was independent of Android dependencies: the test navigated away immediately after starting collection creation, allowing its library GET to race the POST. Wait for the server-confirmed collection in the UI before navigating, rather than increasing timeouts or retries.
+The device matrix runs the same actual-backend playback/resume, progress conflict,
+activity recreation, logout/revocation and Keystore checks on API 35 and API 37.0.
+Both matrix jobs must succeed before packaging for the unified release publisher.
+The new API uses the SDK repository's `37.0` package name, rather than guessing
+`android-37`. Successful compilation is not evidence of installed-device behavior.
+
+Record actual build/device results in the migration PR. Physical-phone testing,
+production signing and a published-release acceptance run remain separate evidence;
+do not close #69 solely because the build files or device matrix have changed.
+
+## Historical failures
+
+- #67/#68 changed one AGP plugin independently; AGP 9.5 required a newer wrapper.
+- #64 selected Compose/core requiring SDK 37 and AGP 9.1+ against the former SDK 36 build.
+- #65 selected Kotlinx libraries with Kotlin 2.4 metadata against a Kotlin 2.2 compiler.
+
+Those errors motivated coordinated migration. They are not reasons to suppress
+metadata validation, remove tests or dismiss dependency vulnerability alerts.

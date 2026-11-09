@@ -30,10 +30,8 @@ jobs:
           java-version: '17'
       - uses: android-actions/setup-android@v4
         with:
-          packages: platform-tools platforms;android-36 build-tools;35.0.0
+          packages: platform-tools platforms;android-37.0 build-tools;36.0.0
           log-accepted-android-sdk-licenses: false
-      - name: Install the Android 17 preview platform
-        run: sdkmanager --install --channel=3 "platforms;android-37.0"
       - uses: gradle/actions/setup-gradle@v6
       - name: Test Android release safety
         run: node --test scripts/tests/android-release.test.cjs
@@ -58,10 +56,15 @@ jobs:
           path: |
             clients/android/core/build/reports/tests/
             clients/android/app/build/reports/lint-results-*
-  device:
+  device_matrix:
+    name: Device API ${{ matrix.api-level }}
     needs: build
     runs-on: ubuntu-24.04
     timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        api-level: ['35', '37.0']
     steps:
       - uses: actions/checkout@v7
         with:
@@ -91,12 +94,22 @@ jobs:
       - name: Install and exercise the APK against the real backend
         uses: reactivecircus/android-emulator-runner@v2
         with:
-          api-level: 35
+          api-level: ${{ matrix.api-level }}
           target: google_apis
           arch: x86_64
           disable-animations: true
           emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim
           script: python3 scripts/test-android-backend.py
+  device:
+    # Preserve the existing required check name while gating every tested API.
+    needs: device_matrix
+    if: always()
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Require all device API levels
+        env:
+          DEVICE_RESULT: ${{ needs.device_matrix.result }}
+        run: test "$DEVICE_RESULT" = success
   package:
     needs: [build, device]
     if: inputs.build_number != ''

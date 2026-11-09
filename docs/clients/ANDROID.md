@@ -28,7 +28,13 @@ Remote plain HTTP is blocked by both URL validation and Android network security
 
 ## Development builds
 
-Requirements: JDK 17, Android SDK command-line tools or Android Studio, platform `android-36`, build-tools `35.0.0`, and platform-tools. AGP 8.13.2, Kotlin 2.2.21 and the checksum-pinned Gradle 8.13 wrapper are checked in. The app compiles/targets API 36 and supports API 26+.
+Requirements: JDK 17, Android SDK command-line tools or Android Studio, platform
+`android-37.0`, build-tools `36.0.0`, and platform-tools. AGP 9.1.1, Kotlin 2.4.21
+and the checksum-pinned Gradle 9.7.0 wrapper are checked in. AGP's built-in Kotlin
+uses the same compiler version as the Compose and serialization plugins; legacy
+Kotlin/DSL opt-outs are removed. The app compiles against API 37, retains target
+API 36 and supports API 26+. Raising the target SDK is a separate behavior review.
+See [Android dependency compatibility](../development/ANDROID-UPDATES.md).
 
 ```sh
 python3 scripts/generate-android-models.py --check
@@ -75,7 +81,15 @@ Playback pauses when the activity backgrounds. A foreground MediaSession supplie
 
 `core:testDebugUnitTest` checks URL restrictions, origin-bound cookies, logout race protection, corrupt storage, compatibility, redirects, unauthorized responses, response-size limits and disconnected servers. DTO generation derives shared types from `shared/api/openapi-v1.json`; the current CSRF endpoint lacks a response schema, so its tiny token transport model is explicitly handwritten.
 
-The Android workflow builds debug/test/release APKs and AAB, runs lint/JVM tests, installs the debug APK on an API 35 emulator, and runs `scripts/test-android-backend.py` against a fresh actual ASP.NET backend. The script generates a synthetic VP9/Opus video, scans it, seeds progress and exercises rendered playback, resume, activity recreation, Keystore encryption, competing progress updates and session revocation. Run it locally after building the backend and Android test APKs with an emulator/device attached. The fixture owns localhost port 5050; stop your normal server first. Fixture credentials exist only in the temporary test database.
+The Android workflow builds debug/test/release APKs and AAB, runs lint/JVM tests,
+then installs the debug APK on separate API 35 and API 37.0 Google APIs x86_64
+emulators. Both jobs run `scripts/test-android-backend.py` against a fresh actual
+ASP.NET backend and must pass before release packaging. The script generates a
+synthetic VP9/Opus video, scans it, seeds progress and exercises rendered playback,
+resume, activity recreation, Keystore encryption, competing progress updates and
+session revocation. Run it locally after building the backend and Android test
+APKs with an emulator/device attached. The fixture owns localhost port 5050; stop
+your normal server first. Fixture credentials exist only in the temporary test database.
 
 A successful build proves compilation; an emulator first-frame test proves playback for that fixture. Neither proves all codecs, minimum Android versions, physical phones, remote HTTPS configurations or manufacturer-specific behavior. See the PR/check results for observed validation; this document does not imply all device tests have passed.
 
