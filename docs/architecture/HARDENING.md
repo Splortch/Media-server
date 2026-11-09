@@ -58,6 +58,13 @@ independent security audit is claimed.
   are not trusted implicitly. Use a private network/VPN; do not put this alpha on an open listener.
 - Probe arguments are passed separately, network protocols are disabled, output is bounded and the
   process tree is killed on timeout. This is a process lifetime limit, not an OS sandbox.
+- Source FFprobe invocations (library scan, download import, staged-source validation and HDR frame
+  inspection) restrict demuxers to MOV/MP4, Matroska/WebM and AVI. A supported filename extension
+  never authorizes HLS, concat or other indirect inputs to read additional local files. Real-media
+  regressions cover all six discovered extensions and disguised HLS/concat inputs. This reduces
+  parser exposure; it does not remove the pathname race described above or sandbox codec parsing.
+  A separate generated-HLS probe permits only HLS/MPEG-TS for server-authored manifests in the
+  private conversion cache. Source files never use that policy; real HLS session tests cover it.
 
 The two maintainers should review these policies and Windows filesystem behavior before enabling
 remote deployment. Physical Windows, SMB/UNC, case-sensitive Windows directory and screen-reader

@@ -103,6 +103,11 @@ public interface IMediaProbe
     // Alternative probes must explicitly support the stricter untrusted-import policy.
     Task<ProbeResult> ProbeImportAsync(string path, CancellationToken ct) =>
         throw new MediaProbeException("import_probe_unavailable");
+
+    // Only server-authored manifests in the private conversion cache may use
+    // indirect HLS input. Never call this for library or downloaded source files.
+    Task<ProbeResult> ProbeGeneratedHlsAsync(string path, CancellationToken ct) =>
+        throw new MediaProbeException("generated_probe_unavailable");
 }
 
 public record PlaybackPlan(string Mode, string MimeType, string? Warning);

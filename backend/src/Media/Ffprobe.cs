@@ -7,23 +7,30 @@ namespace MediaServer.Media;
 
 public sealed class Ffprobe(string executable) : IMediaProbe
 {
+    // Extensions are only discovery hints. Never let a renamed playlist or other
+    // indirect-input demuxer open additional files under the file protocol policy.
+    private const string AllowedFormats = "mov,matroska,webm,avi";
+
     public Task<ProbeResult> ProbeAsync(string path, CancellationToken ct) =>
-        ProbeWithPolicyAsync(path, ct, false);
+        ProbeWithPolicyAsync(path, ct, AllowedFormats);
 
     public Task<ProbeResult> ProbeImportAsync(string path, CancellationToken ct) =>
-        ProbeWithPolicyAsync(path, ct, true);
+        ProbeWithPolicyAsync(path, ct, AllowedFormats);
+
+    public Task<ProbeResult> ProbeGeneratedHlsAsync(string path, CancellationToken ct) =>
+        ProbeWithPolicyAsync(path, ct, "hls,mpegts");
 
     private async Task<ProbeResult> ProbeWithPolicyAsync(
         string path,
         CancellationToken ct,
-        bool importsOnly
+        string formats
     )
     {
         using var deadline = CancellationTokenSource.CreateLinkedTokenSource(ct);
         deadline.CancelAfter(TimeSpan.FromSeconds(20));
         try
         {
-            return await ProbeCoreAsync(path, deadline.Token, importsOnly);
+            return await ProbeCoreAsync(path, deadline.Token, formats);
         }
         catch (OperationCanceledException) when (!ct.IsCancellationRequested)
         {
@@ -34,7 +41,7 @@ public sealed class Ffprobe(string executable) : IMediaProbe
     private async Task<ProbeResult> ProbeCoreAsync(
         string path,
         CancellationToken ct,
-        bool importsOnly
+        string formats
     )
     {
         using var doc = await ReadJsonAsync(
@@ -43,11 +50,8 @@ public sealed class Ffprobe(string executable) : IMediaProbe
                 "error",
                 "-protocol_whitelist",
                 "file",
-                .. (
-                    importsOnly
-                        ? new[] { "-format_whitelist", "mov,matroska,webm,avi" }
-                        : Array.Empty<string>()
-                ),
+                "-format_whitelist",
+                formats,
                 "-show_entries",
                 "format=duration,format_name:format_tags:chapter=start_time,end_time:chapter_tags=title:stream=index,codec_type,codec_name,width,height,channels,channel_layout,bits_per_raw_sample,pix_fmt,color_primaries,color_transfer,color_space:stream_tags=language,title:stream_disposition=default,forced:stream_side_data",
                 "-of",
@@ -102,6 +106,8 @@ public sealed class Ffprobe(string executable) : IMediaProbe
                     "error",
                     "-protocol_whitelist",
                     "file",
+                    "-format_whitelist",
+                    formats,
                     "-threads",
                     "1",
                     "-select_streams",

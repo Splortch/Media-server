@@ -567,7 +567,7 @@ public sealed class PlaybackSessions(
                 progress => Volatile.Write(ref job.Progress, progress)
             );
             job.Phase = "verifying";
-            var encoded = await probe.ProbeAsync(
+            var encoded = await probe.ProbeGeneratedHlsAsync(
                 Path.Combine(job.Directory, level.Name + ".m3u8"),
                 ct
             );
