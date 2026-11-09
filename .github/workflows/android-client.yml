@@ -30,6 +30,7 @@ jobs:
           java-version: '17'
       - uses: android-actions/setup-android@v4
         with:
+          cmdline-tools-version: '15859902' # 22.0 understands dotted API levels.
           packages: platform-tools platforms;android-37.0 build-tools;36.0.0
           log-accepted-android-sdk-licenses: false
       - uses: gradle/actions/setup-gradle@v6
@@ -73,6 +74,22 @@ jobs:
         with:
           distribution: temurin
           java-version: '17'
+      - uses: android-actions/setup-android@v4
+        with:
+          cmdline-tools-version: '15859902'
+          packages: platform-tools
+          log-accepted-android-sdk-licenses: false
+      - name: Use current AVD tools in the emulator action
+        # The emulator action prepends cmdline-tools/latest to PATH, even when
+        # setup-android installed a newer version in its own directory.
+        run: |
+          if [ -d "$ANDROID_HOME/cmdline-tools/22.0" ]; then
+            if [ -e "$ANDROID_HOME/cmdline-tools/latest" ]; then
+              mv "$ANDROID_HOME/cmdline-tools/latest" "$RUNNER_TEMP/android-cmdline-tools-preinstalled"
+            fi
+            ln -s "$ANDROID_HOME/cmdline-tools/22.0" "$ANDROID_HOME/cmdline-tools/latest"
+          fi
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --version
       - uses: actions/setup-dotnet@v6
         with:
           global-json-file: global.json
@@ -104,7 +121,7 @@ jobs:
           # Use GLES software rendering; these Media3 fixtures do not require Vulkan.
           # Stream guest errors too, including crashes before the test script starts.
           emulator-options: -no-window -gpu swiftshader -feature -Vulkan -no-snapshot -noaudio -no-boot-anim -no-metrics -show-kernel -logcat '*:E'
-          pre-emulator-launch-script: adb start-server
+          pre-emulator-launch-script: grep -Fx 'target=android-${{ matrix.api-level }}' "$ANDROID_AVD_HOME/test.ini" && adb start-server
           script: python3 scripts/test-android-backend.py || { adb logcat -b crash -d; adb shell df -h /data; exit 1; }
   device:
     # Preserve the existing required check name while gating every tested API.

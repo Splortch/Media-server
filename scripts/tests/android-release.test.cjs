@@ -69,7 +69,12 @@ test('headless device validation uses software GLES and adequate guest resources
   assert.ok(megabytes('ram-size') >= 2048);
   assert.ok(megabytes('heap-size') >= 256 && megabytes('heap-size') <= megabytes('ram-size'));
   assert.ok(megabytes('disk-size') >= 4096);
-  assert.match(workflow, /pre-emulator-launch-script: adb start-server/);
+  const device = workflow.split('  device_matrix:\n')[1].split('  device:\n')[0];
+  assert.match(device, /uses: android-actions\/setup-android@v4/);
+  assert.match(device, /cmdline-tools-version: '15859902'/);
+  assert.match(device, /ln -s "\$ANDROID_HOME\/cmdline-tools\/22\.0" "\$ANDROID_HOME\/cmdline-tools\/latest"/);
+  assert.ok(device.indexOf('uses: android-actions/setup-android@v4') < device.indexOf('uses: reactivecircus/android-emulator-runner@v2'));
+  assert.match(device, /pre-emulator-launch-script: grep -Fx 'target=android-\$\{\{ matrix\.api-level \}\}' "\$ANDROID_AVD_HOME\/test\.ini" && adb start-server/);
 });
 
 test('standalone Android publication is disabled', async()=>{
