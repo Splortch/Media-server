@@ -61,6 +61,10 @@ jobs:
     needs: build
     runs-on: ubuntu-24.04
     timeout-minutes: 30
+    env:
+      DISPLAY: ':99'
+      LIBGL_ALWAYS_SOFTWARE: '1'
+      GALLIUM_DRIVER: llvmpipe
     strategy:
       fail-fast: false
       matrix:
@@ -87,7 +91,8 @@ jobs:
       - name: Prepare synthetic playback and emulator acceleration
         run: |
           sudo apt-get update
-          sudo apt-get install -y --no-install-recommends ffmpeg
+          sudo apt-get install -y --no-install-recommends ffmpeg xvfb libgl1-mesa-dri libglx-mesa0 libegl-mesa0
+          Xvfb "$DISPLAY" -screen 0 1280x720x24 -nolisten tcp > /tmp/android-xvfb.log 2>&1 &
           echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
           sudo udevadm control --reload-rules
           sudo udevadm trigger --name-match=kvm
@@ -101,10 +106,11 @@ jobs:
           heap-size: 512M
           disk-size: 6G
           disable-animations: true
-          # Select a supported software graphics backend for headless API 35/37.
-          emulator-options: -no-window -gpu software -no-snapshot -noaudio -no-boot-anim -no-metrics -show-kernel
+          # Host GL uses Mesa llvmpipe via Xvfb, avoiding bundled SwiftShader crashes.
+          # This app exercises GLES/Media3; Vulkan is not needed by these fixtures.
+          emulator-options: -no-window -gpu host -feature -Vulkan -no-snapshot -noaudio -no-boot-anim -no-metrics -show-kernel
           pre-emulator-launch-script: adb start-server
-          script: python3 scripts/test-android-backend.py
+          script: python3 scripts/test-android-backend.py || { adb logcat -b crash -d; adb shell df -h /data; exit 1; }
   device:
     # Preserve the existing required check name while gating every tested API.
     needs: device_matrix

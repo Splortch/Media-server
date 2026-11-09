@@ -51,10 +51,15 @@ test('real-backend device tests cover the existing and new API levels before pac
   assert.match(workflow, /run: test "\$DEVICE_RESULT" = success/);
 });
 
-test('headless device validation uses supported software graphics and adequate guest resources', () => {
+test('headless device validation uses Mesa software graphics and adequate guest resources', () => {
   const workflow = fs.readFileSync(path.join(__dirname, '../../.github/workflows/android-client.yml'), 'utf8');
   const options = workflow.match(/^\s+emulator-options: (.+)$/m)[1];
-  assert.match(options, /(?:^|\s)-gpu software(?:\s|$)/);
+  assert.match(options, /(?:^|\s)-gpu host(?:\s|$)/);
+  assert.match(options, /(?:^|\s)-feature -Vulkan(?:\s|$)/);
+  assert.match(workflow, /LIBGL_ALWAYS_SOFTWARE: '1'/);
+  assert.match(workflow, /GALLIUM_DRIVER: llvmpipe/);
+  assert.match(workflow, /Xvfb "\$DISPLAY"/);
+  assert.match(workflow, /adb logcat -b crash -d; adb shell df -h \/data; exit 1/);
   assert.doesNotMatch(options, /swiftshader_indirect|angle_indirect|swangle_indirect/);
   assert.match(options, /(?:^|\s)-show-kernel(?:\s|$)/);
   assert.match(options, /(?:^|\s)-no-metrics(?:\s|$)/);
