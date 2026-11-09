@@ -55,7 +55,68 @@ def bounded_file(path, root):
     return resolved
 
 
-def inventory(assets, lockfile, node_modules, target, commit, runtime):
+def runtime_inventory(published, folders, target, runtime):
+    """Require evidence for the runtime packs actually named by the published app."""
+    config = json.loads(bounded_file(published / 'Api.runtimeconfig.json', published).read_text(encoding='utf-8'))
+    deps = json.loads(bounded_file(published / 'Api.deps.json', published).read_text(encoding='utf-8'))
+    if not deps['runtimeTarget']['name'].endswith('/' + runtime):
+        raise ValueError('Published runtime does not match inventory target')
+    frameworks = config['runtimeOptions'].get('includedFrameworks', [])
+    expected = {'Microsoft.NETCore.App', 'Microsoft.AspNetCore.App'}
+    if len(frameworks) != 2 or {item['name'] for item in frameworks} != expected:
+        raise ValueError('Expected both self-contained server frameworks')
+    packages, evidence = [], []
+    for framework in sorted(frameworks, key=lambda item: item['name']):
+        version = framework['version']
+        if not re.fullmatch(r'[0-9]+\.[0-9]+\.[0-9]+(?:-[A-Za-z0-9.-]+)?', version):
+            raise ValueError('Invalid published framework version')
+        name = framework['name'] + '.Runtime.' + runtime
+        key = 'runtimepack.' + name + '/' + version
+        if deps['libraries'].get(key, {}).get('type') != 'runtimepack':
+            raise ValueError('Published framework has no matching runtime pack')
+        roots = [folder / name.lower() / version.lower() for folder in folders
+                 if (folder / name.lower() / version.lower()).is_dir()]
+        if len(roots) != 1:
+            raise ValueError('Expected one restored runtime pack for ' + name)
+        root = roots[0]
+        nuspecs = list(root.glob('*.nuspec'))
+        if len(nuspecs) != 1:
+            raise ValueError('Missing or ambiguous runtime pack metadata')
+        document = ET.fromstring(bounded_file(nuspecs[0], root).read_bytes())
+        metadata = next((element for element in document if element.tag.rsplit('}', 1)[-1] == 'metadata'), None)
+        if metadata is None:
+            raise ValueError('Runtime pack metadata missing')
+        values = {element.tag.rsplit('}', 1)[-1]: (element.text or '').strip() for element in metadata}
+        if values.get('id', '').lower() != name.lower() or values.get('version') != version:
+            raise ValueError('Restored runtime pack identity does not match published app')
+        # Runtime packs carry Microsoft's terms and upstream third-party notices.
+        # Do not accept a package identity alone as license evidence.
+        notices = sorted(candidate for candidate in root.rglob('*')
+                         if candidate.is_file() and re.fullmatch(
+                             r'(?i)(license|third[-_]?party[-_]?notices)(\.[a-z]+)?', candidate.name))
+        if not any(re.match(r'(?i)^license', p.name) for p in notices) or not any(
+                re.match(r'(?i)^third', p.name) for p in notices):
+            raise ValueError('Runtime pack license and third-party notices are required')
+        entry = component(name, version, 'nuget', values.get('license'))
+        entry['sourceInfo'] = 'Self-contained runtime pack identified by published runtimeconfig/deps and restored nuspec; no lockfile archive checksum is asserted.'
+        packages.append(entry)
+        copied = []
+        for index, notice in enumerate(notices):
+            source = bounded_file(notice, root)
+            destination = target / 'license-evidence' / (entry['SPDXID'] + '-' + str(index) + '.txt')
+            shutil.copyfile(source, destination)
+            copied.append(destination.relative_to(target).as_posix())
+        evidence.append({'ecosystem': 'nuget', 'name': name, 'version': version,
+                         'declaredLicense': values.get('license') or None,
+                         'scope': 'published self-contained runtime pack', 'notices': copied})
+    actual = {key for key, value in deps['libraries'].items() if value.get('type') == 'runtimepack'}
+    wanted = {'runtimepack.' + item['name'] + '/' + item['version'] for item in evidence}
+    if actual != wanted:
+        raise ValueError('Unexpected published runtime packs require inventory support')
+    return packages, evidence
+
+
+def inventory(assets, lockfile, node_modules, target, commit, runtime, published=None):
     if not re.fullmatch(r'[a-f0-9]{40}', commit) or runtime not in ('win-x64', 'linux-x64', 'osx-x64', 'osx-arm64'):
         raise ValueError('Invalid source or runtime identity')
     if target.exists() and any(target.iterdir()):
@@ -129,6 +190,10 @@ def inventory(assets, lockfile, node_modules, target, commit, runtime):
                 shutil.copyfile(notice, destination)
                 copied.append(destination.relative_to(target).as_posix())
         evidence.append({'ecosystem': 'npm', 'name': name, 'version': item['version'], 'declaredLicense': declared or None, 'scope': 'production browser dependency', 'notices': copied})
+    if published is not None:
+        runtime_packages, runtime_evidence = runtime_inventory(published, folders, target, runtime)
+        packages.extend(runtime_packages)
+        evidence.extend(runtime_evidence)
     packages.sort(key=lambda value: (value['name'], value['versionInfo'], value['SPDXID']))
     if len({value['SPDXID'] for value in packages}) != len(packages):
         # Nested npm copies of the same exact package describe the same component.
@@ -138,14 +203,15 @@ def inventory(assets, lockfile, node_modules, target, commit, runtime):
         'name': 'MediaServer-' + runtime,
         'documentNamespace': f'https://spdx.org/spdxdocs/media-server-{commit}-{runtime}',
         'creationInfo': {'creators': ['Tool: MediaServer-release-inventory-1'], 'created': '1970-01-01T00:00:00Z',
-                         'comment': 'Deterministic metadata inventory; epoch timestamp is intentional, source commit identifies build. Not a license review or complete OS/runtime inventory.'},
+                         'comment': 'Deterministic metadata inventory; epoch timestamp is intentional, source commit identifies build. Not a license review or complete OS/native SDK inventory.'},
         'packages': packages,
         'relationships': [{'spdxElementId': 'SPDXRef-DOCUMENT', 'relationshipType': 'DESCRIBES', 'relatedSpdxElement': value['SPDXID']} for value in packages],
     }
     target.mkdir(parents=True, exist_ok=True)
     (target / 'SBOM.spdx.json').write_text(json.dumps(document, indent=2, sort_keys=True) + '\n', encoding='utf-8')
     report = {'sourceCommit': commit, 'runtime': runtime, 'components': evidence,
-              'limitations': ['Metadata declarations are not legal conclusions.', 'NuGet inventory includes build/design dependencies; presence does not prove redistribution.', 'Microsoft runtime/OS packages and native client dependencies require separate inventories.', 'Native servers do not bundle FFmpeg; downloaded tools have separate licenses. Container FFmpeg/source evidence is distributed separately.']}
+              'runtimePackEvidence': published is not None,
+              'limitations': ['Metadata declarations are not legal conclusions.', 'NuGet inventory includes build/design dependencies; presence does not prove redistribution.', 'Runtime pack evidence is identified by the published app, not a locked archive hash.' if published is not None else 'Microsoft runtime packs were not inventoried.', 'OS packages and native client dependencies require separate inventories.', 'Native servers do not bundle FFmpeg; downloaded tools have separate licenses. Container FFmpeg/source evidence is distributed separately.']}
     (target / 'THIRD-PARTY-INVENTORY.json').write_text(json.dumps(report, indent=2, sort_keys=True) + '\n', encoding='utf-8')
     return document
 
@@ -158,6 +224,7 @@ if __name__ == '__main__':
     parser.add_argument('--output', type=Path, required=True)
     parser.add_argument('--commit', required=True)
     parser.add_argument('--runtime', required=True)
+    parser.add_argument('--published-dir', type=Path, required=True)
     args = parser.parse_args()
-    result = inventory(args.assets, args.lockfile, args.node_modules, args.output, args.commit, args.runtime)
+    result = inventory(args.assets, args.lockfile, args.node_modules, args.output, args.commit, args.runtime, args.published_dir)
     print(f'Inventoried {len(result["packages"])} locked components; license conclusions require review.')
