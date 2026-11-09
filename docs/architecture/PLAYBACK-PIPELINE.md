@@ -28,6 +28,14 @@ Web and desktop clients share the HLS/quality/audio/subtitle controls. Desktop r
 
 Limits: two conversion/cache jobs globally, 8 GiB source per job, six-hour source duration, 4 GiB output per job, two encoder threads and 30-minute conversion deadline. Files are sampled for output quota every 500 ms; reserve extra disk space for that interval. At most 24 GiB plus quota overshoot is required for two full staged+output jobs. Full-file staging costs time and disk but keeps FFmpeg away from attacker-replaceable library paths. There is no source modification, download authorization shortcut or public cache directory.
 
+Failed conversions discard their staged source and partial output immediately after their work
+stops. The safe failure status remains available to its lease owners until expiry, explicit
+release, or a new source needs an occupied conversion slot. Admission then retires terminal
+jobs before returning a capacity conflict; preparing and ready jobs are never evicted. If
+filesystem cleanup fails, the slot remains occupied and cleanup is retried, rather than allowing
+disk use to exceed the two-job limit. Releasing one shared lease preserves other owners' work;
+releasing the last one waits for cancellation and deletes only that private conversion cache.
+
 Run `python scripts/check-media-tools.py` to verify the selected FFmpeg build provides the conversion encoders and HDR filters used by the tests. Missing filters cause an explicit conversion error; they never trigger an un-tone-mapped SDR fallback.
 
 ## Hardware opt-in

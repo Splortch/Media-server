@@ -66,6 +66,9 @@ public sealed class FfmpegRunner(string executable)
                 process.Kill(true);
             }
             catch (InvalidOperationException) { }
+            // Kill is asynchronous. Do not let callers delete the cache or
+            // admit replacement work while the encoder still owns its files.
+            await process.WaitForExitAsync(CancellationToken.None);
             try
             {
                 await Task.WhenAll(error, output);
