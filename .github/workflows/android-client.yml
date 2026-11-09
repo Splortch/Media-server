@@ -97,8 +97,12 @@ jobs:
           api-level: ${{ matrix.api-level }}
           target: google_apis
           arch: x86_64
+          ram-size: 2048M
+          heap-size: 512M
           disable-animations: true
-          emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim
+          # Select a supported software graphics backend for headless API 35/37.
+          emulator-options: -no-window -gpu software -no-snapshot -noaudio -no-boot-anim -no-metrics -show-kernel
+          pre-emulator-launch-script: adb start-server
           script: python3 scripts/test-android-backend.py
   device:
     # Preserve the existing required check name while gating every tested API.

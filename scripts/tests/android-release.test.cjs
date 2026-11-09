@@ -51,6 +51,18 @@ test('real-backend device tests cover the existing and new API levels before pac
   assert.match(workflow, /run: test "\$DEVICE_RESULT" = success/);
 });
 
+test('headless device validation uses supported software graphics and explicit guest memory', () => {
+  const workflow = fs.readFileSync(path.join(__dirname, '../../.github/workflows/android-client.yml'), 'utf8');
+  const options = workflow.match(/^\s+emulator-options: (.+)$/m)[1];
+  assert.match(options, /(?:^|\s)-gpu software(?:\s|$)/);
+  assert.doesNotMatch(options, /swiftshader_indirect|angle_indirect|swangle_indirect/);
+  assert.match(options, /(?:^|\s)-show-kernel(?:\s|$)/);
+  assert.match(options, /(?:^|\s)-no-metrics(?:\s|$)/);
+  assert.match(workflow, /ram-size: 2048M/);
+  assert.match(workflow, /heap-size: 512M/);
+  assert.match(workflow, /pre-emulator-launch-script: adb start-server/);
+});
+
 test('standalone Android publication is disabled', async()=>{
   await assert.rejects(require('../publish-android.cjs')({}), /Standalone Android publication is disabled/);
 });
