@@ -51,15 +51,21 @@ test('real-backend device tests cover the existing and new API levels before pac
   assert.match(workflow, /run: test "\$DEVICE_RESULT" = success/);
 });
 
-test('headless device validation uses supported software graphics and explicit guest memory', () => {
+test('headless device validation uses supported software graphics and adequate guest resources', () => {
   const workflow = fs.readFileSync(path.join(__dirname, '../../.github/workflows/android-client.yml'), 'utf8');
   const options = workflow.match(/^\s+emulator-options: (.+)$/m)[1];
   assert.match(options, /(?:^|\s)-gpu software(?:\s|$)/);
   assert.doesNotMatch(options, /swiftshader_indirect|angle_indirect|swangle_indirect/);
   assert.match(options, /(?:^|\s)-show-kernel(?:\s|$)/);
   assert.match(options, /(?:^|\s)-no-metrics(?:\s|$)/);
-  assert.match(workflow, /ram-size: 2048M/);
-  assert.match(workflow, /heap-size: 512M/);
+  const megabytes = (name) => {
+    const value = workflow.match(new RegExp(`^\\s+${name}: (\\d+)([MG])$`, 'm'));
+    assert.ok(value, `${name} must set an explicit guest resource limit`);
+    return Number(value[1]) * (value[2] === 'G' ? 1024 : 1);
+  };
+  assert.ok(megabytes('ram-size') >= 2048);
+  assert.ok(megabytes('heap-size') >= 256 && megabytes('heap-size') <= megabytes('ram-size'));
+  assert.ok(megabytes('disk-size') >= 4096);
   assert.match(workflow, /pre-emulator-launch-script: adb start-server/);
 });
 

@@ -99,6 +99,7 @@ jobs:
           arch: x86_64
           ram-size: 2048M
           heap-size: 512M
+          disk-size: 6G
           disable-animations: true
           # Select a supported software graphics backend for headless API 35/37.
           emulator-options: -no-window -gpu software -no-snapshot -noaudio -no-boot-anim -no-metrics -show-kernel
