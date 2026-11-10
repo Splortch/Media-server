@@ -129,16 +129,25 @@ public sealed class ScanWorker(
                     try
                     {
                         var relative = Path.GetRelativePath(library.Path, path);
-                        policy.Resolve(library.Path, relative);
+                        using var source = policy.OpenRead(library.Path, relative);
+                        var size = source.Length;
+                        var modifiedTicks = File.GetLastWriteTimeUtc(source.SafeFileHandle).Ticks;
                         var fingerprint = "";
                         if (library.ComputeHashes)
                         {
-                            using var stream = policy.OpenRead(library.Path, relative);
                             fingerprint = Convert.ToHexString(
-                                await SHA256.HashDataAsync(stream, stoppingToken)
+                                await SHA256.HashDataAsync(source, stoppingToken)
                             );
                         }
-                        var metadata = await probe.ProbeAsync(path, stoppingToken);
+                        var metadata = OperatingSystem.IsLinux()
+                            ? await probe.ProbeFileAsync(source, stoppingToken)
+                            : await probe.ProbeAsync(path, stoppingToken);
+                        if (
+                            source.Length != size
+                            || File.GetLastWriteTimeUtc(source.SafeFileHandle).Ticks
+                                != modifiedTicks
+                        )
+                            throw new IOException("Media changed during probing.");
                         var item = await db
                             .Items.IgnoreQueryFilters()
                             .SingleOrDefaultAsync(
@@ -190,12 +199,12 @@ public sealed class ScanWorker(
                         item.SearchTitle = item.Title.ToLowerInvariant();
                         item.IsMissing = false;
                         item.Fingerprint = fingerprint;
-                        item.ModifiedTicks = File.GetLastWriteTimeUtc(path).Ticks;
+                        item.ModifiedTicks = modifiedTicks;
                         item.Duration = metadata.Duration;
                         item.Container = metadata.Container;
                         item.VideoCodec = metadata.VideoCodec;
                         item.AudioCodec = metadata.AudioCodec;
-                        item.Size = new FileInfo(path).Length;
+                        item.Size = size;
                         job.Discovered++;
                         await db.SaveChangesAsync(stoppingToken);
                     }

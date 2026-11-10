@@ -9,7 +9,7 @@ maintainer-review requirements cannot be replaced by software CI.
 
 | Issue | Remaining work / validation |
 | --- | --- |
-| [#1](https://github.com/Splortch/Media-server/issues/1) | FFprobe pathname/process boundary and both-maintainer security review; preserve existing setup/session/no-follow streaming protections. |
+| [#1](https://github.com/Splortch/Media-server/issues/1) | Linux scans pin FFprobe input to validated handles; Windows/macOS probe-path boundaries, process isolation and both-maintainer security review remain. Preserve setup/session/no-follow streaming protections. |
 | [#2](https://github.com/Splortch/Media-server/issues/2) | SBOM/license inventory and redistribution evidence; clean physical-machine distribution checks. Base pinning and installer automation already exist. |
 | [#4](https://github.com/Splortch/Media-server/issues/4) | Audit existing HLS/session/quota implementation against every criterion; fix measured gaps, do not build a duplicate pipeline. |
 | [#6](https://github.com/Splortch/Media-server/issues/6) | Physical NVENC execution and evidence after the implemented capability/fallback adapter. |

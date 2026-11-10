@@ -100,6 +100,11 @@ public interface IMediaProbe
 {
     Task<ProbeResult> ProbeAsync(string path, CancellationToken ct);
 
+    // Linux library scans must keep the validated inode pinned through both
+    // metadata and HDR inspection. Alternative probes must opt in explicitly.
+    Task<ProbeResult> ProbeFileAsync(FileStream source, CancellationToken ct) =>
+        throw new MediaProbeException("pinned_probe_unavailable");
+
     // Alternative probes must explicitly support the stricter untrusted-import policy.
     Task<ProbeResult> ProbeImportAsync(string path, CancellationToken ct) =>
         throw new MediaProbeException("import_probe_unavailable");

@@ -6,6 +6,47 @@ namespace Api.Tests;
 
 public sealed class ProbeBoundaryTests
 {
+    [Fact]
+    public async Task CancelledPinnedProbeHasExitedBeforeReturningAndLeavesSourceOpen()
+    {
+        if (!OperatingSystem.IsLinux())
+            return;
+        var root = Path.Combine(TestPaths.TempRoot, "cancel-probe-" + Guid.NewGuid());
+        Directory.CreateDirectory(root);
+        try
+        {
+            var executable = Path.Combine(root, "probe");
+            var pidFile = Path.Combine(root, "pid");
+            await File.WriteAllTextAsync(
+                executable,
+                "#!/bin/sh\nprintf '%s' \"$$\" > '"
+                    + pidFile.Replace("'", "'\\''")
+                    + "'\nexec sleep 60\n"
+            );
+            File.SetUnixFileMode(
+                executable,
+                UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute
+            );
+            await File.WriteAllTextAsync(Path.Combine(root, "movie.mp4"), "source");
+            using var source = new PathPolicy([root]).OpenRead(root, "movie.mp4");
+            using var cancel = new CancellationTokenSource();
+            var running = new Ffprobe(executable).ProbeFileAsync(source, cancel.Token);
+            using var startup = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+            while (!File.Exists(pidFile) || new FileInfo(pidFile).Length == 0)
+                await Task.Delay(10, startup.Token);
+            var pid = int.Parse(await File.ReadAllTextAsync(pidFile, startup.Token));
+            cancel.Cancel();
+            await Assert.ThrowsAnyAsync<OperationCanceledException>(() => running);
+            Assert.False(Directory.Exists($"/proc/{pid}"));
+            Assert.False(source.SafeFileHandle.IsClosed);
+            Assert.Equal((int)'s', source.ReadByte());
+        }
+        finally
+        {
+            Directory.Delete(root, true);
+        }
+    }
+
     [Theory]
     [InlineData("mp4", "libx264")]
     [InlineData("m4v", "libx264")]
@@ -31,6 +72,15 @@ public sealed class ProbeBoundaryTests
             Assert.NotEmpty(scan.VideoCodec);
             Assert.Equal(scan.Container, import.Container);
             Assert.Equal(scan.VideoCodec, import.VideoCodec);
+            if (OperatingSystem.IsLinux())
+            {
+                using var source = new PathPolicy([root]).OpenRead(root, Path.GetFileName(path));
+                var pinned = await probe.ProbeFileAsync(source, timeout.Token);
+                Assert.Equal(scan.Container, pinned.Container);
+                Assert.Equal(scan.VideoCodec, pinned.VideoCodec);
+                Assert.Equal(scan.Duration, pinned.Duration);
+                Assert.Equal(scan.ColorJson, pinned.ColorJson);
+            }
         }
         finally
         {
@@ -69,6 +119,14 @@ public sealed class ProbeBoundaryTests
             );
             Assert.Equal("invalid_media", error.Code);
             Assert.DoesNotContain(root, error.Message);
+            if (OperatingSystem.IsLinux() && !imports)
+            {
+                using var source = new PathPolicy([root]).OpenRead(root, Path.GetFileName(path));
+                var pinnedError = await Assert.ThrowsAsync<MediaProbeException>(() =>
+                    probe.ProbeFileAsync(source, timeout.Token)
+                );
+                Assert.Equal("invalid_media", pinnedError.Code);
+            }
         }
         finally
         {
