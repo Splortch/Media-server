@@ -59,7 +59,8 @@ test('headless device validation uses software GLES and adequate guest resources
   assert.match(options, /(?:^|\s)-logcat '\*:E'(?:\s|$)/);
   assert.match(workflow, /adb logcat -b crash -d; adb shell df -h \/data; exit 1/);
   assert.doesNotMatch(options, /swiftshader_indirect|angle_indirect|swangle_indirect/);
-  assert.match(options, /(?:^|\s)-show-kernel(?:\s|$)/);
+  // Both diagnostics claim QEMU's stdio serial device and prevent boot.
+  assert.doesNotMatch(options, /(?:^|\s)-show-kernel(?:\s|$)/);
   assert.match(options, /(?:^|\s)-no-metrics(?:\s|$)/);
   const megabytes = (name) => {
     const value = workflow.match(new RegExp(`^\\s+${name}: (\\d+)([MG])$`, 'm'));
