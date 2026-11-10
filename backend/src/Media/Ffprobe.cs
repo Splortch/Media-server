@@ -14,6 +14,31 @@ public sealed class Ffprobe(string executable) : IMediaProbe
     public Task<ProbeResult> ProbeAsync(string path, CancellationToken ct) =>
         ProbeWithPolicyAsync(path, ct, AllowedFormats);
 
+    public async Task<ProbeResult> ProbeFileAsync(FileStream source, CancellationToken ct)
+    {
+        if (!OperatingSystem.IsLinux())
+            throw new MediaProbeException("pinned_probe_unavailable");
+        var handle = source.SafeFileHandle;
+        var retained = false;
+        try
+        {
+            handle.DangerousAddRef(ref retained);
+            // Reopening this procfs entry selects the already validated inode,
+            // even if its filename or an ancestor has since been replaced.
+            // It remains seekable, unlike a pipe (MP4 may put moov at the end).
+            return await ProbeWithPolicyAsync(
+                $"/proc/{Environment.ProcessId}/fd/{handle.DangerousGetHandle().ToInt32()}",
+                ct,
+                AllowedFormats
+            );
+        }
+        finally
+        {
+            if (retained)
+                handle.DangerousRelease();
+        }
+    }
+
     public Task<ProbeResult> ProbeImportAsync(string path, CancellationToken ct) =>
         ProbeWithPolicyAsync(path, ct, AllowedFormats);
 
@@ -288,6 +313,9 @@ public sealed class Ffprobe(string executable) : IMediaProbe
                 process.Kill(true);
             }
             catch (InvalidOperationException) { }
+            // The caller must not release/reuse a pinned descriptor while a
+            // cancelled child could still open its procfs entry.
+            await process.WaitForExitAsync(CancellationToken.None);
             try
             {
                 await Task.WhenAll(output, error);

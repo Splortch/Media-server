@@ -10,7 +10,7 @@ No arbitrary file URL is accepted. Stream IDs resolve to database paths and are 
 
 ## Remaining risks and limitations
 
-- Streaming uses no-follow Linux descriptor traversal and Windows validated file handles. Scanning still probes by pathname and is not safe against malicious local writers. Keep media directories controlled by trusted users and mounted read-only. See [hardening and recovery](HARDENING.md) for guarantees and platform limitations.
+- Streaming uses no-follow descriptor traversal and validated file handles. Linux scans also pin FFprobe input, fingerprints and file metadata to the validated handle. Windows/macOS probe-path boundaries and codec process isolation remain open; in-place writes are not frozen. Keep media directories controlled by trusted users and mounted read-only. See [hardening and recovery](HARDENING.md) for guarantees and platform limitations.
 - Loopback HTTP cookies are not forced Secure. HTTPS deployment must explicitly set secure cookies. The local data key ring is protected by OS permissions, not an application-managed external key vault. Windows operators must set restrictive ACLs themselves.
 - A database copy contains salted password hashes and watch history. A key-ring copy plus cookies compromises sessions. Encrypt backups and protect the whole data directory.
 - Settings supports authenticated password changes; local operators have an offline recovery command. Both revoke all affected sessions. No MFA, remote password reset, account-management UI or supported public remote-access deployment is provided. Session rows also expire after seven days.

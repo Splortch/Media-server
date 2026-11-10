@@ -114,6 +114,20 @@ public sealed class Server : WebApplicationFactory<Program>
 
 public sealed class TestProbe : IMediaProbe
 {
+    public Task<ProbeResult> ProbeFileAsync(FileStream source, CancellationToken ct)
+    {
+        // SafeMediaFile constructs streams from handles, so Name is not a
+        // pathname. Recognize the corrupt fixtures through the pinned input.
+        var prefix = new byte[32];
+        var count = RandomAccess.Read(source.SafeFileHandle, prefix, 0);
+        var text = System.Text.Encoding.UTF8.GetString(prefix, 0, count);
+        return
+            text.StartsWith("not a video", StringComparison.Ordinal)
+            || text.StartsWith("corrupt fixture", StringComparison.Ordinal)
+            ? throw new IOException("invalid video")
+            : Task.FromResult(new ProbeResult(100, "webm", "vp9", "opus"));
+    }
+
     public Task<ProbeResult> ProbeAsync(string path, CancellationToken ct) =>
         Path.GetFileName(path).StartsWith("broken", StringComparison.Ordinal)
             ? throw new IOException("invalid video")

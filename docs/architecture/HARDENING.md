@@ -42,12 +42,27 @@ hanging on FIFOs. Windows opens with FILE_FLAG_OPEN_REPARSE_POINT, refuses non-d
 handles, compares the final handle path and denies write/delete sharing while the stream is open.
 Unsupported operating systems fail closed. Linux requires a modern kernel/glibc with statx.
 
-These checks do not sandbox FFprobe, prevent a trusted local owner from rewriting existing media,
-or make hostile shared filesystems safe. Media roots and their ancestors must remain controlled by
-the operator. Scanning still invokes FFprobe by pathname: a local writer can race scanning, so do
-not treat uploads/untrusted writable roots as supported input. Kernel process isolation, resource
-quotas and stronger scan-handle integration remain follow-up work; no internet-facing readiness or
-independent security audit is claimed.
+Linux library scans now keep one validated no-follow handle open for fingerprinting, probing,
+size and modification time. FFprobe opens `/proc/<server-pid>/fd/<descriptor>` for both metadata
+and HDR frame inspection. Replacing a filename or ancestor with another file/symlink cannot
+redirect those reads. The input remains seekable without copying whole movies into temporary
+storage. The descriptor is retained until every probe subprocess has exited, including on
+cancellation. A changed size/modification time rejects the scan result rather than persisting
+an inconsistent fingerprint. Alternative Linux scan probes must explicitly implement pinned
+input; there is no silent pathname fallback.
+
+This requires procfs access to the server's descriptor from its same-user FFprobe child. If
+container/LSM/procfs permissions deny access, the probe fails; do not relax isolation or add
+ptrace privileges to make it pass. Windows and macOS scans still use pathname-based FFprobe
+input while holding the validated source open; eliminating their remaining pathname boundary
+requires a separate platform-specific implementation and tests.
+
+These checks do not sandbox FFprobe, freeze file contents against in-place writes, or make
+hostile shared filesystems safe. Size/timestamp checks are best-effort mutation detection, not
+an immutable snapshot. Media roots and their ancestors must remain controlled by the operator;
+uploads/untrusted writable roots remain unsupported. Kernel process isolation, the remaining
+platform scan boundaries and both-maintainer review stay open under #1; no internet-facing
+readiness or independent security audit is claimed.
 
 ## Request policy review
 
@@ -62,7 +77,7 @@ independent security audit is claimed.
   inspection) restrict demuxers to MOV/MP4, Matroska/WebM and AVI. A supported filename extension
   never authorizes HLS, concat or other indirect inputs to read additional local files. Real-media
   regressions cover all six discovered extensions and disguised HLS/concat inputs. This reduces
-  parser exposure; it does not remove the pathname race described above or sandbox codec parsing.
+  parser exposure; it does not resolve the remaining platform boundaries above or sandbox codec parsing.
   A separate generated-HLS probe permits only HLS/MPEG-TS for server-authored manifests in the
   private conversion cache. Source files never use that policy; real HLS session tests cover it.
 

@@ -49,6 +49,9 @@ public sealed class DownloadImportTests
 
     private sealed class ProbeGate : IMediaProbe
     {
+        public Task<ProbeResult> ProbeFileAsync(FileStream source, CancellationToken ct) =>
+            new Ffprobe("ffprobe").ProbeFileAsync(source, ct);
+
         public TaskCompletionSource Started =
                 new(TaskCreationOptions.RunContinuationsAsynchronously),
             Release = new(TaskCreationOptions.RunContinuationsAsynchronously);
