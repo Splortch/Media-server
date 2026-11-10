@@ -27,6 +27,7 @@ artifacts/
 
 # Android build state and local signing material
 **/.gradle/
+**/.kotlin/
 **/build/
 **/local.properties
 *.jks

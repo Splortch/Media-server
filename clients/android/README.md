@@ -4,13 +4,18 @@ A native Kotlin/Jetpack Compose phone application backed by the existing server 
 
 Start with the [step-by-step installation, USB connection, development and signing guide](../../docs/clients/ANDROID.md). The server must already be configured; this app does not install it. Android 8.0+ is required.
 
-From this directory, with JDK 17 and Android SDK 36 installed:
+From this directory, with JDK 17, Android SDK platform `android-37.0` and build-tools `36.0.0` installed:
 
 ```sh
 ./gradlew :app:assembleDebug :app:assembleDebugAndroidTest :core:testDebugUnitTest :app:lint
 ```
 
 On Windows use `gradlew.bat`. Debug APK: `app/build/outputs/apk/debug/app-debug.apk`. Unsigned release APK/AAB require signing before distribution; no production keys are included.
+
+The checksum-pinned Gradle 9.7.0 wrapper, AGP 9.1.1 and Kotlin 2.4.21 use AGP's
+built-in Kotlin and new DSL. Compose and serialization compiler plugins match
+the Kotlin compiler. Compile SDK 37 is separate from the reviewed target SDK 36;
+minimum Android remains API 26. See the [toolchain policy](../../docs/development/ANDROID-UPDATES.md).
 
 - `core`: generated shared-contract DTOs, Retrofit/OkHttp transport, origin validation and Keystore-backed session storage.
 - `app`: Compose activity, lifecycle-aware playback state and Media3 player.

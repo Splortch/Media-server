@@ -3,18 +3,79 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 
-test('Android preview SDK is installed from the preview channel before the build', () => {
+test('Android build installs the same stable SDK used by both modules', () => {
   const root = path.resolve(__dirname, '../..');
   const workflow = fs.readFileSync(path.join(root, '.github/workflows/android-client.yml'), 'utf8');
   const packages = workflow.match(/^\s+packages: (.+)$/m)[1];
-  assert.doesNotMatch(packages, /platforms;android-37(?:\s|$)/);
-  const previewInstall = workflow.indexOf('sdkmanager --install --channel=3 "platforms;android-37.0"');
-  assert.ok(previewInstall > 0);
-  assert.ok(previewInstall < workflow.indexOf('run: ./gradlew'));
+  const app = fs.readFileSync(path.join(root, 'clients/android/app/build.gradle.kts'), 'utf8');
+  const compileSdk = app.match(/compileSdk = (\d+)/)[1];
+  assert.ok(packages.split(' ').includes(`platforms;android-${compileSdk}.0`));
+  assert.ok(packages.split(' ').includes('build-tools;36.0.0'));
+  assert.ok(workflow.indexOf('packages:') < workflow.indexOf('run: ./gradlew'));
   for (const module of ['app', 'core']) {
     const build = fs.readFileSync(path.join(root, 'clients/android', module, 'build.gradle.kts'), 'utf8');
-    assert.match(build, /compileSdk = 37/);
+    assert.equal(build.match(/compileSdk = (\d+)/)[1], compileSdk);
+    assert.match(build, /minSdk = 26/);
   }
+  assert.match(app, /targetSdk = 36/);
+});
+
+test('built-in Kotlin and compiler plugins agree without suppressing compatibility checks', () => {
+  const android = path.join(__dirname, '../../clients/android');
+  const rootBuild = fs.readFileSync(path.join(android, 'build.gradle.kts'), 'utf8');
+  const compiler = rootBuild.match(/kotlin-gradle-plugin:([\d.]+)/)[1];
+  const versions = [...rootBuild.matchAll(/kotlin\("plugin\.(?:compose|serialization)"\) version "([\d.]+)"/g)].map(m => m[1]);
+  assert.equal(versions.length, 2);
+  assert.ok(versions.every(v => v === compiler));
+  const agp = [...rootBuild.matchAll(/id\("com.android\.(?:application|library)"\) version "([\d.]+)"/g)].map(m => m[1]);
+  assert.equal(agp.length, 2);
+  assert.equal(agp[0], agp[1]);
+  const app = fs.readFileSync(path.join(android, 'app/build.gradle.kts'), 'utf8');
+  const composeBoms = [...app.matchAll(/androidx\.compose:compose-bom:([\d.]+)/g)].map(m => m[1]);
+  assert.equal(composeBoms.length, 2);
+  assert.equal(composeBoms[0], composeBoms[1]);
+  const config = [rootBuild, fs.readFileSync(path.join(android, 'gradle.properties'), 'utf8'),
+    ...['app', 'core'].map(module => fs.readFileSync(path.join(android, module, 'build.gradle.kts'), 'utf8'))].join('\n');
+  assert.doesNotMatch(config, /kotlin\("android"\)|android\.(?:builtInKotlin|newDsl)\s*=\s*false/);
+  assert.doesNotMatch(config, /suppressUnsupportedCompileSdk|suppressKotlinVersionCompatibilityCheck|skip-metadata-version-check/);
+});
+
+test('real-backend device tests cover the existing and new API levels before packaging', () => {
+  const workflow = fs.readFileSync(path.join(__dirname, '../../.github/workflows/android-client.yml'), 'utf8');
+  assert.match(workflow, /api-level: \['35', '37\.0'\]/);
+  assert.match(workflow, /api-level: \$\{\{ matrix\.api-level \}\}/);
+  assert.match(workflow, /script: python3 scripts\/test-android-backend.py/);
+  assert.match(workflow, /fail-fast: false/);
+  assert.match(workflow, /device:\n[\s\S]*needs: device_matrix\n\s+if: always\(\)/);
+  assert.match(workflow, /DEVICE_RESULT: \$\{\{ needs\.device_matrix\.result \}\}/);
+  assert.match(workflow, /run: test "\$DEVICE_RESULT" = success/);
+});
+
+test('headless device validation uses software GLES and adequate guest resources', () => {
+  const workflow = fs.readFileSync(path.join(__dirname, '../../.github/workflows/android-client.yml'), 'utf8');
+  const options = workflow.match(/^\s+emulator-options: (.+)$/m)[1];
+  assert.match(options, /(?:^|\s)-gpu swiftshader(?:\s|$)/);
+  assert.match(options, /(?:^|\s)-feature -Vulkan(?:\s|$)/);
+  assert.match(options, /(?:^|\s)-logcat '\*:E'(?:\s|$)/);
+  assert.match(workflow, /adb logcat -b crash -d; adb shell df -h \/data; exit 1/);
+  assert.doesNotMatch(options, /swiftshader_indirect|angle_indirect|swangle_indirect/);
+  // Both diagnostics claim QEMU's stdio serial device and prevent boot.
+  assert.doesNotMatch(options, /(?:^|\s)-show-kernel(?:\s|$)/);
+  assert.match(options, /(?:^|\s)-no-metrics(?:\s|$)/);
+  const megabytes = (name) => {
+    const value = workflow.match(new RegExp(`^\\s+${name}: (\\d+)([MG])$`, 'm'));
+    assert.ok(value, `${name} must set an explicit guest resource limit`);
+    return Number(value[1]) * (value[2] === 'G' ? 1024 : 1);
+  };
+  assert.ok(megabytes('ram-size') >= 2048);
+  assert.ok(megabytes('heap-size') >= 256 && megabytes('heap-size') <= megabytes('ram-size'));
+  assert.ok(megabytes('disk-size') >= 4096);
+  const device = workflow.split('  device_matrix:\n')[1].split('  device:\n')[0];
+  assert.match(device, /uses: android-actions\/setup-android@v4/);
+  assert.match(device, /cmdline-tools-version: '15859902'/);
+  assert.match(device, /ln -s "\$ANDROID_HOME\/cmdline-tools\/22\.0" "\$ANDROID_HOME\/cmdline-tools\/latest"/);
+  assert.ok(device.indexOf('uses: android-actions/setup-android@v4') < device.indexOf('uses: reactivecircus/android-emulator-runner@v2'));
+  assert.match(device, /pre-emulator-launch-script: grep -Fx 'target=android-\$\{\{ matrix\.api-level \}\}' "\$ANDROID_AVD_HOME\/test\.ini" && adb start-server/);
 });
 
 test('standalone Android publication is disabled', async()=>{
