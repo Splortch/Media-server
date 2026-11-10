@@ -50,6 +50,9 @@ dependencies {
     implementation("androidx.media3:media3-session:1.9.4")
     androidTestImplementation(platform("androidx.compose:compose-bom:2026.09.00"))
     androidTestImplementation("androidx.compose.ui:ui-test-junit4")
+    // Compose testing still pulls Espresso 3.5; API 37 removed its reflective
+    // InputManager.getInstance call. 3.7 uses Context.getSystemService instead.
+    androidTestImplementation("androidx.test.espresso:espresso-core:3.7.0")
     androidTestImplementation("androidx.test.ext:junit:1.3.0")
     androidTestImplementation("androidx.test:runner:1.7.0")
     debugImplementation("androidx.compose.ui:ui-test-manifest")
