@@ -52,6 +52,10 @@ runpy.run_path(sys.argv[0], run_name='__main__')
     def test_recovery_regression_change_runs_backend(self):
         self.assertTrue(module.component_changed('backend', {'before': 'base'}, 'head', lambda *a, **k: self.result(['scripts/test-credential-recovery.py'])))
 
+    def test_desktop_inventory_changes_run_both_native_packaging_paths(self):
+        for kind in ('desktop', 'windows'):
+            self.assertTrue(module.component_changed(kind, {'before': 'base'}, 'head', lambda *a, **k: self.result(['scripts/desktop-inventory.py'])))
+
     def test_missing_history_runs_checks(self):
         self.assertTrue(module.component_changed('backend', {'before': 'base'}, 'head', lambda *a, **k: self.result([], 128)))
 

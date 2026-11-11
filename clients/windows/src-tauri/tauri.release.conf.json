@@ -1,0 +1,7 @@
+{
+  "bundle": {
+    "resources": {
+      "../../../artifacts/desktop-inventory/": "inventory/"
+    }
+  }
+}
