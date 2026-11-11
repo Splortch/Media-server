@@ -2,9 +2,9 @@ name: Android client
 on:
   push:
     branches: [main]
-    paths: ['clients/android/**', 'shared/api/**', 'backend/**', 'scripts/*android*', 'scripts/tests/android-*', '.github/workflows/android-client.yml', 'global.json', 'Directory.Build.props']
+    paths: ['clients/android/**', 'shared/api/**', 'backend/**', 'scripts/*android*', 'scripts/tests/android-*', 'scripts/tests/test_android_inventory.py', '.github/workflows/android-client.yml', 'global.json', 'Directory.Build.props']
   pull_request:
-    paths: ['clients/android/**', 'shared/api/**', 'backend/**', 'scripts/*android*', 'scripts/tests/android-*', '.github/workflows/android-client.yml', 'global.json', 'Directory.Build.props']
+    paths: ['clients/android/**', 'shared/api/**', 'backend/**', 'scripts/*android*', 'scripts/tests/android-*', 'scripts/tests/test_android_inventory.py', '.github/workflows/android-client.yml', 'global.json', 'Directory.Build.props']
   workflow_dispatch:
   workflow_call:
     inputs:
@@ -41,6 +41,13 @@ jobs:
       - name: Build APKs and bundle; run JVM tests and Android lint
         working-directory: clients/android
         run: ./gradlew --no-daemon -PandroidBuildNumber=${{ inputs.build_number || github.run_number }} :app:assembleDebug :app:assembleDebugAndroidTest :core:testDebugUnitTest :app:assembleRelease :app:bundleRelease :app:lint
+      - name: Verify inventories in actual APKs and app bundle
+        run: python3 scripts/android-inventory.py --verify-build clients/android/app/build --commit "$GITHUB_SHA" --version "0.1.0-alpha.${{ inputs.build_number || github.run_number }}"
+      - uses: actions/upload-artifact@v7
+        with:
+          name: android-inventory
+          path: clients/android/app/build/reports/dependencyInventory/
+          if-no-files-found: error
       - uses: actions/upload-artifact@v7
         with:
           name: android-build
@@ -145,6 +152,12 @@ jobs:
         with:
           name: android-build
           path: clients/android/app/build/outputs
+      - uses: actions/download-artifact@v8
+        with:
+          name: android-inventory
+          path: clients/android/app/build/reports/dependencyInventory
+      - name: Verify downloaded Android package evidence
+        run: python3 scripts/android-inventory.py --verify-build clients/android/app/build --commit "$GITHUB_SHA" --version "0.1.0-alpha.${{ inputs.build_number }}"
       - name: Package validated Android outputs
         env:
           ANDROID_BUILD_NUMBER: ${{ inputs.build_number }}
