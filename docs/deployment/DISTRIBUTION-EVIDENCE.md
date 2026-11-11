@@ -88,12 +88,59 @@ compliance or replace review of notices and source obligations. Browser notices
 remain bundled separately. OS libraries, WebViews/native SDKs, Rust's toolchain
 runtime and Android dependencies are outside this inventory's coverage.
 
+## Android runtime inventory
+
+Each application debug/release variant generates its own `assets/inventory/`
+before asset merging. The app bundle carries release evidence at
+`base/assets/inventory/`. The generated assets contain `SBOM.spdx.json`,
+`THIRD-PARTY-INVENTORY.json`, `SHA256SUMS` and `license-evidence/` with original
+Maven POMs and available standard-named archive license/notice files. AAR notices
+inside `classes.jar` are retained too. App instrumentation tests, JVM tests and
+compiler/plugin classpaths are not inventoried as application runtime inputs.
+
+Gradle exports the exact resolved runtime component identities, original external
+artifacts and each component's resolved POM. First-party app/core code remains
+covered by the bundled project license and notice. The generator records observed
+SHA256 hashes of external AAR/JAR inputs in the report. These are hashes of this
+build's downloaded artifacts, not dependency-lockfile pins or assertions about
+transformed DEX/native code. Android dependencies are not currently lockfile
+pinned. Runtime graph entries also include metadata-only platforms/BOMs and
+annotations, so presence in the graph does not establish linked-code inclusion.
+
+Only direct POM license declarations are interpreted; parent inheritance and
+property expressions are not resolved. Original POM metadata is retained, with
+missing direct license declarations and missing archive notice files flagged for
+review. SPDX license conclusions remain `NOASSERTION`. No license URLs are fetched
+or treated as vetted license text, and dependency code is never executed by the
+Python generator. Missing POMs, inconsistent identities, unsafe XML/archive paths,
+oversized evidence or malformed archives fail generation. Validated output is
+published together; no partial inventory is available to asset merging.
+
+Generation runs for each requested app variant even when compiled code is cached.
+Only the task-owned generated asset/report directories are replaced. Review copies
+live in `app/build/reports/dependencyInventory/debug` and `release`. Python 3.11+
+is required for Android builds; use `-PinventoryPython=python` when appropriate on
+Windows. This graph/POM export task does not support Gradle configuration caching.
+
+CI compares the entire embedded inventory in the actual debug APK, unsigned release
+APK and unsigned release AAB with fresh generated evidence, including source commit,
+version and variant. Missing, duplicate, additional or changed files fail the gate.
+The separate `android-inventory` artifact preserves review copies without changing
+the existing APK artifact layout used by emulator tests. The unified release job
+downloads both artifacts and repeats verification before packaging. Normal release
+checksums cover the APK/AAB files that contain the inventories.
+
+This inventory does not cover the Android OS, SDK/toolchain, build plugins or
+separately supplied native binaries. It does not change signing behavior or certify
+license compliance. Missing declarations/notices, dependency locking and any source
+redistribution obligations still need maintainer review.
+
 ## Remaining acceptance work
 
 Issue #2 remains open for a full distribution review:
 
-- Add equivalent Android and WebView/native SDK dependency inventories; review
-  missing notice files flagged by the desktop Rust/Tauri inventories.
+- Add WebView/native SDK dependency inventories and review missing declarations
+  or notices flagged by the Android and desktop Rust/Tauri inventories.
 - Review every redistributed license, notice and corresponding-source obligation.
 - Retain the container's exact installed package list, FFmpeg license/build output
   and corresponding-source bundle; these already have a separate release path.
