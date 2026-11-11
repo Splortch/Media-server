@@ -114,6 +114,8 @@ androidComponents.onVariants { variant ->
                 component.id to pom.file
             }
             val archives = runtimeArtifacts.get().artifacts
+                // Multiple selected variants can refer to the very same AAR.
+                .distinctBy { it.file.canonicalFile }
                 .groupBy { it.id.componentIdentifier }
             val components = modules.sortedBy { "${it.group}:${it.module}:${it.version}" }.map { id ->
                 mapOf(
