@@ -178,7 +178,7 @@ def main():
     args = parser.parse_args()
     repository = Path(__file__).resolve().parents[1]
     manifest = repository / 'clients/windows/src-tauri/Cargo.toml'
-    output = manifest.parent / 'target/distribution-inventory'
+    output = repository / 'artifacts/desktop-inventory'
     if args.verify_installed:
         verify_installed(output, args.verify_installed)
         print('Installed desktop inventory matches all generated evidence bytes.')

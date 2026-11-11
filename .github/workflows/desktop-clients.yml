@@ -131,7 +131,7 @@ jobs:
         run: |
           python3 scripts/collect-desktop-client.py
           python3 scripts/test-desktop-installer.py
-          cp -R clients/windows/src-tauri/target/distribution-inventory artifacts/desktop/inventory
+          cp -R artifacts/desktop-inventory artifacts/desktop/inventory
       - uses: actions/upload-artifact@v7
         if: success() && steps.changes.outputs.changed == 'true'
         with:
