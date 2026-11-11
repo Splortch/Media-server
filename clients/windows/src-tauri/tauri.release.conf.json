@@ -1,0 +1,7 @@
+{
+  "bundle": {
+    "resources": {
+      "target/distribution-inventory/": "inventory/"
+    }
+  }
+}

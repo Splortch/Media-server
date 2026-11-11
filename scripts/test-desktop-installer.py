@@ -23,6 +23,7 @@ with tempfile.TemporaryDirectory(prefix='media-desktop-installed-') as temp:
         finally:
             subprocess.run(['hdiutil', 'detach', str(mount)], check=True)
         executable, = (installed / 'Contents/MacOS').iterdir()
+        subprocess.run([sys.executable, str(root / 'scripts/desktop-inventory.py'), '--verify-installed', str(installed)], check=True)
         command = [str(executable)]
     else:
         package_name = subprocess.check_output(['dpkg-deb', '-f', str(package), 'Package'], text=True).strip()
@@ -31,6 +32,10 @@ with tempfile.TemporaryDirectory(prefix='media-desktop-installed-') as temp:
         executables = [Path(p) for p in files if Path(p).parent == Path('/usr/bin') and Path(p).is_file() and os.access(p, os.X_OK)]
         if len(executables) != 1:
             raise RuntimeError('Expected one installed native executable')
+        inventories = [Path(p) for p in files if Path(p).name == 'SBOM.spdx.json' and Path(p).parent.name == 'inventory']
+        if len(inventories) != 1:
+            raise RuntimeError('Installed DEB is missing its desktop dependency inventory')
+        subprocess.run([sys.executable, str(root / 'scripts/desktop-inventory.py'), '--verify-installed', str(inventories[0].parent.parent)], check=True)
         with executables[0].open('rb') as binary:
             if binary.read(4) != b'\x7fELF':
                 raise RuntimeError('Installed application is not an ELF native executable')

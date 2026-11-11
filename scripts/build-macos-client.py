@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 """Retry only macOS disk-image contention; preserve real build/package failures."""
 import re
+import json
+from pathlib import Path
 import subprocess
 import sys
 import time
@@ -29,6 +31,8 @@ if __name__ == '__main__':
         raise SystemExit('This packaging helper requires macOS.')
     if len(sys.argv) != 2 or sys.argv[1] != 'app,dmg':
         raise SystemExit('Usage: build-macos-client.py app,dmg (from clients/windows)')
+    config = json.loads(Path('src-tauri/tauri.release.conf.json').read_text(encoding='utf-8'))
+    config['bundle']['icon'] = ['generated-icons/icon.icns']
     raise SystemExit(build(['npm', 'run', 'tauri', '--', 'build', '--bundles', sys.argv[1],
-                           '--config', '{"bundle":{"icon":["generated-icons/icon.icns"]}}',
+                           '--config', json.dumps(config),
                            '--', '--locked']))

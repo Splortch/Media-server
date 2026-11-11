@@ -105,6 +105,12 @@ jobs:
         if: steps.changes.outputs.changed == 'true' && runner.os == 'macOS'
         working-directory: clients/windows
         run: npm run tauri -- icon src-tauri/icons/icon.png --output src-tauri/generated-icons
+      - name: Inventory locked desktop Rust dependencies
+        if: steps.changes.outputs.changed == 'true'
+        env:
+          SOURCE_SHA: ${{ inputs.source_sha || github.sha }}
+          RID: ${{ matrix.rid }}
+        run: python3 scripts/desktop-inventory.py --runtime "$RID" --commit "$SOURCE_SHA"
       - name: Build the native desktop installer
         if: steps.changes.outputs.changed == 'true'
         working-directory: clients/windows
@@ -115,7 +121,7 @@ jobs:
           if [ "$RUNNER_OS" = macOS ]; then
             python3 ../../scripts/build-macos-client.py "$BUNDLES"
           else
-            npm run tauri -- build --bundles "$BUNDLES" -- --locked
+            npm run tauri -- build --bundles "$BUNDLES" --config src-tauri/tauri.release.conf.json -- --locked
           fi
       - name: Collect and verify installed application
         if: steps.changes.outputs.changed == 'true'
@@ -125,11 +131,12 @@ jobs:
         run: |
           python3 scripts/collect-desktop-client.py
           python3 scripts/test-desktop-installer.py
+          cp -R clients/windows/src-tauri/target/distribution-inventory artifacts/desktop/inventory
       - uses: actions/upload-artifact@v7
         if: success() && steps.changes.outputs.changed == 'true'
         with:
           name: release-desktop-${{ matrix.rid }}
-          path: artifacts/desktop/*
+          path: artifacts/desktop/
           if-no-files-found: error
   required:
     name: Desktop packages
