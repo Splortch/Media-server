@@ -31,6 +31,7 @@ ENTRYPOINT ["dotnet", "Api.dll"]
 FROM runtime-base AS source-bundle
 USER root
 COPY docker/collect-sources.sh /collect-sources.sh
+COPY docker/download-sources.sh /download-sources.sh
 RUN sh /collect-sources.sh
 FROM scratch AS corresponding-source
 COPY --from=source-bundle /Container-Corresponding-Source.tar.gz /

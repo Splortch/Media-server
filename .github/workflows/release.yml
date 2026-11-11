@@ -219,7 +219,8 @@ jobs:
     needs: plan
     if: needs.plan.outputs.build == 'true'
     runs-on: ubuntu-24.04
-    timeout-minutes: 25
+    # Includes the image build, smoke test, exact dependency sources and uploads.
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v7
         with:

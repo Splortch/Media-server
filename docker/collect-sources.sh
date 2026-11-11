@@ -26,10 +26,7 @@ while IFS="$TAB" read -r binary source version; do
         printf '%s=%s\n' "$source" "$version"
     fi
 done < /corresponding-source/installed-packages.tsv | sort -u > /corresponding-source/source-packages.txt
-cd /corresponding-source/packages
-while IFS= read -r package; do
-    apt-get source --download-only --yes "$package"
-done < /corresponding-source/source-packages.txt
+sh /download-sources.sh /corresponding-source/source-packages.txt /corresponding-source/packages
 printf '%s\n' 'Exact Ubuntu source packages (.dsc, original source and Debian/Ubuntu changes) are in packages/. Use dpkg-source -x package.dsc to extract, then the included debian/rules and build dependencies to rebuild. Installed package/source versions and copyright notices are included. The Media Server source is the release tag in the repository; project and browser component notices are also retained in the image under /app/licenses. Microsoft .NET runtime notices remain in the upstream base image.' > /corresponding-source/README.txt
 cd /
 tar -czf /Container-Corresponding-Source.tar.gz corresponding-source
