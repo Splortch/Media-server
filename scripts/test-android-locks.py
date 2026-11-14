@@ -42,6 +42,16 @@ for (variant in listOf("debugCompileClasspath", "debugRuntimeClasspath", "releas
     configurations.create(variant) { isCanBeResolved = true; isCanBeConsumed = false }
     dependencies.add(variant, "org.example:parent:1.+")
 }
+tasks.named("resolveDependencyLocks") {
+    doLast {
+        val selected = configurations.filter { it.isCanBeResolved }.flatMap { configuration ->
+            configuration.incoming.resolutionResult.allComponents.map { it.id }
+                .filterIsInstance<org.gradle.api.artifacts.component.ModuleComponentIdentifier>()
+                .map { it.displayName }
+        }.distinct().sorted()
+        file("resolved.txt").writeText(selected.joinToString("\\n"))
+    }
+}
 ''')
         repository = root / 'repository'
         publish(repository, 'leaf', '1.0', ['1.0'])
@@ -61,19 +71,25 @@ for (variant in listOf("debugCompileClasspath", "debugRuntimeClasspath", "releas
         def locks():
             return {module: (root / module / 'gradle.lockfile').read_bytes() for module in ('app', 'core')}
 
+        def selected():
+            return [(root / module / 'resolved.txt').read_text().splitlines() for module in ('app', 'core')]
+
         run('--write-locks')
         initial = locks()
         assert all(b'org.example:leaf:1.0=' in value for value in initial.values())
+        assert all('org.example:leaf:1.0' in versions for versions in selected())
         # New metadata cannot silently upgrade a previously locked transitive input.
         publish(repository, 'leaf', '1.1', ['1.0', '1.1'])
         run('--refresh-dependencies')
         assert locks() == initial, 'Ordinary resolution rewrote the committed lock state'
+        assert all('org.example:leaf:1.0' in versions and 'org.example:leaf:1.1' not in versions for versions in selected())
         # An explicit update must observe the new version, proving the fixture's
         # updated repository metadata was effective rather than hidden by caching.
         run('--refresh-dependencies', '--update-locks', 'org.example:leaf')
         updated = locks()
         assert all(b'org.example:leaf:1.1=' in value for value in updated.values())
         assert all(b'org.example:parent:1.0=' in value for value in updated.values())
+        assert all('org.example:leaf:1.1' in versions and 'org.example:leaf:1.0' not in versions for versions in selected())
         print('PASS: transitive versions remain pinned until an explicit update.', flush=True)
 
         missing = root / 'app/gradle.lockfile'
