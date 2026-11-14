@@ -38,9 +38,13 @@ jobs:
         run: node --test scripts/tests/android-release.test.cjs
       - name: Check generated API models
         run: python3 scripts/generate-android-models.py --check
+      - name: Test dependency locking against a local Maven repository
+        run: python3 scripts/test-android-locks.py
       - name: Build APKs and bundle; run JVM tests and Android lint
         working-directory: clients/android
-        run: ./gradlew --no-daemon -PandroidBuildNumber=${{ inputs.build_number || github.run_number }} :app:assembleDebug :app:assembleDebugAndroidTest :core:testDebugUnitTest :app:assembleRelease :app:bundleRelease :app:lint
+        run: ./gradlew --no-daemon -PandroidBuildNumber=${{ inputs.build_number || github.run_number }} :app:resolveDependencyLocks :core:resolveDependencyLocks :app:assembleDebug :app:assembleDebugAndroidTest :core:testDebugUnitTest :app:assembleRelease :app:bundleRelease :app:lint
+      - name: Require unchanged dependency lockfiles
+        run: git diff --exit-code -- clients/android/app/gradle.lockfile clients/android/core/gradle.lockfile
       - name: Verify inventories in actual APKs and app bundle
         run: python3 scripts/android-inventory.py --verify-build clients/android/app/build --commit "$GITHUB_SHA" --version "0.1.0-alpha.${{ inputs.build_number || github.run_number }}"
       - uses: actions/upload-artifact@v7

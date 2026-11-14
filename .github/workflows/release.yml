@@ -12,6 +12,7 @@ on:
       - '.github/workflows/android-client.yml'
       - 'scripts/package-android.py'
       - 'scripts/android-inventory.py'
+      - 'scripts/test-android-locks.py'
       - 'scripts/platform-downloads.cjs'
       - 'scripts/*unix*installer*'
       - 'scripts/*desktop*'

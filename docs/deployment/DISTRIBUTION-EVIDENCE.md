@@ -102,9 +102,10 @@ Gradle exports the exact resolved runtime component identities, original externa
 artifacts and each component's resolved POM. First-party app/core code remains
 covered by the bundled project license and notice. The generator records observed
 SHA256 hashes of external AAR/JAR inputs in the report. These are hashes of this
-build's downloaded artifacts, not dependency-lockfile pins or assertions about
-transformed DEX/native code. Android dependencies are not currently lockfile
-pinned. Runtime graph entries also include metadata-only platforms/BOMs and
+build's downloaded artifacts, not lockfile archive checksums or assertions about
+transformed DEX/native code. Application/core compile and runtime versions are
+strictly pinned in their committed Gradle lockfiles (details below). Runtime graph
+entries also include metadata-only platforms/BOMs and
 annotations, so presence in the graph does not establish linked-code inclusion.
 
 Only direct POM license declarations are interpreted; parent inheritance and
@@ -132,8 +133,37 @@ checksums cover the APK/AAB files that contain the inventories.
 
 This inventory does not cover the Android OS, SDK/toolchain, build plugins or
 separately supplied native binaries. It does not change signing behavior or certify
-license compliance. Missing declarations/notices, dependency locking and any source
+license compliance. Missing declarations/notices and any source
 redistribution obligations still need maintainer review.
+
+### Android version locks
+
+`clients/android/dependency-locks.gradle.kts` activates Gradle's strict dependency
+locking for registered `*CompileClasspath` and `*RuntimeClasspath` configurations
+in the app/core modules. This covers app debug/release inputs and registered unit
+and instrumentation test classpaths. Missing lock state, additions/removals that
+do not match it and incompatible required versions fail resolution. A newer
+transitive version alone does not silently replace a locked version. Both
+`app/gradle.lockfile` and `core/gradle.lockfile` must be committed.
+
+CI resolves all these classpaths before building, without write/update flags, and
+checks that the two tracked lockfiles remain unchanged. A separate integration
+test applies the actual policy to a temporary project and local Maven repository:
+it publishes a newer transitive version, verifies ordinary resolution stays
+pinned, exercises an explicit targeted update, then verifies missing lock state
+and an unreviewed dependency addition fail without writing production lockfiles.
+
+Use the app/core `resolveDependencyLocks` tasks for read-only checks. Updating
+requires an explicit `--write-locks` or `--update-locks group:artifact`; see the
+Android README. Regeneration resolves every registered locked classpath, including
+variants not compiled by that command, without ambiguously selecting first-party
+Android AAR artifacts. The resolution task does not support configuration caching.
+
+Locking controls selected module versions, not mutable bytes at the same Maven
+coordinates. Gradle plugin/buildscript/compiler configurations, Android SDK inputs,
+artifact signature/checksum verification and whole-build reproducibility are not
+covered by these classpath locks. Inventory archive hashes remain observed evidence,
+not verification against a trusted checksum policy.
 
 ## Remaining acceptance work
 
