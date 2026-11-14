@@ -137,7 +137,7 @@ def generate(graph, output):
         }
         report = {'sourceCommit': commit, 'variant': variant, 'version': version, 'components': components,
                   'limitations': ['License declarations and copied evidence require review; no legal conclusions are asserted.',
-                                  'Versions are resolved by Gradle for this build, not dependency-lockfile pins. Archive hashes identify resolved input files, not transformed DEX/native code.',
+                                  'Gradle enforces committed app/core classpath version locks. Archive hashes describe resolved input files, not lockfile archive checksums or transformed DEX/native code.',
                                   'Runtime metadata includes platforms/BOMs and compile-time annotations; graph presence does not prove linked-code redistribution.',
                                   'Only direct POM licenses are interpreted. Parent inheritance and property expressions are not resolved; original POMs and missing declarations are retained for review.',
                                   'Available standard-named archive notices are copied, including AAR classes.jar. Missing notice files are explicitly flagged.',
