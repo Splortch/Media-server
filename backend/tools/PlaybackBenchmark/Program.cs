@@ -57,11 +57,15 @@ static class Benchmark
             );
             if (
                 !EncoderDiscovery.Encoders.Contains(encoder)
-                || scenario is not ("sdr" or "hevc-hdr" or "av1-hdr")
+                || scenario is not ("sdr" or "hevc-hdr" or "av1-hdr" or "hevc-hlg" or "av1-hlg")
                 || seconds is < 2 or > 60
                 || height is not (360 or 720 or 1080)
             )
                 throw new ArgumentException();
+            var transfer = scenario.EndsWith("-hlg", StringComparison.Ordinal)
+                ? "arib-std-b67"
+                : "smpte2084";
+            var hevc = scenario.StartsWith("hevc-", StringComparison.Ordinal);
             var settings = new TranscodeSettings(
                 new[] { "libx264", encoder }.Distinct().ToArray(),
                 Environment.GetEnvironmentVariable("MediaServer__VaapiDevice")
@@ -131,22 +135,27 @@ static class Benchmark
             {
                 input.AddRange([
                     "-vf",
-                    "format=yuv420p10le,setparams=color_primaries=bt2020:color_trc=smpte2084:colorspace=bt2020nc:range=limited",
+                    $"format=yuv420p10le,setparams=color_primaries=bt2020:color_trc={transfer}:colorspace=bt2020nc:range=limited",
                     "-color_primaries",
                     "bt2020",
                     "-color_trc",
-                    "smpte2084",
+                    transfer,
                     "-colorspace",
                     "bt2020nc",
                 ]);
-                if (scenario == "hevc-hdr")
+                if (hevc)
                     input.AddRange([
                         "-c:v",
                         "libx265",
                         "-preset",
                         "ultrafast",
                         "-x265-params",
-                        "pools=none:frame-threads=1:master-display=G(13250,34500)B(7500,3000)R(34000,16000)WP(15635,16450)L(10000000,1):max-cll=1000,400",
+                        "pools=none:frame-threads=1"
+                            + (
+                                transfer == "smpte2084"
+                                    ? ":master-display=G(13250,34500)B(7500,3000)R(34000,16000)WP(15635,16450)L(10000000,1):max-cll=1000,400"
+                                    : ""
+                            ),
                     ]);
                 else
                     input.AddRange(["-c:v", "libaom-av1", "-cpu-used", "8", "-row-mt", "1"]);
@@ -168,10 +177,18 @@ static class Benchmark
                 Size = new FileInfo(path).Length,
                 ModifiedTicks = File.GetLastWriteTimeUtc(path).Ticks,
             };
+            var sourceColor = TranscodeProfile.Color(item);
             if (
-                (scenario != "sdr" && TranscodeProfile.Color(item)?.Hdr != true)
-                || (scenario == "hevc-hdr" && metadata.VideoCodec != "hevc")
-                || (scenario == "av1-hdr" && metadata.VideoCodec != "av1")
+                scenario != "sdr"
+                && (
+                    sourceColor?.Hdr != true
+                    || sourceColor.BitDepth != 10
+                    || sourceColor.Primaries != "bt2020"
+                    || sourceColor.Transfer != transfer
+                    || sourceColor.Matrix != "bt2020nc"
+                    || metadata.VideoCodec != (hevc ? "hevc" : "av1")
+                    || (scenario == "hevc-hdr" && !sourceColor.HasMasteringMetadata)
+                )
             )
                 throw new IOException("Synthetic input does not match the requested scenario.");
             report["source"] = new
@@ -180,7 +197,9 @@ static class Benchmark
                 nominalSeconds = seconds,
                 width = height * 16 / 9,
                 height,
-                hdr = TranscodeProfile.Color(item)?.Hdr == true,
+                hdr = sourceColor?.Hdr == true,
+                codec = metadata.VideoCodec,
+                color = sourceColor,
             };
             using var sessions = new PlaybackSessions(
                 Path.Combine(root, "data"),
@@ -253,10 +272,22 @@ static class Benchmark
                     if (
                         decoded.VideoCodec != "h264"
                         || decoded.AudioCodec != "aac"
-                        || color?.Width % 2 != 0
-                        || color?.Height % 2 != 0
-                        || color?.Hdr == true
-                        || (scenario != "sdr" && color?.Primaries != "bt709")
+                        || color is null
+                        || color.Width <= 0
+                        || color.Height <= 0
+                        || color.Width % 2 != 0
+                        || color.Height % 2 != 0
+                        || color.Hdr
+                        || (
+                            scenario != "sdr"
+                            && (
+                                color.BitDepth != 8
+                                || color.Primaries != "bt709"
+                                || color.Transfer != "bt709"
+                                || color.Matrix != "bt709"
+                                || color.HasMasteringMetadata
+                            )
+                        )
                     )
                         throw new IOException();
                     foreach (

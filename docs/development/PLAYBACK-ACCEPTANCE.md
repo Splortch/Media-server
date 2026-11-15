@@ -9,7 +9,7 @@ Implementation: [PR #83](https://github.com/Splortch/Media-server/pull/83). Repe
 | Adaptive quality (#5) | Real server; Chromium throughput shaping, quality switch, rebuffer counters; cache/authorization concurrency tests | Every real network or device |
 | NVENC (#6) | Runtime synthetic encode, selected GPU binding, unavailable-device fallback tests; hardware workflow rejects fallback | Physical NVIDIA GPU throughput/driver compatibility |
 | Intel/AMD (#7) | Shared runtime probes; QSV/VAAPI device binding; AMF default-device path; strict configuration tests | Physical Intel/AMD driver/device compatibility |
-| HDR conversion (#8) | PQ/HLG neutral-ramp numerical regression; SDR/HEVC-HDR/AV1-HDR production benchmarks; output metadata checks | Reference-color fidelity, gamut accuracy or HDR display output |
+| HDR conversion (#8) | PQ/HLG neutral-ramp numerical regression; SDR and 10-bit PQ/HLG HEVC/AV1 production benchmarks; strict BT.709/8-bit output metadata checks and caption preservation | Reference-color fidelity, gamut accuracy or HDR display output |
 | Captions/audio (#9) | Authorized delivery, language labels, real cue loading, cache edits, sanitization; keyboard selection on Chromium/Firefox; selection semantics, focus and axe checks on each browser; conversion benchmark checks timing and source preservation | Spoken output and interaction with a physical screen reader |
 
 The neutral-ramp test checks black preservation, neutral channels and monotonic luminance. Its thresholds deliberately tolerate rounding between FFmpeg builds. It is not a perceptual color reference and must not be described as display certification. Conversions explicitly produce SDR; Dolby Vision and bitmap subtitle burn-in remain unsupported. ASS styling is not preserved when converted to text WebVTT.
@@ -39,7 +39,7 @@ No hosted software build substitutes for a device test. To fill a row:
 
 1. Provision a trusted runner with the `media-validation` label, Python 3, pinned .NET SDK, full FFmpeg/FFprobe and vendor driver. Configure device access as described in [PLAYBACK-VALIDATION.md](PLAYBACK-VALIDATION.md).
 2. From main, manually dispatch **Playback validation**, enable hardware, and choose the encoder. Pull requests cannot invoke the hardware runner.
-3. Run all three scenarios. The benchmark must report the requested encoder as actual; `--require-hardware` rejects unavailable hardware or software fallback.
+3. Run all five scenarios (SDR, HEVC PQ, AV1 PQ, HEVC HLG and AV1 HLG). The benchmark must report the requested encoder as actual; `--require-hardware` rejects unavailable hardware or software fallback.
 4. Retain the JSON and generated `hardware-matrix.md` artifacts. Record GPU model, driver version, OS, FFmpeg version, device setting, commit, workflow URL and test date in an issue update. Never include private media paths or credentials.
 5. Repeat on the applicable Windows/Linux paths. An unavailable device is an untested/failed row, never a pass.
 
