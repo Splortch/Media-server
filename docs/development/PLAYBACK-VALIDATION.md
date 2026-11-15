@@ -7,9 +7,13 @@ dotnet restore backend/tools/PlaybackBenchmark --locked-mode
 dotnet run --project backend/tools/PlaybackBenchmark -- --scenario sdr --output artifacts/sdr.json
 dotnet run --project backend/tools/PlaybackBenchmark -- --scenario hevc-hdr --output artifacts/hevc-hdr.json
 dotnet run --project backend/tools/PlaybackBenchmark -- --scenario av1-hdr --output artifacts/av1-hdr.json
+dotnet run --project backend/tools/PlaybackBenchmark -- --scenario hevc-hlg --output artifacts/hevc-hlg.json
+dotnet run --project backend/tools/PlaybackBenchmark -- --scenario av1-hlg --output artifacts/av1-hlg.json
 ```
 
-The tool generates six seconds of 720p video with synthesized audio in its own temporary directory. `--seconds` accepts 2–60 and `--height` accepts 360, 720 or 1080. It prepares all three HLS renditions through production `PlaybackSessions`, probes the results for H.264/AAC and SDR output, and checks authorized cache reuse and independent session release. It never opens or alters a configured media library.
+`hevc-hdr` and `av1-hdr` use PQ (`smpte2084`); `hevc-hlg` and `av1-hlg` use HLG (`arib-std-b67`). All HDR fixtures are synthetic 10-bit BT.2020 patterns, not color-reference footage. The HEVC PQ fixture includes mastering-display/content-light metadata; HLG intentionally omits it to test transfer-based HDR detection.
+
+The tool generates six seconds of 720p video with synthesized audio in its own temporary directory. `--seconds` accepts 2–60 and `--height` accepts 360, 720 or 1080. It prepares all three HLS renditions through production `PlaybackSessions`, probes the results for H.264/AAC and SDR output, and requires positive even dimensions. HDR conversions must have 8-bit BT.709 primaries, transfer and matrix, with no mastering metadata. Source codec and full color metadata are retained in JSON. It also checks authorized cache reuse and independent session release. It never opens or alters a configured media library.
 
 JSON records the platform, source, requested and actual encoder, runtime capability checks, conversion time, output metadata, segment bytes and reuse time. `nominalAggregateFramesPerSecond` includes source staging, probing and all rendition conversions; it is not a raw encoder benchmark. Complete-VOD preparation time is not playback startup time for progressive streaming. These synthetic fixtures check metadata and pipeline behavior; they do not establish visual HDR fidelity or real-film performance.
 
@@ -41,7 +45,7 @@ The Playback validation workflow runs software checks on hosted Linux runners. H
 
 | Coverage | Current evidence |
 | --- | --- |
-| Software SDR, HEVC HDR and AV1 HDR conversion | Automated synthetic pipeline checks; JSON artifact from each workflow run |
+| Software SDR plus PQ/HLG HEVC and AV1 conversion | Automated synthetic pipeline checks; JSON artifact from each workflow run |
 | Unsupported hardware and software fallback | Automated capability/pipeline tests |
 | Native HLS authorization, ranges, logout and malicious manifests | Rust real-backend integration tests |
 | Android HLS rendering and quality changes | Emulator instrumentation against the real backend; not physical-device evidence |

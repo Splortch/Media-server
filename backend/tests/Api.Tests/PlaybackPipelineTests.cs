@@ -189,9 +189,15 @@ public sealed class PlaybackPipelineTests
     }
 
     [Theory]
-    [InlineData("libx265", "hevc")]
-    [InlineData("libaom-av1", "av1")]
-    public async Task ProbeModernHdrFormatsAndToneMapSyntheticFrames(string encoder, string codec)
+    [InlineData("libx265", "hevc", "smpte2084")]
+    [InlineData("libx265", "hevc", "arib-std-b67")]
+    [InlineData("libaom-av1", "av1", "smpte2084")]
+    [InlineData("libaom-av1", "av1", "arib-std-b67")]
+    public async Task ProbeModernHdrFormatsAndToneMapSyntheticFrames(
+        string encoder,
+        string codec,
+        string transfer
+    )
     {
         var root = Path.Combine(TestPaths.TempRoot, "color-test-" + Guid.NewGuid());
         Directory.CreateDirectory(root);
@@ -208,7 +214,7 @@ public sealed class PlaybackPipelineTests
                 "-t",
                 "0.25",
                 "-vf",
-                "format=yuv420p10le,setparams=color_primaries=bt2020:color_trc=smpte2084:colorspace=bt2020nc:range=limited",
+                $"format=yuv420p10le,setparams=color_primaries=bt2020:color_trc={transfer}:colorspace=bt2020nc:range=limited",
                 "-c:v",
                 encoder,
                 "-threads",
@@ -216,14 +222,19 @@ public sealed class PlaybackPipelineTests
                 "-color_primaries",
                 "bt2020",
                 "-color_trc",
-                "smpte2084",
+                transfer,
                 "-colorspace",
                 "bt2020nc",
             };
             if (encoder == "libx265")
                 args.AddRange([
                     "-x265-params",
-                    "pools=none:frame-threads=1:master-display=G(13250,34500)B(7500,3000)R(34000,16000)WP(15635,16450)L(10000000,1):max-cll=1000,400",
+                    "pools=none:frame-threads=1"
+                        + (
+                            transfer == "smpte2084"
+                                ? ":master-display=G(13250,34500)B(7500,3000)R(34000,16000)WP(15635,16450)L(10000000,1):max-cll=1000,400"
+                                : ""
+                        ),
                 ]);
             else
                 args.AddRange(["-cpu-used", "8"]);
@@ -242,8 +253,10 @@ public sealed class PlaybackPipelineTests
             Assert.True(color.Hdr, result.ColorJson);
             Assert.Equal(10, color.BitDepth);
             Assert.Equal("bt2020", color.Primaries);
+            Assert.Equal(transfer, color.Transfer);
+            Assert.Equal("bt2020nc", color.Matrix);
             if (encoder == "libx265")
-                Assert.True(color.HasMasteringMetadata, result.ColorJson);
+                Assert.Equal(transfer == "smpte2084", color.HasMasteringMetadata);
             var watch = Stopwatch.StartNew();
             await runner.RunAsync(
                 [
@@ -275,6 +288,8 @@ public sealed class PlaybackPipelineTests
             Assert.False(output.HasMasteringMetadata);
             Assert.Equal(8, output.BitDepth);
             Assert.Equal("bt709", output.Primaries);
+            Assert.Equal("bt709", output.Transfer);
+            Assert.Equal("bt709", output.Matrix);
             var inspect = new ProcessStartInfo("ffprobe")
             {
                 UseShellExecute = false,
