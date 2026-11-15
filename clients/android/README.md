@@ -18,10 +18,28 @@ assets are merged. If Python is named `python` on Windows, pass
 `app/build/reports/dependencyInventory/debug` and `release`; see the
 [distribution evidence guide](../../docs/deployment/DISTRIBUTION-EVIDENCE.md).
 
-The checksum-pinned Gradle 9.7.0 wrapper, AGP 9.1.1 and Kotlin 2.4.21 use AGP's
+The checksum-pinned Gradle 9.9.0 wrapper, AGP 9.5.1 and Kotlin 2.4.21 use AGP's
 built-in Kotlin and new DSL. Compose and serialization compiler plugins match
 the Kotlin compiler. Compile SDK 37 is separate from the reviewed target SDK 36;
 minimum Android remains API 26. See the [toolchain policy](../../docs/development/ANDROID-UPDATES.md).
+
+Application and test compile/runtime dependency versions are strictly locked in
+`app/gradle.lockfile` and `core/gradle.lockfile`. Check all registered classpaths
+without changing them:
+
+```sh
+./gradlew :app:resolveDependencyLocks :core:resolveDependencyLocks
+```
+
+After an intentional dependency change, regenerate both files with
+`./gradlew :app:resolveDependencyLocks :core:resolveDependencyLocks --write-locks`,
+review the complete diff and commit both lockfiles with the build-file change.
+For a targeted update, use the same tasks with
+`--update-locks group:artifact` instead of `--write-locks`; Gradle can also update
+related constraints, so review both diffs. Ordinary builds and CI never write
+lockfiles. These locks pin module versions; they do not authenticate downloaded
+bytes or cover Gradle plugins/compiler tooling. See the distribution evidence
+guide for the inventory's observed archive checksums and remaining limitations.
 
 - `core`: generated shared-contract DTOs, Retrofit/OkHttp transport, origin validation and Keystore-backed session storage.
 - `app`: Compose activity, lifecycle-aware playback state and Media3 player.
