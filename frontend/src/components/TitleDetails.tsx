@@ -17,8 +17,10 @@ export default function TitleDetails({
   bookmarkRequest,
   tracks,
   metadata,
+  seriesView = false,
 }: {
   item: Media;
+  seriesView?: boolean;
   tracks?: {
     type: string;
     codec: string;
@@ -70,24 +72,27 @@ export default function TitleDetails({
           {item.title}
         </h1>
         <p className="muted">
-          {duration(item.duration)} ·{' '}
-          {item.container.split(',')[0].toUpperCase()}
+          {seriesView
+            ? 'TV series'
+            : `${duration(item.duration)} · ${item.container.split(',')[0].toUpperCase()}`}
         </p>
         <p className="muted">
-          {metadata?.details.synopsis ||
-            item.metadata?.description ||
-            'No description is embedded in this file.'}
+          {seriesView
+            ? 'Select a season and episode to view its information.'
+            : metadata?.details.synopsis ||
+              item.metadata?.description ||
+              'No description is embedded in this file.'}
         </p>
         {metadata && (
           <>
             <p>
               {[
-                metadata.details.year,
+                seriesView ? null : metadata.details.year,
                 metadata.details.series,
-                metadata.details.season !== null
+                !seriesView && metadata.details.season !== null
                   ? `Season ${metadata.details.season}`
                   : null,
-                metadata.details.episode !== null
+                !seriesView && metadata.details.episode !== null
                   ? `Episode ${metadata.details.episode}`
                   : null,
               ]
@@ -95,7 +100,7 @@ export default function TitleDetails({
                 .join(' · ')}
             </p>
             <p className="muted">{metadata.details.attribution}</p>
-            {metadata.backdropUrl && (
+            {!seriesView && metadata.backdropUrl && (
               <img
                 className="metadata-backdrop"
                 src={metadata.backdropUrl}
@@ -105,62 +110,66 @@ export default function TitleDetails({
             )}
           </>
         )}
-        <div className="action-group title-actions" aria-busy={busy}>
-          {resume > 0 && (
-            <button disabled={busy} onClick={() => begin(onResume)}>
-              <Icon name="play" /> Resume from {duration(resume)}
+        {!seriesView && (
+          <div className="action-group title-actions" aria-busy={busy}>
+            {resume > 0 && (
+              <button disabled={busy} onClick={() => begin(onResume)}>
+                <Icon name="play" /> Resume from {duration(resume)}
+              </button>
+            )}
+            <button
+              disabled={busy}
+              className={resume > 0 ? 'secondary' : undefined}
+              onClick={() => begin(onPlay)}
+            >
+              <Icon name="play" /> Play from beginning
             </button>
-          )}
-          <button
-            disabled={busy}
-            className={resume > 0 ? 'secondary' : undefined}
-            onClick={() => begin(onPlay)}
-          >
-            <Icon name="play" /> Play from beginning
-          </button>
-        </div>
-        <dl className="title-facts">
-          {(
-            [
-              ['Release date', item.metadata?.releaseDate],
-              ['Genre', item.metadata?.genre],
-              ['Director', item.metadata?.director],
-            ] as const
-          ).map(([label, value]) =>
-            value ? (
-              <div key={label}>
-                <dt>{label}</dt>
-                <dd>{value}</dd>
-              </div>
-            ) : null,
-          )}
-          <div>
-            <dt>Year</dt>
-            <dd>{metadata?.details.year ?? 'Not available'}</dd>
           </div>
-          <div>
-            <dt>Genres</dt>
-            <dd>{metadata?.details.genres.join(' · ') || 'Not available'}</dd>
-          </div>
-          <div>
-            <dt>Cast</dt>
-            <dd>{metadata?.details.cast.join(', ') || 'Not available'}</dd>
-          </div>
-          <div>
-            <dt>Video</dt>
-            <dd>{item.videoCodec.toUpperCase() || 'Unknown'}</dd>
-          </div>
-          <div>
-            <dt>Audio</dt>
-            <dd>{item.audioCodec.toUpperCase() || 'No audio metadata'}</dd>
-          </div>
-          <div>
-            <dt>File size</dt>
-            <dd>{(item.size / 1024 ** 3).toFixed(2)} GB</dd>
-          </div>
-        </dl>
+        )}
+        {!seriesView && (
+          <dl className="title-facts">
+            {(
+              [
+                ['Release date', item.metadata?.releaseDate],
+                ['Genre', item.metadata?.genre],
+                ['Director', item.metadata?.director],
+              ] as const
+            ).map(([label, value]) =>
+              value ? (
+                <div key={label}>
+                  <dt>{label}</dt>
+                  <dd>{value}</dd>
+                </div>
+              ) : null,
+            )}
+            <div>
+              <dt>Year</dt>
+              <dd>{metadata?.details.year ?? 'Not available'}</dd>
+            </div>
+            <div>
+              <dt>Genres</dt>
+              <dd>{metadata?.details.genres.join(' · ') || 'Not available'}</dd>
+            </div>
+            <div>
+              <dt>Cast</dt>
+              <dd>{metadata?.details.cast.join(', ') || 'Not available'}</dd>
+            </div>
+            <div>
+              <dt>Video</dt>
+              <dd>{item.videoCodec.toUpperCase() || 'Unknown'}</dd>
+            </div>
+            <div>
+              <dt>Audio</dt>
+              <dd>{item.audioCodec.toUpperCase() || 'No audio metadata'}</dd>
+            </div>
+            <div>
+              <dt>File size</dt>
+              <dd>{(item.size / 1024 ** 3).toFixed(2)} GB</dd>
+            </div>
+          </dl>
+        )}
       </div>
-      {!!item.metadata?.chapters.length && (
+      {!seriesView && !!item.metadata?.chapters.length && (
         <section aria-label="Chapters">
           <h2>Chapters</h2>
           <ol>
@@ -177,23 +186,25 @@ export default function TitleDetails({
           </ol>
         </section>
       )}
-      <details className="panel">
-        <summary>File and track details</summary>
-        {tracks?.length ? (
-          <ul>
-            {tracks.map((track, index) => (
-              <li key={index}>
-                {track.type} · {track.codec || 'Unknown codec'} ·{' '}
-                {track.language || 'Language unknown'}
-                {track.title ? ` · ${track.title}` : ''}
-              </li>
-            ))}
-          </ul>
-        ) : (
-          <p className="muted">Track information is not available.</p>
-        )}
-      </details>
-      {bookmarks && onBookmark && (
+      {!seriesView && (
+        <details className="panel">
+          <summary>File and track details</summary>
+          {tracks?.length ? (
+            <ul>
+              {tracks.map((track, index) => (
+                <li key={index}>
+                  {track.type} · {track.codec || 'Unknown codec'} ·{' '}
+                  {track.language || 'Language unknown'}
+                  {track.title ? ` · ${track.title}` : ''}
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="muted">Track information is not available.</p>
+          )}
+        </details>
+      )}
+      {!seriesView && bookmarks && onBookmark && (
         <Bookmarks
           key={item.id}
           id={item.id}

@@ -12,6 +12,7 @@ vi.mock('../src/bridge', () => ({
     ),
   playbackFileUrl: vi.fn(),
   artworkFileUrl: vi.fn(),
+  previewFileUrl: vi.fn(),
   desktopCapabilities: vi
     .fn()
     .mockResolvedValue({ os: 'windows', persistentSessions: true }),
@@ -24,6 +25,7 @@ vi.mock('../src/bridge', () => ({
   expired: () => false,
   api: {
     media: vi.fn().mockResolvedValue([]),
+    catalog: vi.fn().mockResolvedValue({ items: [], nextCursor: null }),
     continuing: vi.fn().mockResolvedValue([]),
     me: vi.fn(),
     detail: vi.fn(),
@@ -121,7 +123,10 @@ it.each([false, true])(
       name: 'Alice',
       role: 'Viewer',
     });
-    vi.mocked(bridge.api.media).mockResolvedValue([media]);
+    vi.mocked(bridge.api.catalog).mockResolvedValue({
+      items: [media],
+      nextCursor: null,
+    });
     vi.mocked(bridge.api.detail).mockResolvedValue({
       ...media,
       contentRating: 0,

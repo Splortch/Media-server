@@ -15,7 +15,7 @@ vi.mock('../src/services/api', () => ({
     if (path === '/features') return { features: [] };
     if (path === '/status')
       return { version: 'test', mediaCount: 0, libraryCount: 1 };
-    if (path.startsWith('/media-page')) return { items: [], nextCursor: null };
+    if (path.startsWith('/catalog')) return { items: [], nextCursor: null };
     return [];
   }),
 }));
