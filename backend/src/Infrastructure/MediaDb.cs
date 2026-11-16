@@ -6,6 +6,15 @@ namespace MediaServer.Infrastructure;
 public class MediaDb(DbContextOptions<MediaDb> options, IUserContext? context = null)
     : DbContext(options)
 {
+    // SQLite JSON extraction keeps episode discovery bounded and filtered in SQL.
+    [DbFunction("json_extract", IsBuiltIn = true)]
+    public static string? MetadataText(string document, string path) =>
+        throw new NotSupportedException();
+
+    [DbFunction("json_extract", IsBuiltIn = true)]
+    public static int? MetadataNumber(string document, string path) =>
+        throw new NotSupportedException();
+
     private int? CurrentUserId => context?.UserId;
     public DbSet<MediaMetadata> Metadata => Set<MediaMetadata>();
     public DbSet<DownloadJob> Downloads => Set<DownloadJob>();

@@ -148,3 +148,70 @@ it('keeps explicit playback available when track metadata cannot be loaded', asy
   fireEvent.click(screen.getByRole('button', { name: 'Play from beginning' }));
   expect(await screen.findByLabelText('Own video')).toBeInTheDocument();
 });
+
+it('selects the next identified episode without streaming and returns to the original filtered card', async () => {
+  const implementation = vi.mocked(api).getMockImplementation()!;
+  const episode = {
+    id: 8,
+    title: 'Second episode',
+    season: 2,
+    episode: 1,
+    duration: 100,
+    seconds: 0,
+    completed: false,
+  };
+  vi.mocked(api).mockImplementation((path, ...args) => {
+    if (path === '/media/7/metadata' || path === '/media/8/metadata')
+      return Promise.resolve({
+        details: {
+          title: path.includes('/8/') ? episode.title : media.title,
+          year: 2020,
+          synopsis: 'Our series',
+          genres: [],
+          cast: [],
+          series: 'Our show',
+          season: path.includes('/8/') ? 2 : 1,
+          episode: 1,
+          attribution: 'Local metadata',
+        },
+        posterUrl: null,
+        backdropUrl: null,
+        revision: 1,
+      });
+    if (path === '/media/7/episodes' || path === '/media/8/episodes')
+      return Promise.resolve({
+        series: 'Our show',
+        seasons: [1, 2],
+        season: 2,
+        episodes: [episode],
+        nextOffset: null,
+        nextEpisode: path.includes('/8/') ? null : episode,
+      });
+    if (path === '/media/8')
+      return Promise.resolve({ ...media, id: 8, title: episode.title });
+    if (path === '/v1/media/8/tracks') return Promise.resolve({ tracks: [] });
+    return implementation(path, ...args);
+  });
+  await details('Own');
+  fireEvent.click(
+    await screen.findByRole('button', { name: /View next episode/ }),
+  );
+  await waitFor(() =>
+    expect(
+      screen.getByRole('heading', { name: 'Second episode' }),
+    ).toHaveFocus(),
+  );
+  expect(document.querySelector('video')).toBeNull();
+  expect(
+    vi.mocked(api).mock.calls.some(([path]) => /stream|playback/.test(path)),
+  ).toBe(false);
+  fireEvent.click(screen.getByRole('link', { name: 'Back to collection' }));
+  await waitFor(() =>
+    expect(screen.getByLabelText('Search library')).toHaveValue('Own'),
+  );
+  await waitFor(() =>
+    expect(
+      screen.getByRole('heading', { name: 'Own video' }).closest('a'),
+    ).toHaveFocus(),
+  );
+});

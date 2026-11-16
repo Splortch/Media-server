@@ -25,7 +25,7 @@ maintainer-review requirements cannot be replaced by software CI.
 
 | Order | Issue | Implementation boundary |
 | --- | --- | --- |
-| 1 | [#52](https://github.com/Splortch/Media-server/issues/52) | Information-first web/desktop pages, no streaming before Play/Resume, fresh progress and list-context restoration. Series navigation follows #10/#45. |
+| 1 | [#52](https://github.com/Splortch/Media-server/issues/52) | Information-first web/desktop pages with identified metadata, authorized season/episode navigation, next-episode details, explicit Play/Resume and list-context restoration. See the title-navigation contract. |
 | 2 | [#51](https://github.com/Splortch/Media-server/issues/51) | Small feature registry, server policy and per-user visibility for shipped optional features; no switches advertising imaginary modules. |
 | 3 | [#10](https://github.com/Splortch/Media-server/issues/10) | Safe local NFO/artwork and manual corrections first, then explicitly configured provider adapters. |
 | 4 | [#53](https://github.com/Splortch/Media-server/issues/53) | Permission-filtered provenance, private file diagnostics and deduplicated match reports on title pages. |
@@ -51,8 +51,10 @@ stream URLs are requested only after the action. Existing library query/filter
 state is retained on Back, with focus/scroll restoration when the originating
 card is still on the loaded page. A direct title URL falls back to the library.
 
-Titles still come from filenames. No synopsis, poster, season, year or cast is
-invented. This increment does not finish #10 or the series criteria of #52.
+Titles use saved local/manual/provider metadata when available, with honest fallbacks.
+Web and desktop expose season/episode selection and next-episode details for
+identified episodes. No streaming occurs before Play/Resume; returning from the
+player saves progress before reopening details. See [title navigation](../clients/TITLE-NAVIGATION.md).
 Android retains its existing separate details/playback flow.
 
 ## Second increment: optional features

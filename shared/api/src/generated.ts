@@ -2039,6 +2039,46 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/media/{id}/episodes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: {
+                    season?: number;
+                    offset?: number;
+                };
+                header?: never;
+                path: {
+                    id: number;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["SeriesNavigation"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/media/{id}/metadata": {
         parameters: {
             query?: never;
@@ -3589,6 +3629,30 @@ export interface components {
             fileName: string;
             code: string;
             correlationId: string;
+        };
+        SeriesEpisode: {
+            /** Format: int32 */
+            id: number;
+            title: string;
+            /** Format: int32 */
+            season: number;
+            /** Format: int32 */
+            episode: number;
+            /** Format: double */
+            duration: number;
+            /** Format: double */
+            seconds: number;
+            completed: boolean;
+        };
+        SeriesNavigation: {
+            series: null | string;
+            seasons: number[];
+            /** Format: int32 */
+            season: null | number;
+            episodes: components["schemas"]["SeriesEpisode"][];
+            /** Format: int32 */
+            nextOffset: null | number;
+            nextEpisode: null | components["schemas"]["SeriesEpisode"];
         };
         ServerInfo: {
             name: string;

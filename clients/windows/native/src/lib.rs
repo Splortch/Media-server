@@ -299,6 +299,7 @@ impl DesktopClient {
         };
         let router = Router::new()
             .route("/{secret}/media/{id}", get(stream_media))
+            .route("/{secret}/artwork/{id}/{kind}", get(stream_artwork))
             .route(
                 "/{secret}/playback/{session}/files/{file}",
                 get(stream_playback),
@@ -450,6 +451,16 @@ impl DesktopClient {
         let c = self.current().await?;
         Ok(format!("{}/{}/media/{id}", self.proxy, c.proxy_secret))
     }
+    pub async fn artwork_url(&self, id: u64, kind: &str) -> Result<String> {
+        if id == 0 || !matches!(kind, "poster" | "backdrop") {
+            return Err(ClientError::new("PATH", "Invalid artwork resource."));
+        }
+        let c = self.current().await?;
+        Ok(format!(
+            "{}/{}/artwork/{id}/{kind}",
+            self.proxy, c.proxy_secret
+        ))
+    }
     pub async fn playback_url(&self, session: &str, file: &str) -> Result<String> {
         if !valid_session(session) || !playback_file(file) {
             return Err(ClientError::new("PATH", "Invalid playback resource."));
@@ -481,6 +492,25 @@ fn allowed_request(method: &str, path: &str) -> bool {
     {
         return url.query().is_none() || p == "media";
     }
+    if method == "GET"
+        && parts.len() == 3
+        && parts[0] == "media"
+        && parts[1].parse::<u64>().is_ok_and(|n| n > 0)
+        && parts[2] == "episodes"
+    {
+        let mut seen = std::collections::HashSet::new();
+        return url.query_pairs().all(|(key, value)| {
+            let max = match key.as_ref() {
+                "season" => 99,
+                "offset" => 100000,
+                _ => return false,
+            };
+            seen.insert(key.into_owned())
+                && !value.is_empty()
+                && value.bytes().all(|c| c.is_ascii_digit())
+                && value.parse::<u32>().is_ok_and(|n| n <= max)
+        });
+    }
     if url.query().is_some() {
         return false;
     }
@@ -507,7 +537,11 @@ fn allowed_request(method: &str, path: &str) -> bool {
         return matches!(
             (method, parts.len(), parts.get(2).copied()),
             ("GET", 2, _)
-                | ("GET", 3, Some("progress" | "tracks" | "playback-options"))
+                | (
+                    "GET",
+                    3,
+                    Some("progress" | "tracks" | "playback-options" | "metadata")
+                )
                 | ("PUT", 3, Some("progress-sync"))
                 | ("POST", 3, Some("playback-errors" | "playback-sessions"))
         );
@@ -645,6 +679,80 @@ async fn stream_playback(
         .take_until(c.cancel.cancelled_owned())
         .map_err(std::io::Error::other);
     builder.body(Body::from_stream(body)).unwrap()
+}
+async fn stream_artwork(
+    State(client): State<DesktopClient>,
+    Path((secret, id, kind)): Path<(String, u64, String)>,
+    method: Method,
+    headers: HeaderMap,
+) -> Response {
+    let empty = |status| {
+        Response::builder()
+            .status(status)
+            .body(Body::empty())
+            .unwrap()
+    };
+    if id == 0
+        || !matches!(kind.as_str(), "poster" | "backdrop")
+        || (headers.contains_key("origin") && bridge_origin(&headers).is_none())
+    {
+        return empty(StatusCode::NOT_FOUND);
+    }
+    let Ok(c) = client.current().await else {
+        return empty(StatusCode::NOT_FOUND);
+    };
+    if secret != c.proxy_secret.as_ref() {
+        return empty(StatusCode::NOT_FOUND);
+    }
+    let path = format!("/api/v1/media/{id}/artwork/{kind}");
+    let Ok(response) = c
+        .http
+        .request(method.clone(), c.base.join(&path).unwrap())
+        .send()
+        .await
+    else {
+        return empty(StatusCode::BAD_GATEWAY);
+    };
+    if !response.status().is_success() {
+        return empty(response.status());
+    }
+    let kind = response
+        .headers()
+        .get("content-type")
+        .and_then(|x| x.to_str().ok())
+        .unwrap_or("");
+    if !matches!(kind, "image/jpeg" | "image/png" | "image/webp") {
+        return empty(StatusCode::BAD_GATEWAY);
+    }
+    let mut builder = Response::builder()
+        .status(response.status())
+        .header("Content-Type", kind)
+        .header("Cache-Control", "no-store")
+        .header("X-Content-Type-Options", "nosniff");
+    if let Some(origin) = bridge_origin(&headers) {
+        builder = builder
+            .header("Access-Control-Allow-Origin", origin)
+            .header("Access-Control-Allow-Credentials", "true")
+            .header("Vary", "Origin");
+    }
+    if method == Method::HEAD {
+        return builder.body(Body::empty()).unwrap();
+    }
+    let mut bytes = Vec::new();
+    let stream = response
+        .bytes_stream()
+        .take_until(c.cancel.cancelled_owned());
+    futures_util::pin_mut!(stream);
+    while let Some(chunk) = stream.next().await {
+        let Ok(chunk) = chunk else {
+            return empty(StatusCode::BAD_GATEWAY);
+        };
+        if bytes.len() + chunk.len() > 4 * 1024 * 1024 {
+            return empty(StatusCode::BAD_GATEWAY);
+        }
+        bytes.extend_from_slice(&chunk);
+    }
+    builder.body(Body::from(bytes)).unwrap()
 }
 async fn stream_media(
     State(client): State<DesktopClient>,
@@ -803,6 +911,9 @@ mod tests {
     fn renderer_requests_are_scoped() {
         for (method, path) in [
             ("GET", "/api/v1/media?search=test"),
+            ("GET", "/api/v1/media/4/metadata"),
+            ("GET", "/api/v1/media/4/episodes"),
+            ("GET", "/api/v1/media/4/episodes?season=0&offset=200"),
             ("PUT", "/api/v1/media/4/progress-sync"),
             ("GET", "/api/v1/media/4/bookmarks"),
             ("POST", "/api/v1/media/4/bookmarks/import"),
@@ -819,6 +930,13 @@ mod tests {
         }
         for (method, path) in [
             ("GET", "//evil.example/api/v1/media"),
+            ("PUT", "/api/v1/media/4/metadata"),
+            ("GET", "/api/v1/media/4/metadata?url=https://evil.example"),
+            ("GET", "/api/v1/media/4/episodes?season=100"),
+            ("GET", "/api/v1/media/4/episodes?season=1&season=2"),
+            ("GET", "/api/v1/media/4/episodes?offset=-1"),
+            ("GET", "/api/v1/media/4/episodes?url=https://evil.example"),
+            ("POST", "/api/v1/media/4/episodes"),
             ("POST", "/api/v1/setup"),
             ("GET", "/api/v1/media/../../auth/csrf"),
             ("GET", "/api/v1/media/4/stream"),

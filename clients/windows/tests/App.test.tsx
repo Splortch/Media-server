@@ -5,8 +5,13 @@ import * as bridge from '../src/bridge';
 vi.mock('../src/bridge', () => ({
   preferences: vi.fn().mockResolvedValue({}),
   playbackRequest: vi.fn(),
-  bookmarkRequest: vi.fn().mockResolvedValue([]),
+  bookmarkRequest: vi
+    .fn()
+    .mockImplementation(async (path: string) =>
+      path.endsWith('/metadata') ? null : [],
+    ),
   playbackFileUrl: vi.fn(),
+  artworkFileUrl: vi.fn(),
   desktopCapabilities: vi
     .fn()
     .mockResolvedValue({ os: 'windows', persistentSessions: true }),
@@ -31,6 +36,9 @@ vi.mock('../src/bridge', () => ({
 beforeEach(() => {
   localStorage.clear();
   vi.clearAllMocks();
+  vi.mocked(bridge.bookmarkRequest).mockImplementation(
+    async (path: string) => (path.endsWith('/metadata') ? null : []) as never,
+  );
   vi.mocked(bridge.connect).mockReset();
   vi.mocked(bridge.login).mockReset();
 });
@@ -88,77 +96,153 @@ it('keeps passwords out of persistent browser storage', async () => {
   persisted.mockRestore();
 });
 
-it('opens title details before requesting a playback URL and resumes only after an explicit action', async () => {
-  const media = {
-    id: 7,
-    libraryId: 1,
-    title: 'Own video',
-    duration: 100,
-    size: 100,
-    container: 'webm',
-    videoCodec: 'vp9',
-    audioCodec: 'opus',
-  };
-  vi.mocked(bridge.connect).mockResolvedValueOnce({
-    name: 'Fixture',
-    serverVersion: 'fixture',
-    apiVersion: 1,
-    minimumClientApiVersion: 1,
-    setupRequired: false,
-    features: [],
-  });
-  vi.mocked(bridge.login).mockResolvedValueOnce({
-    name: 'Alice',
-    role: 'Viewer',
-  });
-  vi.mocked(bridge.api.media).mockResolvedValue([media]);
-  vi.mocked(bridge.api.detail).mockResolvedValue({
-    ...media,
-    contentRating: 0,
-    playback: { mode: 'direct', mimeType: 'video/webm', warning: null },
-  });
-  vi.mocked(bridge.api.progress).mockResolvedValue({
-    mediaItemId: 7,
-    seconds: 32,
-    revision: 3,
-    completed: false,
-    updatedAt: null,
-  });
-  vi.mocked(bridge.api.tracks).mockResolvedValue({
-    tracks: [],
-    canSelectAudio: false,
-    canSelectSubtitles: false,
-  });
-  vi.mocked(bridge.api.transport.streamUrl).mockResolvedValue(
-    'http://127.0.0.1:1234/media/7',
-  );
-  render(<App />);
-  fireEvent.change(screen.getByLabelText('Server address'), {
-    target: { value: 'https://fixture.example' },
-  });
-  fireEvent.click(screen.getByRole('button', { name: 'Connect' }));
-  await screen.findByLabelText('Password');
-  fireEvent.change(screen.getByLabelText('Username'), {
-    target: { value: 'Alice' },
-  });
-  fireEvent.change(screen.getByLabelText('Password'), {
-    target: { value: 'fixture-password' },
-  });
-  fireEvent.click(screen.getByRole('button', { name: 'Sign in' }));
-  fireEvent.click(await screen.findByRole('heading', { name: 'Own video' }));
-  await screen.findByRole('region', { name: 'Title information' });
-  expect(document.querySelector('video')).toBeNull();
-  expect(bridge.api.transport.streamUrl).not.toHaveBeenCalled();
-  fireEvent.click(screen.getByText('File and track details'));
-  expect(screen.getByText('Track information is not available.')).toBeVisible();
-  await waitFor(() =>
-    expect(screen.getByRole('heading', { name: 'Own video' })).toHaveFocus(),
-  );
-  fireEvent.click(screen.getByRole('button', { name: 'Resume from 32 sec' }));
-  await screen.findByLabelText('Own video');
-  expect(bridge.api.transport.streamUrl).toHaveBeenCalledExactlyOnceWith(7);
-  expect(bridge.api.progress).toHaveBeenCalledTimes(2);
-});
+it.each([false, true])(
+  'opens details and starts only after an explicit action (track lookup unavailable: %s)',
+  async (tracksUnavailable) => {
+    const media = {
+      id: 7,
+      libraryId: 1,
+      title: 'Own video',
+      duration: 100,
+      size: 100,
+      container: 'webm',
+      videoCodec: 'vp9',
+      audioCodec: 'opus',
+    };
+    vi.mocked(bridge.connect).mockResolvedValueOnce({
+      name: 'Fixture',
+      serverVersion: 'fixture',
+      apiVersion: 1,
+      minimumClientApiVersion: 1,
+      setupRequired: false,
+      features: [],
+    });
+    vi.mocked(bridge.login).mockResolvedValueOnce({
+      name: 'Alice',
+      role: 'Viewer',
+    });
+    vi.mocked(bridge.api.media).mockResolvedValue([media]);
+    vi.mocked(bridge.api.detail).mockResolvedValue({
+      ...media,
+      contentRating: 0,
+      playback: { mode: 'direct', mimeType: 'video/webm', warning: null },
+    });
+    vi.mocked(bridge.api.progress).mockResolvedValue({
+      mediaItemId: 7,
+      seconds: 32,
+      revision: 3,
+      completed: false,
+      updatedAt: null,
+    });
+    vi.mocked(bridge.api.tracks).mockResolvedValue({
+      tracks: [],
+      canSelectAudio: false,
+      canSelectSubtitles: false,
+    });
+    if (tracksUnavailable)
+      vi.mocked(bridge.api.tracks).mockRejectedValueOnce(
+        new Error('Unavailable'),
+      );
+    vi.mocked(bridge.api.transport.streamUrl).mockResolvedValue(
+      'http://127.0.0.1:1234/media/7',
+    );
+    vi.mocked(bridge.bookmarkRequest).mockImplementation(
+      async (path: string) => {
+        if (path.endsWith('/metadata'))
+          return {
+            details: {
+              title: path.includes('/8/') ? 'Second episode' : 'Own video',
+              year: 2020,
+              synopsis: 'Identified series synopsis',
+              genres: ['Drama'],
+              cast: ['Fixture actor'],
+              series: 'Our show',
+              season: 1,
+              episode: path.includes('/8/') ? 2 : 1,
+              attribution: 'Local metadata',
+            },
+            posterUrl: '/api/v1/media/7/artwork/poster',
+            backdropUrl: null,
+            revision: 1,
+          } as never;
+        if (path.endsWith('/episodes'))
+          return {
+            series: 'Our show',
+            seasons: [1],
+            season: 1,
+            episodes: [],
+            nextOffset: null,
+            nextEpisode: path.includes('/8/')
+              ? null
+              : {
+                  id: 8,
+                  title: 'Second episode',
+                  season: 1,
+                  episode: 2,
+                  duration: 100,
+                  seconds: 32,
+                  completed: false,
+                },
+          } as never;
+        return [] as never;
+      },
+    );
+    vi.mocked(bridge.artworkFileUrl).mockResolvedValue(
+      'http://127.0.0.1:1234/nonce/artwork/7/poster',
+    );
+    vi.mocked(bridge.api.detail).mockImplementation(async (id: number) => ({
+      ...media,
+      id,
+      title: id === 8 ? 'Second episode' : 'Own video',
+      contentRating: 0,
+      playback: { mode: 'direct', mimeType: 'video/webm', warning: null },
+    }));
+    render(<App />);
+    fireEvent.change(screen.getByLabelText('Server address'), {
+      target: { value: 'https://fixture.example' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Connect' }));
+    await screen.findByLabelText('Password');
+    fireEvent.change(screen.getByLabelText('Username'), {
+      target: { value: 'Alice' },
+    });
+    fireEvent.change(screen.getByLabelText('Password'), {
+      target: { value: 'fixture-password' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Sign in' }));
+    fireEvent.click(await screen.findByRole('heading', { name: 'Own video' }));
+    await screen.findByRole('region', { name: 'Title information' });
+    expect(document.querySelector('video')).toBeNull();
+    expect(bridge.api.transport.streamUrl).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByText('File and track details'));
+    expect(
+      screen.getByText('Track information is not available.'),
+    ).toBeVisible();
+    await waitFor(() =>
+      expect(screen.getByRole('heading', { name: 'Own video' })).toHaveFocus(),
+    );
+    expect(await screen.findByText('Identified series synopsis')).toBeVisible();
+    expect(screen.getByText('Fixture actor')).toBeVisible();
+    expect(document.querySelector('.metadata-poster')).toHaveAttribute(
+      'src',
+      'http://127.0.0.1:1234/nonce/artwork/7/poster',
+    );
+    fireEvent.click(
+      await screen.findByRole('button', { name: /View next episode/ }),
+    );
+    await waitFor(() =>
+      expect(
+        screen.getByRole('heading', { name: 'Second episode' }),
+      ).toHaveFocus(),
+    );
+    expect(bridge.api.transport.streamUrl).not.toHaveBeenCalled();
+    expect(document.querySelector('video')).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Resume from 32 sec' }));
+    await screen.findByLabelText('Second episode');
+    expect(bridge.api.transport.streamUrl).toHaveBeenCalledExactlyOnceWith(8);
+    expect(bridge.api.progress).toHaveBeenCalledTimes(3);
+  },
+);
 
 it('saves named servers, clears a connection when switching and removes saved addresses', async () => {
   vi.mocked(bridge.logout).mockResolvedValue(undefined);

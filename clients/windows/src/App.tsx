@@ -1,7 +1,14 @@
-import { useEffect, useRef, useState, type FormEvent } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type FormEvent,
+} from 'react';
 import {
   api,
   playbackRequest,
+  artworkFileUrl,
   bookmarkRequest,
   playbackFileUrl,
   connect,
@@ -37,7 +44,7 @@ import {
 } from '../../../frontend/src/theme/themes';
 import Player from '../../../frontend/src/components/Player';
 import Icon from '../../../frontend/src/components/Icon';
-import TitleDetails from '../../../frontend/src/components/TitleDetails';
+import IdentifiedTitle from '../../../frontend/src/components/IdentifiedTitle';
 import { duration } from '../../../frontend/src/services/api';
 type Selection = {
   item: Detail;
@@ -113,6 +120,11 @@ export default function App() {
   const [watching, setWatching] = useState<ProgressState[]>([]);
   const [continueItems, setContinueItems] = useState<Detail[]>([]);
   const [selection, setSelection] = useState<Selection>();
+  const selectedId = selection?.item.id;
+  const titleArtwork = useCallback(
+    (kind: 'poster' | 'backdrop') => artworkFileUrl(selectedId!, kind),
+    [selectedId],
+  );
   const detailHeading = useRef<HTMLHeadingElement>(null);
   const listContext = useRef({ id: 0, scroll: 0 });
   const restoreList = useRef(false);
@@ -328,16 +340,21 @@ export default function App() {
       setBusy(false);
     }
   }
-  async function open(item: Media | Detail) {
+  async function open(item: Pick<Media, 'id'>, fromSeries = false) {
     const requestVersion = ++loadVersion.current;
-    listContext.current = { id: item.id, scroll: window.scrollY };
+    if (!fromSeries)
+      listContext.current = { id: item.id, scroll: window.scrollY };
     setBusy(true);
     setError('');
     try {
       const [detail, progress, tracks] = await Promise.all([
         api.detail(item.id),
         api.progress(item.id),
-        api.tracks(item.id),
+        api.tracks(item.id).catch(() => ({
+          tracks: [],
+          canSelectAudio: false,
+          canSelectSubtitles: false,
+        })),
       ]);
       if (requestVersion !== loadVersion.current) return;
       setSelection({
@@ -692,7 +709,12 @@ export default function App() {
               </button>
               {selection.url && <h1>{selection.item.title}</h1>}
               {!selection.url && (
-                <TitleDetails
+                <IdentifiedTitle
+                  key={selection.item.id}
+                  admin={false}
+                  request={bookmarkRequest}
+                  artworkUrl={titleArtwork}
+                  onEpisode={(id) => void open({ id }, true)}
                   item={selection.item}
                   tracks={selection.tracks.tracks}
                   bookmarks
@@ -712,6 +734,20 @@ export default function App() {
               {selection.url && (
                 <Player
                   startPlaying
+                  onReturnToDetails={async () => {
+                    const version = loadVersion.current;
+                    try {
+                      const progress = await api.progress(selection.item.id);
+                      if (version === loadVersion.current)
+                        setSelection({
+                          ...selection,
+                          url: undefined,
+                          progress,
+                        });
+                    } catch (e) {
+                      if (version === loadVersion.current) failure(e);
+                    }
+                  }}
                   bookmarkRequest={bookmarkRequest}
                   key={selection.item.id}
                   item={selection.item}

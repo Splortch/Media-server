@@ -36,3 +36,11 @@ The built-in backup stores the metadata database but does not include artwork-ca
 Authenticated users can read `/api/media/{id}/metadata` and `/api/media/{id}/artwork/{poster|backdrop}` only when they can access the underlying media item, including library and rating restrictions. Unknown or restricted items return 404. Admin-only endpoints are `/api/metadata/providers`, `POST /api/metadata/search`, `POST /api/media/{id}/metadata/local`, `POST /api/media/{id}/metadata/tmdb`, and `PUT /api/media/{id}/metadata`. Mutations retain CSRF protection. Equivalent `/api/v1` routes are in the client contract. No local source path, token or raw provider exception is returned.
 
 Automated tests cover local NFO and cached images, malformed XML, restricted users, stale revisions, manual corrections, size/MIME/link rejection, provider search caching, fixed request hosts, credential separation and rate-limit backoff. Provider tests use controlled responses; live TMDB matching requires an operator key and is not claimed as verified against a real account.
+
+## Season and episode navigation
+
+Web and desktop detail views read the same identified metadata and use `GET /api/v1/media/{id}/episodes` (also available under `/api`). The source must have an explicit series name, season and episode; unidentified media returns an empty navigation result. Episodes match the exact saved series name within the same library. Separate remakes or identically named shows using distinct series names. No filename inference or cloud lookup occurs during browsing.
+
+The response contains accessible seasons, the selected season, ordered episode summaries with this user's progress, and the next available episode after the current season/episode. Optional `season` (0–99; 0 is specials) and `offset` (0–100000) parameters return pages of up to 200 episodes with `nextOffset`. The next episode crosses seasons, skips inaccessible/missing items and excludes duplicate versions of the current episode number. It is a chronological navigation action, not an unwatched recommendation or automatic playback. Library grants and ratings apply to season discovery and every returned item. Metadata reads and navigation never request media bytes.
+
+See [title-navigation behavior](../clients/TITLE-NAVIGATION.md) for client focus, artwork transport and explicit playback.

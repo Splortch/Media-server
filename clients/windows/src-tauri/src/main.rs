@@ -47,6 +47,14 @@ async fn stream_url(
     client.stream_url(id).await
 }
 #[tauri::command]
+async fn artwork_url(
+    id: u64,
+    kind: String,
+    client: tauri::State<'_, DesktopClient>,
+) -> Result<String, ClientError> {
+    client.artwork_url(id, &kind).await
+}
+#[tauri::command]
 async fn playback_url(
     session: String,
     file: String,
@@ -120,6 +128,7 @@ fn main() {
             api_request,
             stream_url,
             playback_url,
+            artwork_url,
             preferences,
             save_preferences,
             desktop_capabilities
