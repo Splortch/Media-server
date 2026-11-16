@@ -1,0 +1,41 @@
+name: Publish Dependabot locks
+on:
+  workflow_run:
+    workflows: ['Dependabot lock preparation']
+    types: [completed]
+permissions: {}
+concurrency:
+  group: publish-dependabot-locks-${{ github.event.workflow_run.head_branch }}
+  cancel-in-progress: false
+jobs:
+  publish:
+    if: >-
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.event == 'pull_request' &&
+      github.event.workflow_run.head_repository.full_name == github.repository &&
+      startsWith(github.event.workflow_run.head_branch, 'dependabot/nuget/')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: write
+      actions: write
+      pull-requests: read
+    steps:
+      # Only trusted default-branch code runs with a write token.
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          persist-credentials: false
+      - uses: actions/download-artifact@v8
+        with:
+          name: nuget-locks
+          path: ${{ runner.temp }}/nuget-lock-data
+          run-id: ${{ github.event.workflow_run.id }}
+          github-token: ${{ github.token }}
+      - uses: actions/github-script@v8
+        env:
+          LOCK_BUNDLE: ${{ runner.temp }}/nuget-lock-data/nuget-locks.json
+        with:
+          script: |
+            const { publish } = require('./scripts/dependabot-locks.cjs');
+            await publish({github, context, core, bundlePath: process.env.LOCK_BUNDLE});
