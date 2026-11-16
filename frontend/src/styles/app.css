@@ -1696,3 +1696,22 @@ textarea {
   margin: 24px 0;
   font-size: 0.85rem;
 }
+
+.episode-navigation {
+  margin-block: 1.5rem;
+}
+.episode-list {
+  display: grid;
+  gap: 0.65rem;
+  list-style: none;
+  padding: 0;
+}
+.episode-list button {
+  width: 100%;
+  text-align: left;
+  white-space: normal;
+}
+.episode-list [aria-current='page'] {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}

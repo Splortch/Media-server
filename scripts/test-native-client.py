@@ -1,11 +1,13 @@
 #!/usr/bin/env python3
 """Exercise the production Rust transport against a fresh real ASP.NET server."""
-import json, os, pathlib, subprocess, tempfile, time, urllib.request
+import base64, json, os, pathlib, subprocess, tempfile, time, urllib.request
 root=pathlib.Path(__file__).resolve().parents[1]
 with tempfile.TemporaryDirectory(prefix='media-client-test-') as folder:
     folder=str(pathlib.Path(folder).resolve())
     data=pathlib.Path(folder)/'data';media=pathlib.Path(folder)/'media';media.mkdir()
     subprocess.run(['ffmpeg','-v','error','-f','lavfi','-i','testsrc=size=320x180:rate=24','-f','lavfi','-i','sine=frequency=440','-t','8','-c:v','libvpx-vp9','-c:a','libopus','-y',str(media/'sample.webm')],check=True)
+    (media/'sample.nfo').write_text('<episodedetails><title>sample</title><showtitle>Synthetic series</showtitle><season>1</season><episode>1</episode><plot>Local native fixture</plot></episodedetails>', encoding='utf-8')
+    (media/'sample-poster.png').write_bytes(base64.b64decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+j2ioAAAAASUVORK5CYII='))
     env=dict(os.environ,MediaServer__DataDirectory=str(data),MediaServer__AllowedRoots__0=str(media),ASPNETCORE_URLS='http://127.0.0.1:5053')
     with open(pathlib.Path(folder)/'server.log','w+') as log:
         # Own the API process itself. `dotnet run` starts a child apphost on Windows;

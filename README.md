@@ -27,6 +27,7 @@ The [client ecosystem](docs/clients/README.md) adds a shared Tauri desktop clien
 | Native alpha releases | Implemented workflow | Self-contained Windows/Linux/macOS servers, native desktop packages, bundled web UI, one automatic alpha release for all platforms |
 | HLS conversion / quality / audio / text subtitles | Implemented alpha | Bounded full-video preparation; FFmpeg required; Auto/manual quality in web, desktop and Android clients |
 | Hardware encoders / HDR | Partial alpha | Opt-in NVENC/QSV/VAAPI/AMF adapters and software fallback; explicit SDR tone mapping; synthetic PQ/HLG HEVC/AV1 validation; physical GPU/HDR validation pending |
+| Title information / series navigation | Implemented alpha (web/desktop) | [Metadata-first details, seasons/episodes, explicit Play/Resume and next-episode information](docs/clients/TITLE-NAVIGATION.md); no streaming on details entry |
 | Artwork / online metadata / TV matching | Implemented alpha (web) | [Local NFO, manual corrections and explicit opt-in TMDB matching](docs/architecture/METADATA.md); bounded offline artwork cache; native editor pending |
 | Accounts / permissions / ratings | Implemented alpha | Admin-managed accounts, library grants, explicit content ratings; unknown ratings denied to restricted viewers |
 | Library watching / reconciliation | Implemented alpha | Opt-in watching, missing-entry tombstones and optional hash-based move/duplicate detection |

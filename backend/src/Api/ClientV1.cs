@@ -77,6 +77,7 @@ public static class ClientV1
                         !await db.Users.AnyAsync(),
                         [
                             "direct-play",
+                            "series-navigation",
                             "hls-conversion",
                             "track-selection",
                             "library-removal",

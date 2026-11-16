@@ -13,6 +13,7 @@ public static class MetadataEndpoints
             var group = app.MapGroup(prefix).RequireAuthorization();
             if (prefix.EndsWith("v1"))
                 group.WithGroupName("client-v1");
+            group.MapSeriesEpisodes();
             group
                 .MapGet(
                     "/media/{id:int}/metadata",

@@ -1,5 +1,6 @@
 import { useEffect, useState, type ComponentProps } from 'react';
 import TitleDetails from './TitleDetails';
+import EpisodeNavigation from './EpisodeNavigation';
 import { api } from '../services/api';
 
 type Details = {
@@ -42,8 +43,16 @@ const empty: Details = {
 };
 export default function IdentifiedTitle({
   admin,
+  request = api,
+  artworkUrl,
+  onEpisode,
   ...props
-}: ComponentProps<typeof TitleDetails> & { admin: boolean }) {
+}: ComponentProps<typeof TitleDetails> & {
+  admin: boolean;
+  request?: typeof api;
+  artworkUrl?: (kind: 'poster' | 'backdrop') => Promise<string>;
+  onEpisode?: (id: number) => void;
+}) {
   const [value, setValue] = useState<Metadata | null>(null);
   const [draft, setDraft] = useState<Details>({
     ...empty,
@@ -60,8 +69,15 @@ export default function IdentifiedTitle({
   const id = props.item.id;
   useEffect(() => {
     let active = true;
-    void api<Metadata | null>(`/media/${id}/metadata`)
-      .then((row) => {
+    void request<Metadata | null>(`/media/${id}/metadata`)
+      .then(async (row) => {
+        if (row && artworkUrl) {
+          const [posterUrl, backdropUrl] = await Promise.all([
+            row.posterUrl ? artworkUrl('poster').catch(() => null) : null,
+            row.backdropUrl ? artworkUrl('backdrop').catch(() => null) : null,
+          ]);
+          row = { ...row, posterUrl, backdropUrl };
+        }
         if (active) {
           setValue(row);
           setDraft(row?.details ?? { ...empty, title: props.item.title });
@@ -71,7 +87,7 @@ export default function IdentifiedTitle({
         if (active) setError(e.message);
       });
     if (admin)
-      void api<{ enabled: boolean }>('/metadata/providers')
+      void request<{ enabled: boolean }>('/metadata/providers')
         .then((row) => {
           if (active) setEnabled(row.enabled);
         })
@@ -79,12 +95,12 @@ export default function IdentifiedTitle({
     return () => {
       active = false;
     };
-  }, [id, props.item.title, admin]);
+  }, [id, props.item.title, admin, request, artworkUrl]);
   async function change(action: string, method: string, body: object) {
     setBusy(true);
     setError('');
     try {
-      const row = await api<Metadata>(
+      const row = await request<Metadata>(
         `/media/${id}/metadata${action}`,
         method,
         { ...body, expectedRevision: value?.revision ?? 0 },
@@ -107,6 +123,18 @@ export default function IdentifiedTitle({
         }}
         metadata={value}
       />
+      {onEpisode &&
+        value?.details.series &&
+        value.details.season !== null &&
+        value.details.episode !== null && (
+          <EpisodeNavigation
+            key={`${id}:${value.revision}`}
+            id={id}
+            request={request}
+            onEpisode={onEpisode}
+            busy={props.busy}
+          />
+        )}
       {error && <p role="alert">{error}</p>}
       {admin && (
         <details className="title-admin metadata-editor">

@@ -1791,6 +1791,52 @@
         }
       }
     },
+    "/api/v1/media/{id}/episodes": {
+      "get": {
+        "tags": [
+          "Api"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "season",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SeriesNavigation"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/media/{id}/metadata": {
       "get": {
         "tags": [
@@ -4679,6 +4725,102 @@
           },
           "correlationId": {
             "type": "string"
+          }
+        }
+      },
+      "SeriesEpisode": {
+        "required": [
+          "id",
+          "title",
+          "season",
+          "episode",
+          "duration",
+          "seconds",
+          "completed"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "title": {
+            "type": "string"
+          },
+          "season": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "episode": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "duration": {
+            "type": "number",
+            "format": "double"
+          },
+          "seconds": {
+            "type": "number",
+            "format": "double"
+          },
+          "completed": {
+            "type": "boolean"
+          }
+        }
+      },
+      "SeriesNavigation": {
+        "required": [
+          "series",
+          "seasons",
+          "season",
+          "episodes",
+          "nextOffset",
+          "nextEpisode"
+        ],
+        "type": "object",
+        "properties": {
+          "series": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "seasons": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          "season": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int32"
+          },
+          "episodes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SeriesEpisode"
+            }
+          },
+          "nextOffset": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int32"
+          },
+          "nextEpisode": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/SeriesEpisode"
+              }
+            ]
           }
         }
       },

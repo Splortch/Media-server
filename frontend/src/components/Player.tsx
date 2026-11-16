@@ -16,8 +16,10 @@ export default function Player({
   playbackTransport,
   bookmarkRequest,
   bookmarkStart,
+  onReturnToDetails,
 }: {
   item: Media;
+  onReturnToDetails?: () => Promise<void> | void;
   bookmarkRequest?: BookmarkRequest;
   bookmarkStart?: number;
   resume: number;
@@ -265,6 +267,23 @@ export default function Player({
 
   return (
     <section aria-label="Video player" className="player-wrap">
+      {onReturnToDetails && (
+        <button
+          onClick={() => {
+            void (async () => {
+              const video = videoRef.current;
+              if (video) {
+                video.pause();
+                await save(video, true, video.ended);
+                if (blocked.current) return;
+              }
+              await onReturnToDetails();
+            })();
+          }}
+        >
+          Back to title information
+        </button>
+      )}
       {!guest && (!streamUrl || playbackTransport) && (
         <PlaybackSettings
           transport={playbackTransport}

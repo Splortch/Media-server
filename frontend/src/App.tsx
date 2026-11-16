@@ -323,7 +323,7 @@ export default function App() {
       }
       document.title = `${phase === 'setup' ? 'Set up your server' : 'Sign in'} · Media Server`;
     }
-  }, [phase, route, loading, item, returnTo]);
+  }, [phase, route, loading, item, returnTo, playFrom]);
   async function authenticate(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     const f = new FormData(e.currentTarget);
@@ -736,6 +736,9 @@ export default function App() {
                 {playFrom === undefined ? (
                   <IdentifiedTitle
                     key={item.id}
+                    onEpisode={(id) => {
+                      location.hash = `#media/${id}`;
+                    }}
                     admin={user?.role === 'Admin'}
                     item={item}
                     headingRef={detailHeading}
@@ -784,6 +787,21 @@ export default function App() {
                     key={item.id}
                     item={item}
                     startPlaying
+                    onReturnToDetails={async () => {
+                      const epoch = requestEpoch.current;
+                      try {
+                        const fresh = await api<Progress[]>(
+                          '/progress?mediaIds=' + item.id,
+                        );
+                        if (epoch !== requestEpoch.current) return;
+                        setProgress(fresh);
+                        setPlayFrom(undefined);
+                        focusedRoute.current = '';
+                      } catch (e) {
+                        if (epoch === requestEpoch.current)
+                          setError((e as Error).message);
+                      }
+                    }}
                     guest={user?.role === 'Guest'}
                     onSaveProgress={
                       user?.role === 'Guest' ? async () => {} : undefined

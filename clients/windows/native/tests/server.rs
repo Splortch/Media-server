@@ -111,6 +111,46 @@ async fn real_server_cookie_login_ranges_resume_conflicts_revocation_and_disconn
         .unwrap();
     assert_eq!(list.as_array().unwrap().len(), 1);
     let id = list[0]["id"].as_u64().unwrap();
+    write(
+        &http,
+        &base,
+        &format!("/api/media/{id}/metadata/local"),
+        json!({"expectedRevision":0}),
+    )
+    .await;
+    let metadata = first
+        .request("GET", &format!("/api/v1/media/{id}/metadata"), None)
+        .await
+        .unwrap();
+    assert_eq!(metadata["details"]["synopsis"], "Local native fixture");
+    let episodes = first
+        .request(
+            "GET",
+            &format!("/api/v1/media/{id}/episodes?season=1&offset=0"),
+            None,
+        )
+        .await
+        .unwrap();
+    assert_eq!(episodes["series"], "Synthetic series");
+    assert_eq!(episodes["episodes"].as_array().unwrap().len(), 1);
+    let artwork = first.artwork_url(id, "poster").await.unwrap();
+    let image = http.get(&artwork).send().await.unwrap();
+    assert_eq!(image.status(), 200);
+    assert_eq!(image.headers()["content-type"], "image/png");
+    assert!(image.bytes().await.unwrap().starts_with(&[137, 80, 78, 71]));
+    assert!(first.artwork_url(id, "../stream").await.is_err());
+    assert!(first.artwork_url(0, "poster").await.is_err());
+    assert_eq!(
+        http.get(&artwork)
+            .header("Origin", "https://evil.example")
+            .send()
+            .await
+            .unwrap()
+            .status(),
+        404
+    );
+    let bad_artwork = artwork.replacen(artwork.split('/').nth(3).unwrap(), "wrong", 1);
+    assert_eq!(http.get(bad_artwork).send().await.unwrap().status(), 404);
     let source = first.stream_url(id).await.unwrap();
     let range = http
         .get(&source)
@@ -293,6 +333,7 @@ async fn real_server_cookie_login_ranges_resume_conflicts_revocation_and_disconn
         Some(401)
     );
     first.logout().await.unwrap();
+    assert_eq!(http.get(&artwork).send().await.unwrap().status(), 404);
     assert_eq!(http.get(&source).send().await.unwrap().status(), 404);
     assert_eq!(
         public_http
