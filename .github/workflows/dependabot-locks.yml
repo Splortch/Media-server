@@ -1,0 +1,34 @@
+name: Dependabot lock preparation
+on:
+  pull_request:
+    paths: ['backend/**']
+permissions:
+  contents: read
+concurrency:
+  group: dependabot-locks-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+jobs:
+  prepare:
+    if: >-
+      github.event.pull_request.user.login == 'dependabot[bot]' &&
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      startsWith(github.head_ref, 'dependabot/nuget/')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      # All dependency resolution stays in this read-only job without secrets.
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - uses: actions/setup-dotnet@v6
+        with:
+          global-json-file: global.json
+      - name: Refresh consuming projects and all four publish graphs
+        run: python3 scripts/refresh-nuget-locks.py --bundle "${{ runner.temp }}/nuget-locks.json"
+      - uses: actions/upload-artifact@v7
+        with:
+          name: nuget-locks
+          path: ${{ runner.temp }}/nuget-locks.json
+          if-no-files-found: error
+          retention-days: 2
