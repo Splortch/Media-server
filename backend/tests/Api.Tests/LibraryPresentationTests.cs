@@ -387,6 +387,19 @@ public sealed class LibraryPresentationTests
             db.Items.Single(x => x.Id == 4).Duration = 2;
             await db.SaveChangesAsync();
         }
+        await admin.PutAsJsonAsync(
+            "/api/experiments/guests",
+            new { enabled = true, libraries = new[] { 1 } }
+        );
+        using var guest = server.CreateClient();
+        await Server.Csrf(guest);
+        await guest.PostAsync("/api/auth/guest", null);
+        foreach (var prefix in new[] { "/api", "/api/v1" })
+        {
+            var guestImage = await guest.GetAsync(prefix + "/media/4/thumbnail");
+            Assert.Equal(HttpStatusCode.OK, guestImage.StatusCode);
+            Assert.Equal("image/jpeg", guestImage.Content.Headers.ContentType!.MediaType);
+        }
         var source = await File.ReadAllBytesAsync(Path.Combine(server.MediaPath, "4.webm"));
         var image = await admin.GetAsync("/api/media/4/thumbnail");
         Assert.Equal(HttpStatusCode.OK, image.StatusCode);

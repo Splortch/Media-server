@@ -942,7 +942,7 @@ export default function App() {
                   <p role="status" aria-label="Search results">
                     {query !== debouncedQuery || loading
                       ? 'Searching…'
-                      : `${items.length} matching videos${nextCursor ? ' loaded' : ''}`}
+                      : `${items.length} matching titles${nextCursor ? ' loaded' : ''}`}
                   </p>
                 )}
                 {!items.length && !loading ? (
@@ -950,7 +950,7 @@ export default function App() {
                     <span aria-hidden="true">▦</span>
                     <h2>
                       {query || collection
-                        ? 'No matching videos.'
+                        ? 'No matching titles.'
                         : user?.role === 'Admin'
                           ? 'A great collection starts somewhere.'
                           : 'No media available to this account.'}

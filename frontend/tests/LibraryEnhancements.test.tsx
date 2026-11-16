@@ -7,6 +7,7 @@ import {
 } from '@testing-library/react';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import CardArtwork from '../src/components/CardArtwork';
+import Player from '../src/components/Player';
 import WatchControls from '../src/components/WatchControls';
 import NextEpisodePrompt from '../src/components/NextEpisodePrompt';
 import SeekPreview from '../src/components/SeekPreview';
@@ -253,4 +254,42 @@ it('uploads a selected image with the current revision and clears the file input
     expectedRevision: 3,
   });
   expect(input).toHaveValue('');
+});
+
+it('cancels the completion countdown when the user seeks back into the current episode', async () => {
+  const request = vi.fn().mockResolvedValue(next);
+  const play = vi.fn().mockResolvedValue(undefined);
+  localStorage.setItem('viewer-a', 'true');
+  render(
+    <Player
+      item={{
+        id: 1,
+        title: 'Episode',
+        duration: 4,
+        size: 100,
+        container: 'webm',
+        videoCodec: 'vp9',
+        audioCodec: 'opus',
+      }}
+      resume={0}
+      guest
+      bookmarkRequest={request as typeof api}
+      autoplayPreference="viewer-a"
+      onSaveProgress={async () => {}}
+      onNextEpisode={play}
+    />,
+  );
+  await screen.findByLabelText('Automatically play the next episode');
+  fireEvent.ended(screen.getByLabelText('Episode'));
+  expect(
+    await screen.findByText('Next episode starts in 10 seconds.'),
+  ).toBeVisible();
+  fireEvent.seeking(screen.getByLabelText('Episode'));
+  expect(screen.queryByText(/Next episode starts in/)).toBeNull();
+  expect(play).not.toHaveBeenCalled();
+  expect(
+    screen
+      .getByRole('region', { name: 'Next episode' })
+      .closest('.player-surface'),
+  ).not.toBeNull();
 });

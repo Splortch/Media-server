@@ -468,6 +468,7 @@ export default function Player({
             }}
             onCanPlay={() => setBuffering(false)}
             onSeeking={() => {
+              setEnded(false);
               sample.current = undefined;
             }}
             onSeeked={(e) => {
