@@ -485,3 +485,37 @@ it('saves the latest position before returning to title information', async () =
   );
   await waitFor(() => expect(onReturn).toHaveBeenCalledOnce());
 });
+
+it('does not reopen old details after navigation during a pending progress save', async () => {
+  vi.spyOn(HTMLMediaElement.prototype, 'pause').mockImplementation(() => {});
+  let finish!: () => void;
+  const pending = new Promise<void>((resolve) => {
+    finish = resolve;
+  });
+  const onReturn = vi.fn();
+  const view = render(
+    <Player
+      item={{
+        id: 3,
+        title: 'Episode',
+        duration: 100,
+        size: 100,
+        container: 'mp4',
+        videoCodec: 'h264',
+        audioCodec: 'aac',
+      }}
+      resume={0}
+      onSaveProgress={() => pending}
+      onReturnToDetails={onReturn}
+    />,
+  );
+  fireEvent.click(
+    screen.getByRole('button', { name: 'Back to title information' }),
+  );
+  view.unmount();
+  await act(async () => {
+    finish();
+    await pending;
+  });
+  expect(onReturn).not.toHaveBeenCalled();
+});

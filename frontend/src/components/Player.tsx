@@ -31,6 +31,13 @@ export default function Player({
   onPlaybackError?: () => Promise<void>;
   playbackTransport?: PlaybackTransport;
 }) {
+  const mounted = useRef(true);
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+    };
+  }, []);
   const [source, setSource] = useState(
     streamUrl ?? `/api/media/${item.id}/stream`,
   );
@@ -275,7 +282,7 @@ export default function Player({
               if (video) {
                 video.pause();
                 await save(video, true, video.ended);
-                if (blocked.current) return;
+                if (!mounted.current || blocked.current) return;
               }
               await onReturnToDetails();
             })();

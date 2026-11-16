@@ -1,5 +1,6 @@
 import { test, expect } from '@playwright/test';
 import { mkdir, copyFile, readFile } from 'node:fs/promises';
+import { execFileSync } from 'node:child_process';
 import path from 'node:path';
 import AxeBuilder from '@axe-core/playwright';
 
@@ -36,14 +37,29 @@ test('identified seasons remain information-first through keyboard selection and
   ).toBeTruthy();
   const folder = path.join(media, 'series-fixture');
   await mkdir(folder, { recursive: true });
-  await Promise.all(
-    ['one', 'two'].map((name) =>
-      copyFile(
-        path.join(media, 'sample.webm'),
-        path.join(folder, name + '.webm'),
-      ),
-    ),
-  );
+  // Other suites rename/remove their media. Own this fixture completely.
+  const firstFile = path.join(folder, 'one.webm');
+  execFileSync('ffmpeg', [
+    '-v',
+    'error',
+    '-f',
+    'lavfi',
+    '-i',
+    'testsrc=size=320x180:rate=24',
+    '-f',
+    'lavfi',
+    '-i',
+    'sine=frequency=440',
+    '-t',
+    '4',
+    '-c:v',
+    'libvpx-vp9',
+    '-c:a',
+    'libopus',
+    '-y',
+    firstFile,
+  ]);
+  await copyFile(firstFile, path.join(folder, 'two.webm'));
   const created = await page.request.post('/api/libraries', {
     headers: await csrf(),
     data: { name: 'Series fixture', path: folder, kind: 'tv' },
