@@ -8,6 +8,7 @@ with tempfile.TemporaryDirectory(prefix='media-client-test-') as folder:
     subprocess.run(['ffmpeg','-v','error','-f','lavfi','-i','testsrc=size=320x180:rate=24','-f','lavfi','-i','sine=frequency=440','-t','8','-c:v','libvpx-vp9','-c:a','libopus','-y',str(media/'sample.webm')],check=True)
     (media/'sample.nfo').write_text('<episodedetails><title>sample</title><showtitle>Synthetic series</showtitle><season>1</season><episode>1</episode><plot>Local native fixture</plot></episodedetails>', encoding='utf-8')
     (media/'sample-poster.png').write_bytes(base64.b64decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+j2ioAAAAASUVORK5CYII='))
+    (media/'sample-upload.txt').write_text(base64.b64encode(base64.b64decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+j2ioAAAAASUVORK5CYII=') + bytes(100000)).decode('ascii'), encoding='ascii')
     env=dict(os.environ,MediaServer__DataDirectory=str(data),MediaServer__AllowedRoots__0=str(media),ASPNETCORE_URLS='http://127.0.0.1:5053')
     with open(pathlib.Path(folder)/'server.log','w+') as log:
         # Own the API process itself. `dotnet run` starts a child apphost on Windows;

@@ -78,6 +78,9 @@ public static class ClientV1
                         [
                             "direct-play",
                             "series-navigation",
+                            "library-artwork",
+                            "seek-previews",
+                            "watch-state",
                             "hls-conversion",
                             "track-selection",
                             "library-removal",
@@ -136,7 +139,7 @@ public static class ClientV1
                         || (item.Duration > 0 && input.Seconds >= item.Duration * .95);
                     await using var transaction = await db.Database.BeginTransactionAsync();
                     var count = await db.Database.ExecuteSqlInterpolatedAsync(
-                        $"INSERT INTO Progress (UserId, MediaItemId, Seconds, UpdatedAt, Revision, Completed) SELECT {uid}, {id}, {input.Seconds}, {updated}, 1, {completed} WHERE {input.ExpectedRevision} = 0 OR EXISTS (SELECT 1 FROM Progress WHERE UserId={uid} AND MediaItemId={id} AND Revision={input.ExpectedRevision}) ON CONFLICT(UserId, MediaItemId) DO UPDATE SET Seconds=excluded.Seconds, UpdatedAt=excluded.UpdatedAt, Completed=excluded.Completed, Revision=Progress.Revision+1 WHERE Progress.Revision={input.ExpectedRevision}"
+                        $"INSERT INTO Progress (UserId, MediaItemId, Seconds, UpdatedAt, Revision, Completed) SELECT {uid}, {id}, {input.Seconds}, {updated}, 1, {completed} WHERE {input.ExpectedRevision} = 0 OR EXISTS (SELECT 1 FROM Progress WHERE UserId={uid} AND MediaItemId={id} AND Revision={input.ExpectedRevision}) ON CONFLICT(UserId, MediaItemId) DO UPDATE SET Seconds=excluded.Seconds, UpdatedAt=excluded.UpdatedAt, Completed=excluded.Completed, HiddenFromContinueWatching=0, Revision=Progress.Revision+1 WHERE Progress.Revision={input.ExpectedRevision}"
                     );
                     if (count > 0)
                         await HistoryWriter.RecordAsync(
@@ -177,6 +180,7 @@ public static class ClientV1
                         .Progress.Where(p =>
                             p.UserId == uid
                             && !p.Completed
+                            && !p.HiddenFromContinueWatching
                             && p.Seconds > 0
                             && db.Items.Any(item => item.Id == p.MediaItemId)
                         )
