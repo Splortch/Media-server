@@ -1,5 +1,6 @@
 FROM node:26-bookworm-slim@sha256:5df79989ed685e09f0a98019db4cebfb22fb9df1a53c0161664a011f7ff6b0f1 AS web
 WORKDIR /source/frontend
+COPY vendor/picomatch /source/vendor/picomatch
 COPY frontend/package*.json ./
 RUN npm ci
 COPY frontend/ ./

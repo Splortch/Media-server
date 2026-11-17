@@ -1,0 +1,36 @@
+--- picomatch-4.0.7/lib/parse.js
++++ picomatch-4.0.8-splortch.1/lib/parse.js
+@@ -284,7 +284,33 @@
+   return depth;
+ };
+ 
++// Splortch mitigation for GHSA-fc5q-39xc-vjpf: an unbounded wildcard
++// nested inside a repeated extglob can backtrack exponentially even with one
++// branch. Escaped stars, character classes and nested extglobs keep their
++// existing behavior; the latter already have a separate upstream guard.
++const hasUnboundedWildcard = branch => {
++  let escaped = false;
++  let bracket = false;
++  let parens = 0;
++  for (let i = 0; i < branch.length; i++) {
++    const ch = branch[i];
++    if (escaped) { escaped = false; continue; }
++    if (ch === '\\') { escaped = true; continue; }
++    if (ch === '[' && !bracket) { bracket = true; continue; }
++    if (ch === ']' && bracket) { bracket = false; continue; }
++    if (bracket) continue;
++    if (ch === '(') { parens++; continue; }
++    if (ch === ')') { parens--; continue; }
++    if (ch === '*' && parens === 0 && branch[i + 1] !== '(') return true;
++  }
++  return false;
++};
++
+ const analyzeRepeatedExtglob = (body, options) => {
++  if (splitTopLevel(body).some(hasUnboundedWildcard)) {
++    return { risky: true };
++  }
++
+   if (options.maxExtglobRecursion === false) {
+     return { risky: false };
+   }
