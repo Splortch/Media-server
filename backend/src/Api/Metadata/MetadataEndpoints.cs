@@ -14,6 +14,8 @@ public static class MetadataEndpoints
             if (prefix.EndsWith("v1"))
                 group.WithGroupName("client-v1");
             group.MapSeriesEpisodes();
+            group.MapLibraryCatalog();
+            group.MapImages(prefix);
             group
                 .MapGet(
                     "/media/{id:int}/metadata",

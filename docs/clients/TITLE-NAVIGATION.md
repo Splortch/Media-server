@@ -19,3 +19,7 @@ Artwork uses a nonce-scoped loopback URL for a numeric media ID and fixed `poste
 ## Validation
 
 Component and route tests cover information-only entry, season selection, pagination, errors/retry, next-episode selection, explicit playback, focus and list restoration. Server tests cover library/rating boundaries, other-user progress isolation, missing files, specials, cross-season ordering and pagination. Browser acceptance exercises the real server with synthetic local episodes and runs an axe check. Native integration verifies metadata/episode reads, artwork MIME/nonce/origin/logout behavior and the existing stream authorization flow. Physical Windows installers, screen readers and TV remotes still require device testing.
+
+## Artwork and completion follow-up
+
+Library/search now use grouped TV cards and poster/generated-frame covers. A series overview requires explicit episode selection before Play. See [library artwork and playback completion](LIBRARY-ARTWORK.md) for image editing, seek previews, watched/unwatched/Continue Watching actions and the opt-in next-episode countdown.

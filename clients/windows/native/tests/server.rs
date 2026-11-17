@@ -133,6 +133,38 @@ async fn real_server_cookie_login_ranges_resume_conflicts_revocation_and_disconn
         .unwrap();
     assert_eq!(episodes["series"], "Synthetic series");
     assert_eq!(episodes["episodes"].as_array().unwrap().len(), 1);
+    let catalog = first
+        .request(
+            "GET",
+            "/api/v1/catalog?limit=200&offset=0&prefix=Synthetic",
+            None,
+        )
+        .await
+        .unwrap();
+    assert_eq!(catalog["items"][0]["series"], "Synthetic series");
+    assert_eq!(catalog["items"][0]["episodeCount"], 1);
+    let images = first
+        .request("GET", &format!("/api/v1/media/{id}/images"), None)
+        .await
+        .unwrap();
+    assert!(images["posterUrl"].is_string());
+    let data =
+        std::fs::read_to_string(std::path::Path::new(&root).join("sample-upload.txt")).unwrap();
+    write(
+        &http,
+        &base,
+        &format!("/api/media/{id}/artwork/upload"),
+        json!({"kind":"poster","data":data,"expectedRevision":1}),
+    )
+    .await;
+    let thumbnail = first.artwork_url(id, "thumbnail").await.unwrap();
+    let generated = http.get(&thumbnail).send().await.unwrap();
+    assert_eq!(generated.status(), 200);
+    assert_eq!(generated.headers()["content-type"], "image/jpeg");
+    let preview = first.preview_url(id, 0.0).await.unwrap();
+    assert_eq!(http.get(&preview).send().await.unwrap().status(), 200);
+    assert!(first.preview_url(id, -1.0).await.is_err());
+    assert!(first.preview_url(id, f64::NAN).await.is_err());
     let artwork = first.artwork_url(id, "poster").await.unwrap();
     let image = http.get(&artwork).send().await.unwrap();
     assert_eq!(image.status(), 200);
@@ -333,6 +365,8 @@ async fn real_server_cookie_login_ranges_resume_conflicts_revocation_and_disconn
         Some(401)
     );
     first.logout().await.unwrap();
+    assert_eq!(http.get(&preview).send().await.unwrap().status(), 404);
+    assert_eq!(http.get(&thumbnail).send().await.unwrap().status(), 404);
     assert_eq!(http.get(&artwork).send().await.unwrap().status(), 404);
     assert_eq!(http.get(&source).send().await.unwrap().status(), 404);
     assert_eq!(

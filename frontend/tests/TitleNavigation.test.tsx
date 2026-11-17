@@ -46,7 +46,7 @@ beforeEach(() => {
     if (path === '/auth/me') return { name: 'Alice', role: 'Viewer' };
     if (path === '/status')
       return { version: 'fixture', mediaCount: 1, libraryCount: 1 };
-    if (path.startsWith('/media-page'))
+    if (path.startsWith('/catalog'))
       return { items: [media], nextCursor: null };
     if (path === '/media/7') return media;
     if (path === '/v1/media/7/tracks')
@@ -214,4 +214,84 @@ it('selects the next identified episode without streaming and returns to the ori
       screen.getByRole('heading', { name: 'Own video' }).closest('a'),
     ).toHaveFocus(),
   );
+});
+
+it('opens a grouped series overview and requires episode selection before offering playback', async () => {
+  const implementation = vi.mocked(api).getMockImplementation()!;
+  const details = {
+    title: 'Pilot',
+    year: 2020,
+    synopsis: 'Episode description',
+    genres: [],
+    cast: [],
+    series: 'Our show',
+    season: 1,
+    episode: 1,
+    attribution: 'Local metadata',
+  };
+  vi.mocked(api).mockImplementation((path, ...args) => {
+    if (path.startsWith('/catalog'))
+      return Promise.resolve({
+        items: [
+          { ...media, title: 'Our show', series: 'Our show', episodeCount: 2 },
+        ],
+        nextCursor: null,
+      });
+    if (path === '/media/7/metadata' || path === '/media/8/metadata')
+      return Promise.resolve({
+        details: path.includes('/8/')
+          ? { ...details, title: 'Second episode', episode: 2 }
+          : details,
+        posterUrl: null,
+        backdropUrl: null,
+        revision: 1,
+      });
+    if (path === '/media/7/episodes' || path === '/media/8/episodes')
+      return Promise.resolve({
+        series: 'Our show',
+        seasons: [1],
+        season: 1,
+        episodes: [
+          {
+            id: 8,
+            title: 'Second episode',
+            season: 1,
+            episode: 2,
+            duration: 100,
+            seconds: 0,
+            completed: false,
+          },
+        ],
+        nextOffset: null,
+        nextEpisode: null,
+      });
+    if (path === '/media/8')
+      return Promise.resolve({ ...media, id: 8, title: 'Second episode' });
+    if (path === '/v1/media/8/tracks') return Promise.resolve({ tracks: [] });
+    return implementation(path, ...args);
+  });
+  render(<App />);
+  fireEvent.click(await screen.findByRole('heading', { name: 'Our show' }));
+  await waitFor(() =>
+    expect(screen.getByRole('heading', { name: 'Our show' })).toHaveFocus(),
+  );
+  expect(
+    screen.queryByRole('button', { name: 'Play from beginning' }),
+  ).toBeNull();
+  expect(screen.queryByText('Episode description')).toBeNull();
+  expect(document.querySelector('video')).toBeNull();
+  fireEvent.click(
+    await screen.findByRole('button', { name: /^Episode 2 · Second episode/ }),
+  );
+  await waitFor(() =>
+    expect(
+      screen.getByRole('heading', { name: 'Second episode' }),
+    ).toHaveFocus(),
+  );
+  expect(
+    screen.getByRole('button', { name: 'Play from beginning' }),
+  ).toBeVisible();
+  await waitFor(() => expect(api).toHaveBeenCalledWith('/media/8/episodes'));
+  await screen.findByRole('button', { name: /^Episode 2 · Second episode/ });
+  expect(document.querySelector('video')).toBeNull();
 });

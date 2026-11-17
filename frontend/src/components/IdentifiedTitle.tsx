@@ -1,6 +1,8 @@
 import { useEffect, useState, type ComponentProps } from 'react';
 import TitleDetails from './TitleDetails';
 import EpisodeNavigation from './EpisodeNavigation';
+import ArtworkManager from './ArtworkManager';
+import WatchControls from './WatchControls';
 import { api } from '../services/api';
 
 type Details = {
@@ -46,13 +48,20 @@ export default function IdentifiedTitle({
   request = api,
   artworkUrl,
   onEpisode,
+  seriesView = false,
   ...props
 }: ComponentProps<typeof TitleDetails> & {
   admin: boolean;
+  seriesView?: boolean;
   request?: typeof api;
   artworkUrl?: (kind: 'poster' | 'backdrop') => Promise<string>;
   onEpisode?: (id: number) => void;
 }) {
+  const [watchState, setWatchState] = useState<{
+    completed: boolean;
+    seconds: number;
+  }>();
+  const [reload, setReload] = useState(0);
   const [value, setValue] = useState<Metadata | null>(null);
   const [draft, setDraft] = useState<Details>({
     ...empty,
@@ -95,7 +104,7 @@ export default function IdentifiedTitle({
     return () => {
       active = false;
     };
-  }, [id, props.item.title, admin, request, artworkUrl]);
+  }, [id, props.item.title, admin, request, artworkUrl, reload]);
   async function change(action: string, method: string, body: object) {
     setBusy(true);
     setError('');
@@ -116,12 +125,22 @@ export default function IdentifiedTitle({
   return (
     <>
       <TitleDetails
+        seriesView={seriesView}
         {...props}
         item={{
           ...props.item,
-          title: value?.details.title ?? props.item.title,
+          title: seriesView
+            ? (value?.details.series ?? props.item.title)
+            : (value?.details.title ?? props.item.title),
         }}
         metadata={value}
+        resume={
+          watchState
+            ? watchState.completed
+              ? 0
+              : watchState.seconds
+            : props.resume
+        }
       />
       {onEpisode &&
         value?.details.series &&
@@ -135,6 +154,16 @@ export default function IdentifiedTitle({
             busy={props.busy}
           />
         )}
+      {!seriesView && props.bookmarks && (
+        <WatchControls id={id} request={request} onChange={setWatchState} />
+      )}
+      {admin && !seriesView && (
+        <ArtworkManager
+          id={id}
+          revision={value?.revision ?? 0}
+          onChanged={() => setReload((x) => x + 1)}
+        />
+      )}
       {error && <p role="alert">{error}</p>}
       {admin && (
         <details className="title-admin metadata-editor">

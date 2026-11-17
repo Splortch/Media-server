@@ -56,7 +56,7 @@ vi.mock('../src/services/api', () => ({
       path.startsWith('/progress')
     )
       return [];
-    if (path.startsWith('/media-page')) {
+    if (path.startsWith('/catalog')) {
       if (path.includes('cursor='))
         return new Promise((resolve) => {
           state.deferred = resolve;

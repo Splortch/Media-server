@@ -46,6 +46,7 @@ public class MediaItem
 
 public class PlaybackProgress
 {
+    public bool HiddenFromContinueWatching { get; set; }
     public int UserId { get; set; }
     public int MediaItemId { get; set; }
     public double Seconds { get; set; }

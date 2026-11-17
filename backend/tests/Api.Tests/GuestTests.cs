@@ -111,6 +111,32 @@ public sealed class GuestTests
             HttpStatusCode.NotFound,
             (await guest.GetAsync(prefix + $"/media/{privateId}/stream")).StatusCode
         );
+        var catalog = await guest.GetFromJsonAsync<JsonElement>(prefix + "/catalog");
+        Assert.Single(catalog.GetProperty("items").EnumerateArray());
+        Assert.Equal(publicId, catalog.GetProperty("items")[0].GetProperty("id").GetInt32());
+        foreach (var suffix in new[] { "images", "metadata", "episodes" })
+        {
+            Assert.Equal(
+                HttpStatusCode.OK,
+                (await guest.GetAsync(prefix + $"/media/{publicId}/{suffix}")).StatusCode
+            );
+        }
+        foreach (
+            var suffix in new[] { "images", "thumbnail", "metadata", "episodes", "artwork/poster" }
+        )
+        {
+            Assert.Equal(
+                HttpStatusCode.NotFound,
+                (await guest.GetAsync(prefix + $"/media/{privateId}/{suffix}")).StatusCode
+            );
+        }
+        foreach (var suffix in new[] { "artwork/candidates", "watch-state" })
+        {
+            Assert.Equal(
+                HttpStatusCode.Forbidden,
+                (await guest.GetAsync(prefix + $"/media/{publicId}/{suffix}")).StatusCode
+            );
+        }
         var request = new HttpRequestMessage(HttpMethod.Get, prefix + $"/media/{publicId}/stream");
         request.Headers.Range = new System.Net.Http.Headers.RangeHeaderValue(0, 9);
         Assert.Equal(HttpStatusCode.PartialContent, (await guest.SendAsync(request)).StatusCode);

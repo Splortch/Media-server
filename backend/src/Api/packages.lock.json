@@ -282,7 +282,7 @@
       "infrastructure": {
         "type": "Project",
         "dependencies": {
-          "Core": "[1.0.0, )",
+          "Core": "[0.2.0-alpha.1, )",
           "Konscious.Security.Cryptography.Argon2": "[1.3.1, )",
           "Microsoft.EntityFrameworkCore.Sqlite": "[10.0.14, )"
         }
@@ -290,15 +290,15 @@
       "media": {
         "type": "Project",
         "dependencies": {
-          "Core": "[1.0.0, )"
+          "Core": "[0.2.0-alpha.1, )"
         }
       },
       "services": {
         "type": "Project",
         "dependencies": {
-          "Core": "[1.0.0, )",
-          "Infrastructure": "[1.0.0, )",
-          "Media": "[1.0.0, )"
+          "Core": "[0.2.0-alpha.1, )",
+          "Infrastructure": "[0.2.0-alpha.1, )",
+          "Media": "[0.2.0-alpha.1, )"
         }
       }
     }

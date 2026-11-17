@@ -17,6 +17,7 @@ import Player from './components/Player';
 import ThemePicker from './components/ThemePicker';
 import Icon from './components/Icon';
 import IdentifiedTitle from './components/IdentifiedTitle';
+import CardArtwork from './components/CardArtwork';
 import {
   featureVisible,
   loadFeatures,
@@ -44,6 +45,7 @@ export default function App() {
   const [progress, setProgress] = useState<Progress[]>([]);
   const [item, setItem] = useState<Media>();
   const [playFrom, setPlayFrom] = useState<number>();
+  const nextPlayback = useRef<number | undefined>(undefined);
   const [bookmarkFrom, setBookmarkFrom] = useState<number>();
   const [playBusy, setPlayBusy] = useState(false);
   const [returnTo, setReturnTo] = useState({
@@ -172,6 +174,7 @@ export default function App() {
     setWatching([]);
     setCollections([]);
     setNextCursor(null);
+    nextPlayback.current = undefined;
     setQuery('');
     setCollection('');
     setLoading(true);
@@ -183,6 +186,8 @@ export default function App() {
   }, [query]);
   useEffect(() => {
     const change = () => {
+      if (location.hash !== `#media/${nextPlayback.current}`)
+        nextPlayback.current = undefined;
       requestEpoch.current++;
       setRoute(location.hash.slice(1) || 'home');
       setLoading(true);
@@ -200,7 +205,7 @@ export default function App() {
     };
   }, [endSession]);
   const pageUrl = (cursor?: string) =>
-    `/media-page?limit=60&prefix=${encodeURIComponent(debouncedQuery)}${collection ? '&collectionId=' + collection : ''}${cursor ? '&cursor=' + encodeURIComponent(cursor) : ''}`;
+    `/catalog?limit=60&prefix=${encodeURIComponent(debouncedQuery)}${collection ? '&collectionId=' + collection : ''}${cursor ? '&cursor=' + encodeURIComponent(cursor) : ''}`;
   useEffect(() => {
     if (phase !== 'ready') return;
     let active = true;
@@ -218,7 +223,8 @@ export default function App() {
         let visible: Media[] = [];
         let detail: Media | undefined;
         let next: string | null = null;
-        if (route.startsWith('media/')) detail = await api<Media>('/' + route);
+        if (route.startsWith('media/') || route.startsWith('series/'))
+          detail = await api<Media>('/media/' + route.split('/')[1]);
         else if (route === 'home' || route === 'library') {
           const page = await api<{ items: Media[]; nextCursor: string | null }>(
             pageUrl(),
@@ -244,8 +250,17 @@ export default function App() {
           setDetailTracks(undefined);
           setNextCursor(next);
           setProgress(p);
+          if (detail && nextPlayback.current === detail.id) {
+            nextPlayback.current = undefined;
+            setBookmarkFrom(undefined);
+            setPlayFrom(
+              p.find((x) => x.mediaItemId === detail.id && !x.completed)
+                ?.seconds ?? 0,
+            );
+          }
         }
       } catch (e) {
+        nextPlayback.current = undefined;
         if (active) setError((e as Error).message);
       } finally {
         if (active) setLoading(false);
@@ -387,7 +402,7 @@ export default function App() {
       {list.map((m, i) => (
         <a
           className={`media-card tone-${i % 4}`}
-          href={`#media/${m.id}`}
+          href={`#${m.series ? 'series' : 'media'}/${m.id}`}
           data-media-id={m.id}
           onClick={() => {
             setReturnTo({ route, mediaId: m.id, scroll: window.scrollY });
@@ -395,8 +410,9 @@ export default function App() {
           key={m.id}
         >
           <div className="cover">
+            <CardArtwork id={m.id} />
             <span className="format">
-              {m.videoCodec.toUpperCase() || 'VIDEO'}
+              {m.series ? 'TV SERIES' : m.videoCodec.toUpperCase() || 'VIDEO'}
             </span>
             <span className="monogram" aria-hidden="true">
               {m.title.slice(0, 1).toUpperCase()}
@@ -414,8 +430,9 @@ export default function App() {
           </div>
           <h3>{m.title}</h3>
           <p>
-            {duration(m.duration)} <span aria-hidden="true">·</span>{' '}
-            {m.container.split(',')[0].toUpperCase()}
+            {m.series
+              ? `${m.episodeCount} episodes`
+              : `${duration(m.duration)} · ${m.container.split(',')[0].toUpperCase()}`}
           </p>
         </a>
       ))}
@@ -720,7 +737,7 @@ export default function App() {
             ) : (
               <History />
             )
-          ) : route.startsWith('media/') ? (
+          ) : route.startsWith('media/') || route.startsWith('series/') ? (
             item && (
               <>
                 <a
@@ -736,6 +753,7 @@ export default function App() {
                 {playFrom === undefined ? (
                   <IdentifiedTitle
                     key={item.id}
+                    seriesView={route.startsWith('series/')}
                     onEpisode={(id) => {
                       location.hash = `#media/${id}`;
                     }}
@@ -787,6 +805,11 @@ export default function App() {
                     key={item.id}
                     item={item}
                     startPlaying
+                    autoplayPreference={`media-server.autoplay:${location.origin}:${user?.name ?? 'guest'}`}
+                    onNextEpisode={async (id) => {
+                      nextPlayback.current = id;
+                      location.hash = `media/${id}`;
+                    }}
                     onReturnToDetails={async () => {
                       const epoch = requestEpoch.current;
                       try {
@@ -919,7 +942,7 @@ export default function App() {
                   <p role="status" aria-label="Search results">
                     {query !== debouncedQuery || loading
                       ? 'Searching…'
-                      : `${items.length} matching videos${nextCursor ? ' loaded' : ''}`}
+                      : `${items.length} matching titles${nextCursor ? ' loaded' : ''}`}
                   </p>
                 )}
                 {!items.length && !loading ? (
@@ -927,7 +950,7 @@ export default function App() {
                     <span aria-hidden="true">▦</span>
                     <h2>
                       {query || collection
-                        ? 'No matching videos.'
+                        ? 'No matching titles.'
                         : user?.role === 'Admin'
                           ? 'A great collection starts somewhere.'
                           : 'No media available to this account.'}
