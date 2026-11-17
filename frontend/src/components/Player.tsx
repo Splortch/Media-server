@@ -1,5 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import Icon from './Icon';
+import { formatPlaybackTime } from '../services/playbackTime';
+import SeekPreview, { type PreviewResolver } from './SeekPreview';
+import NextEpisodePrompt from './NextEpisodePrompt';
 import Bookmarks, { type BookmarkRequest } from './Bookmarks';
 import PlaybackEntrance from './PlaybackEntrance';
 import PlaybackSettings, { type PlaybackTransport } from './PlaybackSettings';
@@ -17,8 +20,14 @@ export default function Player({
   bookmarkRequest,
   bookmarkStart,
   onReturnToDetails,
+  previewUrl,
+  onNextEpisode,
+  autoplayPreference,
 }: {
   item: Media;
+  previewUrl?: PreviewResolver;
+  onNextEpisode?: (id: number) => Promise<void>;
+  autoplayPreference?: string;
   onReturnToDetails?: () => Promise<void> | void;
   bookmarkRequest?: BookmarkRequest;
   bookmarkStart?: number;
@@ -66,6 +75,8 @@ export default function Player({
   useEffect(() => {
     if (startPlaying) surfaceRef.current?.focus();
   }, [startPlaying]);
+  const [ended, setEnded] = useState(false);
+  const [hover, setHover] = useState<number>();
   const [paused, setPaused] = useState(true);
   const [position, setPosition] = useState(0);
   const [duration, setDuration] = useState(0);
@@ -422,7 +433,10 @@ export default function Player({
               void save(e.currentTarget);
               measure(e.currentTarget);
             }}
-            onPlay={() => setPaused(false)}
+            onPlay={() => {
+              setPaused(false);
+              setEnded(false);
+            }}
             onVolumeChange={(e) => {
               setVolume(e.currentTarget.volume);
               setMuted(e.currentTarget.muted);
@@ -439,6 +453,7 @@ export default function Player({
               void save(e.currentTarget, true);
             }}
             onEnded={(e) => {
+              setEnded(true);
               setPaused(true);
               void save(e.currentTarget, true, true);
             }}
@@ -453,6 +468,7 @@ export default function Player({
             }}
             onCanPlay={() => setBuffering(false)}
             onSeeking={() => {
+              setEnded(false);
               sample.current = undefined;
             }}
             onSeeked={(e) => {
@@ -500,10 +516,38 @@ export default function Player({
             }
           }}
         >
-          <div className="player-timeline">
+          <div
+            className="player-timeline"
+            onPointerLeave={() => setHover(undefined)}
+          >
+            {hover !== undefined && (
+              <SeekPreview
+                id={item.id}
+                seconds={hover}
+                duration={duration}
+                imageUrl={previewUrl}
+              />
+            )}
             <span>{formatPlaybackTime(position)}</span>
             <input
               aria-label="Seek"
+              onPointerMove={(event) => {
+                const bounds = event.currentTarget.getBoundingClientRect();
+                if (bounds.width > 0 && duration > 0)
+                  setHover(
+                    Math.min(
+                      duration,
+                      Math.max(
+                        0,
+                        ((event.clientX - bounds.left) / bounds.width) *
+                          duration,
+                      ),
+                    ),
+                  );
+              }}
+              onFocus={() => setHover(position)}
+              onBlur={() => setHover(undefined)}
+              onKeyUp={(event) => setHover(Number(event.currentTarget.value))}
               type="range"
               min="0"
               max={duration || 1}
@@ -607,6 +651,22 @@ export default function Player({
             </button>
           </div>
         </div>
+        {onNextEpisode && (
+          <NextEpisodePrompt
+            id={item.id}
+            ended={ended}
+            request={bookmarkRequest}
+            preferenceKey={autoplayPreference}
+            onNext={async (id) => {
+              const video = videoRef.current;
+              if (video) {
+                video.pause();
+                await save(video, true, video.ended);
+              }
+              if (mounted.current && !blocked.current) await onNextEpisode(id);
+            }}
+          />
+        )}
       </div>
       {guest && (
         <p className="muted">
@@ -702,12 +762,7 @@ export function playbackErrorMessage(code?: number) {
   return 'This video could not be played. Check that the file is available and its container and codecs are supported by your browser. In the web player, try Prepare HLS playback under Quality, audio and subtitles. Native clients currently use Direct Play.';
 }
 
-export function formatPlaybackTime(seconds: number) {
-  const total = Number.isFinite(seconds) ? Math.max(0, Math.floor(seconds)) : 0;
-  const hours = Math.floor(total / 3600);
-  const minutes = Math.floor((total % 3600) / 60);
-  return `${hours ? `${hours}:${String(minutes).padStart(2, '0')}` : minutes}:${String(total % 60).padStart(2, '0')}`;
-}
+export { formatPlaybackTime } from '../services/playbackTime';
 
 export function bookmarkTimelineOrigin(video: HTMLVideoElement) {
   return video.seekable.length ? Math.max(0, video.seekable.start(0)) : 0;

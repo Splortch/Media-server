@@ -68,3 +68,31 @@ it('reports the real desktop engine while preserving the Windows defaults', asyn
     codecs: [],
   });
 });
+
+it('keeps older API-v1 libraries usable and preserves grouped page boundaries', async () => {
+  const item = {
+    id: 1,
+    title: 'Movie',
+    duration: 10,
+    size: 20,
+    videoCodec: 'h264',
+    audioCodec: 'aac',
+    container: 'mp4',
+    libraryId: 1,
+  };
+  const request = vi
+    .fn()
+    .mockRejectedValueOnce({ status: 404 })
+    .mockResolvedValueOnce([item]);
+  const client = new ClientApi({ request, streamUrl: vi.fn() } as Transport);
+  expect(await client.catalog()).toEqual({ items: [item], nextCursor: null });
+  expect(request).toHaveBeenLastCalledWith(
+    'GET',
+    '/api/v1/media?limit=200&offset=0&search=',
+  );
+  request.mockResolvedValueOnce({
+    items: [{ ...item, series: 'Our show', episodeCount: 2 }],
+    nextCursor: null,
+  });
+  expect((await client.catalog()).nextCursor).toBeNull();
+});

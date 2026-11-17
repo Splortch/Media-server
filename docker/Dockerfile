@@ -12,7 +12,7 @@ COPY Directory.Build.props global.json ./
 COPY backend/ backend/
 RUN dotnet publish backend/src/Api/Api.csproj -c Release -r linux-x64 --no-self-contained -o /app /p:UseAppHost=false /p:Version=$VERSION /p:RestoreLockedMode=true
 COPY --from=web /source/frontend/dist /app/wwwroot
-FROM mcr.microsoft.com/dotnet/aspnet:10.0.14-noble@sha256:1a48394b6f29d3a32c79d9edecd4abda0ecbe8776d567dbfc4590ed6979c740c AS runtime-base
+FROM mcr.microsoft.com/dotnet/aspnet:10.0.15-noble@sha256:bfd912c83295ce66d4b706ebb8541b9f14259b0e76fbb88b2751f58ce2399d2e AS runtime-base
 USER root
 RUN apt-get update && apt-get upgrade -y --no-install-recommends && apt-get install -y --no-install-recommends ffmpeg curl && rm -rf /var/lib/apt/lists/* && mkdir -p /data && chown app:app /data
 WORKDIR /app
