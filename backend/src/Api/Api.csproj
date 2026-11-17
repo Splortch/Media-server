@@ -4,7 +4,7 @@
     <ProjectReference Include="../Infrastructure/Infrastructure.csproj" />
     <ProjectReference Include="../Media/Media.csproj" />
     <ProjectReference Include="../Services/Services.csproj" />
-    <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.14" />
+    <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.15" />
     <PackageReference
       Include="Microsoft.EntityFrameworkCore.Design"
       Version="10.0.14"
