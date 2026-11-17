@@ -126,6 +126,29 @@ public sealed class MetadataService(ArtworkCache cache, IDownloadTransport trans
             row = new() { MediaItemId = item.Id, Revision = 0 };
             db.Metadata.Add(row);
         }
+        var options = await db.ArtworkOptions.Where(x => x.MediaItemId == item.Id).ToListAsync(ct);
+        foreach (
+            var key in new[] { row.PosterKey, row.BackdropKey, poster, backdrop }
+                .Where(x => x is not null)
+                .Distinct()
+        )
+        {
+            if (options.All(x => x.Key != key))
+            {
+                var option = new MediaArtworkOption { MediaItemId = item.Id, Key = key! };
+                db.ArtworkOptions.Add(option);
+                options.Add(option);
+            }
+        }
+        // Keep a small title-specific gallery; never prune the displayed poster/backdrop.
+        var excess = Math.Max(0, options.Count - 12);
+        foreach (
+            var option in options
+                .Where(x => x.Key != poster && x.Key != backdrop)
+                .OrderBy(x => x.CreatedAt)
+                .Take(excess)
+        )
+            db.ArtworkOptions.Remove(option);
         row.DocumentJson = JsonSerializer.Serialize(value);
         row.PosterKey = poster;
         row.BackdropKey = backdrop;

@@ -158,20 +158,24 @@ builder.Services.AddSingleton<ExternalDownloads>();
 builder.Services.AddSingleton<IDownloadCatalog, CommonsCatalog>();
 builder.Services.AddSingleton<CatalogApproval>();
 builder.Services.AddSingleton<ArtworkCache>();
+builder.Services.AddSingleton<PreviewImages>();
 builder.Services.AddSingleton<LocalMetadata>();
 builder.Services.AddSingleton<IMetadataProvider, TmdbProvider>();
 builder.Services.AddSingleton<MetadataService>();
 builder.Services.AddHostedService<DownloadWorker>();
 builder.Services.AddScoped<IUserContext, RequestUser>();
 builder.Services.AddDbContext<MediaDb>(o =>
-    o.UseSqlite(
-        new Microsoft.Data.Sqlite.SqliteConnectionStringBuilder
+{
+    var connection = new SqliteConnection(
+        new SqliteConnectionStringBuilder
         {
             DataSource = Path.Combine(data, "media.db"),
             ForeignKeys = true,
         }.ToString()
-    )
-);
+    );
+    connection.CreateFunction("media_fold", (string value) => value.ToLowerInvariant());
+    o.UseSqlite(connection, contextOwnsConnection: true);
+});
 builder.Services.AddSingleton(
     new PathPolicy(
         builder.Configuration.GetSection("MediaServer:AllowedRoots").Get<string[]>() ?? []
@@ -299,6 +303,19 @@ builder.Services.AddRateLimiter(o =>
             )
     );
     o.AddPolicy(
+        "previews",
+        context =>
+            RateLimitPartition.GetFixedWindowLimiter(
+                context.User.FindFirstValue(ClaimTypes.NameIdentifier) ?? "anonymous",
+                _ => new FixedWindowRateLimiterOptions
+                {
+                    PermitLimit = 200,
+                    Window = TimeSpan.FromMinutes(1),
+                    QueueLimit = 0,
+                }
+            )
+    );
+    o.AddPolicy(
         "playback",
         context =>
             RateLimitPartition.GetFixedWindowLimiter(
@@ -377,6 +394,13 @@ app.Use(
             "default-src 'self'; img-src 'self' data:; media-src 'self' blob:; style-src 'self'; script-src 'self'; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'";
         if (context.Request.Path.StartsWithSegments("/api"))
             context.Response.Headers.CacheControl = "no-store";
+        if (context.GetEndpoint()?.Metadata.GetMetadata<ArtworkUploadLimit>() is not null)
+        {
+            var feature =
+                context.Features.Get<Microsoft.AspNetCore.Http.Features.IHttpMaxRequestBodySizeFeature>();
+            if (feature is { IsReadOnly: false })
+                feature.MaxRequestBodySize = 6 * 1024 * 1024;
+        }
         try
         {
             await next();
@@ -444,6 +468,7 @@ remoteAccess.Map(app);
 app.MapMovieRequests();
 app.MapDownloadCatalog();
 app.MapMetadata();
+app.MapWatchActions();
 app.MapExternalDownloads();
 app.MapDownloads();
 app.MapDownloadApprovals();
@@ -864,7 +889,7 @@ void MapApi(RouteGroupBuilder root)
             var updated = DateTime.UtcNow;
             await using var transaction = await db.Database.BeginTransactionAsync();
             await db.Database.ExecuteSqlInterpolatedAsync(
-                $"INSERT INTO Progress (UserId, MediaItemId, Seconds, UpdatedAt, Revision, Completed) VALUES ({uid}, {id}, {input.Seconds}, {updated}, 1, {item.Duration > 0 && input.Seconds >= item.Duration * .95}) ON CONFLICT(UserId, MediaItemId) DO UPDATE SET Seconds=excluded.Seconds, UpdatedAt=excluded.UpdatedAt, Revision=Progress.Revision+1, Completed=excluded.Completed"
+                $"INSERT INTO Progress (UserId, MediaItemId, Seconds, UpdatedAt, Revision, Completed) VALUES ({uid}, {id}, {input.Seconds}, {updated}, 1, {item.Duration > 0 && input.Seconds >= item.Duration * .95}) ON CONFLICT(UserId, MediaItemId) DO UPDATE SET Seconds=excluded.Seconds, UpdatedAt=excluded.UpdatedAt, Revision=Progress.Revision+1, Completed=excluded.Completed, HiddenFromContinueWatching=0"
             );
             await HistoryWriter.RecordAsync(
                 db,

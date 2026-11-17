@@ -8,3 +8,10 @@ public sealed class MediaMetadata
     public string? BackdropKey { get; set; }
     public long Revision { get; set; } = 1;
 }
+
+public sealed class MediaArtworkOption
+{
+    public int MediaItemId { get; set; }
+    public string Key { get; set; } = "";
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+}
