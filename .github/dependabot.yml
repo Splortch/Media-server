@@ -4,45 +4,105 @@ updates:
     directory: /
     schedule:
       interval: weekly
-    open-pull-requests-limit: 5
+    open-pull-requests-limit: 3
+    cooldown:
+      default-days: 7
+    # A framework migration needs SDK/TFM/container changes in a separate PR.
+    ignore:
+      - dependency-name: "Microsoft.AspNetCore.*"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "Microsoft.EntityFrameworkCore*"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "Microsoft.Extensions.*"
+        update-types: ["version-update:semver-major"]
+    groups:
+      dotnet-platform:
+        patterns: ["Microsoft.AspNetCore.*", "Microsoft.EntityFrameworkCore*", "Microsoft.Extensions.*"]
+        update-types: [minor, patch]
+      test-tools:
+        patterns: ["Microsoft.NET.Test.Sdk", "xunit*", "coverlet.*"]
+        update-types: [minor, patch]
   - package-ecosystem: npm
-    directory: /frontend
+    directories: [/frontend, /clients/windows, /shared/api]
     schedule:
       interval: weekly
     open-pull-requests-limit: 5
+    cooldown:
+      default-days: 7
+    groups:
+      react:
+        patterns: ["react", "react-dom", "@types/react", "@types/react-dom"]
+      tailwind:
+        patterns: ["tailwindcss", "@tailwindcss/*"]
+      lint:
+        patterns: ["eslint", "@eslint/*", "typescript-eslint", "@typescript-eslint/*", "eslint-plugin-*"]
+        update-types: [minor, patch]
+      build-and-test:
+        patterns: ["vite", "@vitejs/*", "vitest", "@vitest/*", "jsdom"]
+        update-types: [minor, patch]
+      # Keep unrelated upgrades separate, but update shared packages in both clients.
+      shared-packages:
+        patterns: ["*"]
+        group-by: dependency-name
+        update-types: [minor, patch]
+    # Review type-definition major changes against the CI runtime explicitly.
+    ignore:
+      - dependency-name: "@types/node"
+        update-types: ["version-update:semver-major"]
   - package-ecosystem: github-actions
     directory: /
     schedule:
       interval: weekly
+    open-pull-requests-limit: 3
+    groups:
+      actions-maintenance:
+        patterns: ["*"]
+        update-types: [minor, patch]
   - package-ecosystem: docker
     directory: /docker
     schedule:
       interval: weekly
-  - package-ecosystem: npm
-    directory: /clients/windows
-    schedule:
-      interval: weekly
-  - package-ecosystem: npm
-    directory: /shared/api
-    schedule:
-      interval: weekly
+    open-pull-requests-limit: 3
+    # Keep the .NET 10 / Node 26 base images until their migrations are reviewed.
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major", "version-update:semver-minor"]
+    groups:
+      dotnet-images:
+        patterns: ["dotnet/sdk", "dotnet/aspnet"]
   - package-ecosystem: cargo
-    directory: /clients/windows/native
+    directories: [/clients/windows/native, /clients/windows/src-tauri]
     schedule:
       interval: weekly
-  - package-ecosystem: cargo
-    directory: /clients/windows/src-tauri
-    schedule:
-      interval: weekly
+    open-pull-requests-limit: 3
+    cooldown:
+      default-days: 7
+    groups:
+      tauri:
+        patterns: ["tauri", "tauri-*"]
+        update-types: [minor, patch]
+      shared-crates:
+        patterns: ["*"]
+        group-by: dependency-name
+        update-types: [minor, patch]
   - package-ecosystem: gradle
     directory: /clients/android
     schedule:
       interval: weekly
-    open-pull-requests-limit: 5
-    # Compiler/plugins and SDK-sensitive libraries move in one reviewable proposal.
-    # Gradle wrapper and SDK compatibility still require explicit review and green CI.
+    open-pull-requests-limit: 3
+    cooldown:
+      default-days: 7
+    # Major plugin/SDK migrations need coordinated wrapper, JDK and SDK changes.
+    ignore:
+      - dependency-name: "com.android.*"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "org.jetbrains.kotlin*"
+        update-types: ["version-update:semver-major"]
     groups:
       android-platform:
         patterns: ["com.android.*", "org.jetbrains.kotlin*", "androidx.compose:*", "androidx.core:core-ktx"]
+      media-three:
+        patterns: ["androidx.media3:*"]
       androidx:
         patterns: ["androidx.*"]
+        update-types: [minor, patch]

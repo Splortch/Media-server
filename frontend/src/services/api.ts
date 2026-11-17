@@ -1,5 +1,7 @@
 export type Media = {
   id: number;
+  series?: string | null;
+  episodeCount?: number;
   title: string;
   duration: number;
   container: string;

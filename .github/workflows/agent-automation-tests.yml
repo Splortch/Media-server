@@ -1,5 +1,6 @@
 name: Agent automation tests
 on:
+  workflow_dispatch:
   pull_request:
   push:
     branches: [main, feat/issue-to-pr-agent]
@@ -23,7 +24,7 @@ jobs:
       - name: Validate server network configuration
         shell: pwsh
         run: ./scripts/test-server-network.ps1
-      - run: node --test scripts/tests/issue-to-pr.test.cjs scripts/tests/release-plan.test.cjs scripts/tests/release-promotion.test.cjs
+      - run: node --test scripts/tests/issue-to-pr.test.cjs scripts/tests/release-plan.test.cjs scripts/tests/release-promotion.test.cjs scripts/tests/dependabot-locks.test.cjs
       - run: python -m unittest discover -s scripts/tests -p 'test_*.py'
   required:
     name: Agent dispatch policy
