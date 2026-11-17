@@ -76,5 +76,10 @@ export function bookmarkRequest<T>(
   return transport.request<T>(method, '/api/v1' + path, body);
 }
 
-export const artworkFileUrl = (id: number, kind: 'poster' | 'backdrop') =>
-  invoke<string>('artwork_url', { id, kind });
+export const artworkFileUrl = (
+  id: number,
+  kind: 'poster' | 'backdrop' | 'thumbnail',
+) => invoke<string>('artwork_url', { id, kind });
+
+export const previewFileUrl = (id: number, seconds: number) =>
+  invoke<string>('preview_url', { id, seconds });

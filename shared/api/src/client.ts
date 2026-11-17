@@ -2,6 +2,7 @@ import type { components } from "./generated";
 export type ProgressState = components["schemas"]["ProgressState"];
 export type ServerInfo = components["schemas"]["ServerInfo"];
 export type Media = components["schemas"]["MediaSummary"];
+export type CatalogMedia = Media & { series?: string | null; episodeCount?: number };
 export type Detail = components["schemas"]["MediaDetails"];
 export type SessionInfo = components["schemas"]["SessionInfo"];
 export type Tracks = components["schemas"]["TrackCatalog"];
@@ -64,6 +65,21 @@ export class ClientApi {
     if (!Array.isArray(page) || page.length > 200)
       throw new Error("Invalid library response.");
     page.forEach(media);
+    return page;
+  }
+  async catalog(search = "", offset = 0) {
+    let page: { items: CatalogMedia[]; nextCursor: string | null };
+    try {
+      page = await this.transport.request("GET", `/api/v1/catalog?limit=200&offset=${offset}&prefix=${encodeURIComponent(search.slice(0, 128))}`);
+    } catch (error) {
+      // Older API-v1 servers keep their original library usable during a rolling upgrade.
+      if (!error || typeof error !== "object" || !("status" in error) || error.status !== 404) throw error;
+      const items = await this.media(search, offset);
+      return { items, nextCursor: items.length === 200 ? "legacy-next-page" : null };
+    }
+    if (!page || !Array.isArray(page.items) || page.items.length > 200) throw new Error("Invalid catalog response.");
+    page.items.forEach(media);
+    if (page.nextCursor !== null && (typeof page.nextCursor !== "string" || page.nextCursor.length > 1024)) throw new Error("Invalid catalog cursor.");
     return page;
   }
   async detail(id: number) {

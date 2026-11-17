@@ -201,7 +201,11 @@ public static partial class Operations
                 return await (
                     from p in db.Progress
                     join item in db.Items on p.MediaItemId equals item.Id
-                    where p.UserId == uid && !p.Completed && p.Seconds > 0
+                    where
+                        p.UserId == uid
+                        && !p.Completed
+                        && !p.HiddenFromContinueWatching
+                        && p.Seconds > 0
                     orderby p.UpdatedAt descending
                     select new MediaSummary(
                         item.Id,
