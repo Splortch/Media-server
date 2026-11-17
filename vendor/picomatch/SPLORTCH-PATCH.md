@@ -8,7 +8,7 @@ GHSA-fc5q-39xc-vjpf (CVE-2026-112366) affects upstream versions through
 explicitly does not fix the single-branch `+(*a)` case; this copy does not
 claim that PR as a security fix.
 
-This is a Splortch mitigation, versioned `4.0.8-splortch.1`, **not an upstream
+This is a Splortch mitigation, versioned `4.0.8-splortch.2`, **not an upstream
 release**. It adds one guard to lib/parse.js: repeated extglobs containing an
 unescaped top-level unbounded wildcard use the parser's existing literal
 fallback. This prevents the nested unbounded quantifiers responsible for
@@ -42,3 +42,16 @@ a9c26ef3c436216a89b030f9dbd24a31dc069bf76f2275b81ef427470887f49b62849bf318eb1c0e
 
 SPLORTCH-PATCH.diff records the parser changes. Upstream development-only
 scripts and dev dependencies are omitted from the vendored manifest.
+
+## CodeQL unescaping fix
+
+The upstream removeBackslashes helper used a polynomial-time regex when many
+escaped opening brackets had no closing bracket. Version 4.0.8-splortch.2
+replaces it with a linear scan using precomputed closing-bracket and line-break
+indices, and removes the unused vulnerable regex constant. It preserves bracket
+contents, escaped closing brackets, trailing backslashes and JavaScript line
+terminators exactly. Bounded differential tests compare the old and new behavior
+on exhaustive short fixtures and deterministic generated strings. A child-process
+regression checks 100,000 escaped opening brackets through the helper and public
+scan API with a hard timeout. This fixes the finding instead of excluding vendor
+code from CodeQL or dismissing the alert.

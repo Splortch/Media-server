@@ -3,7 +3,6 @@
 
 const {
   REGEX_BACKSLASH,
-  REGEX_REMOVE_BACKSLASH,
   REGEX_SPECIAL_CHARS,
   REGEX_SPECIAL_CHARS_GLOBAL
 } = require('./constants');
@@ -27,10 +26,37 @@ exports.isWindows = () => {
   return false;
 };
 
+// Preserve the original bracket/escape semantics without rescanning the
+// remaining suffix for every unmatched '[' (CodeQL polynomial ReDoS finding).
 exports.removeBackslashes = str => {
-  return str.replace(REGEX_REMOVE_BACKSLASH, match => {
-    return match === '\\' ? '' : match;
-  });
+  const length = str.length;
+  const nextClose = new Uint32Array(length + 1);
+  const nextBreak = new Uint32Array(length + 1);
+  nextClose[length] = nextBreak[length] = length;
+  const isLineBreak = ch => ch === '\n' || ch === '\r' || ch === '\u2028' || ch === '\u2029';
+
+  for (let i = length - 1; i >= 0; i--) {
+    nextClose[i] = str[i] === ']' && str[i - 1] !== '\\' ? i : nextClose[i + 1];
+    nextBreak[i] = isLineBreak(str[i]) ? i : nextBreak[i + 1];
+  }
+
+  const output = [];
+  for (let i = 0; i < length; i++) {
+    if (str[i] === '[' && i + 2 < length) {
+      const close = nextClose[i + 2];
+      // The old .*? cannot cross a line terminator, but its final [^\\]
+      // can consume one immediately before the closing bracket.
+      if (close < length && nextBreak[i + 1] >= close - 1) {
+        output.push(str.slice(i, close + 1));
+        i = close;
+        continue;
+      }
+    }
+    if (str[i] !== '\\' || i + 1 === length || isLineBreak(str[i + 1])) {
+      output.push(str[i]);
+    }
+  }
+  return output.join('');
 };
 
 exports.escapeLast = (input, char, lastIdx) => {
