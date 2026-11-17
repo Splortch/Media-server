@@ -41,10 +41,50 @@ test('both npm lockfiles resolve every picomatch consumer to the reviewed local 
     assert.equal(name, 'node_modules/picomatch');
     assert.equal(entry.link, true);
     assert.equal(path.resolve(root, dir, entry.resolved), vendor);
-    assert.equal(lock.packages[entry.resolved].version, '4.0.8-splortch.1');
+    assert.equal(lock.packages[entry.resolved].version, '4.0.8-splortch.2');
     if (fs.existsSync(path.join(root, dir, 'node_modules/picomatch'))) {
       const requireClient = createRequire(path.join(root, dir, 'package.json'));
       assert.equal(fs.realpathSync(requireClient.resolve('picomatch')), path.join(vendor, 'index.js'));
     }
   }
+});
+
+test('unescaping preserves upstream behavior on bounded bracket and escape combinations', () => {
+  const {removeBackslashes} = require(path.join(vendor, 'lib/utils'));
+  const legacy = input => {
+    assert.ok(input.length <= 32, 'reference regex is restricted to short fixtures');
+    return input.replace(/(?:\[.*?[^\\]\]|\\(?=.))/g, match => match === '\\' ? '' : match);
+  };
+  let inputs = [''];
+  const alphabet = ['[', ']', '\\', 'a', '\n'];
+  for (let size = 0; size <= 6; size++) {
+    for (const input of inputs) {
+      assert.equal(removeBackslashes(input), legacy(input), JSON.stringify(input));
+    }
+    if (size < 6) inputs = inputs.flatMap(prefix => alphabet.map(char => prefix + char));
+  }
+  const extended = [...alphabet, '\r', '\u2028', '\u2029', '.', '*'];
+  let seed = 8675309;
+  const random = () => (seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0);
+  for (let sample = 0; sample < 10000; sample++) {
+    const length = random() % 33;
+    let input = '';
+    for (let i = 0; i < length; i++) input += extended[random() % extended.length];
+    assert.equal(removeBackslashes(input), legacy(input), JSON.stringify(input));
+  }
+});
+
+test('long unmatched escaped brackets finish through both unescaping and public scan', () => {
+  const code = `
+    const assert = require('node:assert/strict');
+    const pm = require(${JSON.stringify(vendor)});
+    const {removeBackslashes} = require(${JSON.stringify(path.join(vendor, 'lib/utils'))});
+    const input = String.fromCharCode(92, 91).repeat(100000);
+    const expected = '['.repeat(100000);
+    assert.equal(removeBackslashes(input), expected);
+    assert.equal(pm.scan(input, {unescape:true}).base, expected);
+  `;
+  const result = spawnSync(process.execPath, ['-e', code], {timeout: 5000, encoding: 'utf8'});
+  assert.equal(result.error, undefined, 'unmatched bracket input exceeded time budget');
+  assert.equal(result.status, 0, result.stderr);
 });
