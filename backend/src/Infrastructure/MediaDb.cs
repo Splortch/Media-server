@@ -15,7 +15,11 @@ public class MediaDb(DbContextOptions<MediaDb> options, IUserContext? context = 
     public static int? MetadataNumber(string document, string path) =>
         throw new NotSupportedException();
 
+    [DbFunction("media_fold", IsBuiltIn = true)]
+    public static string Fold(string value) => throw new NotSupportedException();
+
     private int? CurrentUserId => context?.UserId;
+    public DbSet<MediaArtworkOption> ArtworkOptions => Set<MediaArtworkOption>();
     public DbSet<MediaMetadata> Metadata => Set<MediaMetadata>();
     public DbSet<DownloadJob> Downloads => Set<DownloadJob>();
     public DbSet<DownloadPolicy> DownloadPolicies => Set<DownloadPolicy>();
@@ -40,6 +44,12 @@ public class MediaDb(DbContextOptions<MediaDb> options, IUserContext? context = 
 
     protected override void OnModelCreating(ModelBuilder b)
     {
+        b.Entity<MediaArtworkOption>().HasKey(x => new { x.MediaItemId, x.Key });
+        b.Entity<MediaArtworkOption>()
+            .HasOne<MediaItem>()
+            .WithMany()
+            .HasForeignKey(x => x.MediaItemId)
+            .OnDelete(DeleteBehavior.Cascade);
         b.Entity<MediaMetadata>().HasKey(x => x.MediaItemId);
         b.Entity<MediaMetadata>().Property(x => x.Revision).IsConcurrencyToken();
         b.Entity<MediaMetadata>()

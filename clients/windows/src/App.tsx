@@ -9,6 +9,7 @@ import {
   api,
   playbackRequest,
   artworkFileUrl,
+  previewFileUrl,
   bookmarkRequest,
   playbackFileUrl,
   connect,
@@ -24,6 +25,7 @@ import {
 import {
   ProgressWriter,
   type Media,
+  type CatalogMedia,
   type Detail,
   type ProgressState,
   type Tracks,
@@ -45,9 +47,11 @@ import {
 import Player from '../../../frontend/src/components/Player';
 import Icon from '../../../frontend/src/components/Icon';
 import IdentifiedTitle from '../../../frontend/src/components/IdentifiedTitle';
+import CardArtwork from '../../../frontend/src/components/CardArtwork';
 import { duration } from '../../../frontend/src/services/api';
 type Selection = {
   item: Detail;
+  seriesView?: boolean;
   progress: ProgressState;
   url?: string;
   startAt?: number;
@@ -59,7 +63,7 @@ function MediaCards({
   list,
   onOpen,
 }: {
-  list: (Media | Detail)[];
+  list: (CatalogMedia | Detail)[];
   onOpen: (item: Media | Detail) => Promise<void>;
 }) {
   return (
@@ -72,6 +76,11 @@ function MediaCards({
           onClick={() => void onOpen(m)}
         >
           <div className="cover">
+            <CardArtwork
+              id={m.id}
+              request={bookmarkRequest}
+              imageUrl={artworkFileUrl}
+            />
             <span className="monogram" aria-hidden="true">
               {m.title[0]}
             </span>
@@ -81,7 +90,10 @@ function MediaCards({
           </div>
           <h3>{m.title}</h3>
           <p>
-            {duration(m.duration)} · {m.videoCodec.toUpperCase()}
+            {'series' in m && m.series
+              ? `${m.episodeCount} episodes`
+              : duration(m.duration)}{' '}
+            · {m.videoCodec.toUpperCase()}
           </p>
         </button>
       ))}
@@ -116,7 +128,7 @@ export default function App() {
   const [connected, setConnected] = useState(false);
   const [version, setVersion] = useState('');
   const [user, setUser] = useState<{ name: string; role: string }>();
-  const [items, setItems] = useState<Media[]>([]);
+  const [items, setItems] = useState<CatalogMedia[]>([]);
   const [watching, setWatching] = useState<ProgressState[]>([]);
   const [continueItems, setContinueItems] = useState<Detail[]>([]);
   const [selection, setSelection] = useState<Selection>();
@@ -131,6 +143,7 @@ export default function App() {
   const [sessions, setSessions] = useState<SessionInfo[]>([]);
   const [view, setView] = useState<'library' | 'settings'>('library');
   const [search, setSearch] = useState('');
+  const [hasNext, setHasNext] = useState(false);
   const [offset, setOffset] = useState(0);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
@@ -197,8 +210,8 @@ export default function App() {
     setBusy(true);
     setError('');
     try {
-      const [list, progress] = await Promise.all([
-        api.media(query, start),
+      const [page, progress] = await Promise.all([
+        api.catalog(query, start),
         api.continuing(),
       ]);
       const recent = await Promise.all(
@@ -206,7 +219,8 @@ export default function App() {
       );
       if (requestVersion !== loadVersion.current) return;
       setContinueItems(recent);
-      setItems(list);
+      setItems(page.items);
+      setHasNext(page.nextCursor !== null);
       setWatching(progress);
       setOnline(true);
     } catch (e) {
@@ -340,7 +354,10 @@ export default function App() {
       setBusy(false);
     }
   }
-  async function open(item: Pick<Media, 'id'>, fromSeries = false) {
+  async function open(
+    item: Pick<Media, 'id'> & { series?: string | null },
+    fromSeries = false,
+  ) {
     const requestVersion = ++loadVersion.current;
     if (!fromSeries)
       listContext.current = { id: item.id, scroll: window.scrollY };
@@ -359,6 +376,7 @@ export default function App() {
       if (requestVersion !== loadVersion.current) return;
       setSelection({
         item: detail,
+        seriesView: !!item.series && !fromSeries,
         progress,
         tracks,
         writer: new ProgressWriter(api, item.id, progress.revision),
@@ -712,6 +730,7 @@ export default function App() {
                 <IdentifiedTitle
                   key={selection.item.id}
                   admin={false}
+                  seriesView={selection.seriesView}
                   request={bookmarkRequest}
                   artworkUrl={titleArtwork}
                   onEpisode={(id) => void open({ id }, true)}
@@ -734,6 +753,41 @@ export default function App() {
               {selection.url && (
                 <Player
                   startPlaying
+                  previewUrl={previewFileUrl}
+                  autoplayPreference={`media-server.autoplay:${address}:${user?.name}`}
+                  onNextEpisode={async (id) => {
+                    const version = ++loadVersion.current;
+                    setBusy(true);
+                    setError('');
+                    try {
+                      const [item, progress, tracks, url] = await Promise.all([
+                        api.detail(id),
+                        api.progress(id),
+                        api.tracks(id).catch(() => ({
+                          tracks: [],
+                          canSelectAudio: false,
+                          canSelectSubtitles: false,
+                        })),
+                        api.transport.streamUrl(id),
+                      ]);
+                      if (version !== loadVersion.current) return;
+                      setSelection({
+                        item,
+                        progress,
+                        tracks,
+                        url,
+                        startAt: progress.completed ? 0 : progress.seconds,
+                        writer: new ProgressWriter(api, id, progress.revision),
+                      });
+                    } catch (e) {
+                      if (version === loadVersion.current) {
+                        failure(e);
+                        throw e;
+                      }
+                    } finally {
+                      if (version === loadVersion.current) setBusy(false);
+                    }
+                  }}
                   onReturnToDetails={async () => {
                     const version = loadVersion.current;
                     try {
@@ -832,7 +886,7 @@ export default function App() {
                   <input
                     type="search"
                     value={search}
-                    maxLength={200}
+                    maxLength={128}
                     onChange={(e) => {
                       const query = e.target.value;
                       setSearch(query);
@@ -843,7 +897,7 @@ export default function App() {
                         250,
                       );
                     }}
-                    placeholder="Search filenames…"
+                    placeholder="Search titles or series…"
                   />
                 </label>
               </div>
@@ -883,7 +937,7 @@ export default function App() {
                   Previous
                 </button>
                 <button
-                  disabled={items.length < 200 || busy}
+                  disabled={!hasNext || busy}
                   className="secondary"
                   onClick={() => {
                     const next = offset + 200;
