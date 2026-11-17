@@ -51,3 +51,16 @@ git diff -- backend
 Review and commit the changed lockfiles, then run the regular component checks.
 If automatic publishing succeeds but workflow dispatch fails, manually run the
 listed workflows against that Dependabot branch from the Actions page.
+
+## Build-tool matcher mitigation
+
+Frontend and Windows npm dependencies use the local Picomatch mitigation in
+[vendor/picomatch](../vendor/picomatch/SPLORTCH-PATCH.md) until a fixed upstream
+release is available. Registry audits remain enabled; local packages also need
+explicit security regression tests. Run
+`node --test scripts/tests/picomatch-security.test.cjs` and both client build,
+test, lint and formatting checks after changing this dependency.
+
+Lock preparation runs only for updates performed by Dependabot itself. Manual
+fix commits must include reviewed lockfiles and receive the ordinary CI checks;
+they do not trigger a second automatic lockfile write.
