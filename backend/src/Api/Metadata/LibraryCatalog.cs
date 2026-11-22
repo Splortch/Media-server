@@ -2,6 +2,7 @@ using System.Security.Claims;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using MediaServer.Core;
 using MediaServer.Infrastructure;
 using Microsoft.EntityFrameworkCore;
 
@@ -26,6 +27,39 @@ public record CatalogCursor(int Offset, string Filter);
 
 public static class LibraryCatalog
 {
+    internal sealed class IdentifiedItem
+    {
+        public required MediaItem Media { get; init; }
+        public string? Series { get; init; }
+        public int? Season { get; init; }
+        public int? Episode { get; init; }
+    }
+
+    internal static IQueryable<IdentifiedItem> Identify(MediaDb db) =>
+        from item in db.Items.AsNoTracking()
+        join metadata in db.Metadata.AsNoTracking()
+            on item.Id equals metadata.MediaItemId
+            into details
+        from metadata in details.DefaultIfEmpty()
+        let name = MediaDb.MetadataText(metadata!.DocumentJson, "$.Series")
+        let season = MediaDb.MetadataNumber(metadata!.DocumentJson, "$.Season")
+        let episode = MediaDb.MetadataNumber(metadata!.DocumentJson, "$.Episode")
+        select new IdentifiedItem
+        {
+            Media = item,
+            Series =
+                name != null
+                && name != ""
+                && season >= 0
+                && season <= 99
+                && episode >= 1
+                && episode <= 999
+                    ? name
+                    : null,
+            Season = season,
+            Episode = episode,
+        };
+
     public static void MapLibraryCatalog(this RouteGroupBuilder group)
     {
         group
@@ -101,28 +135,9 @@ public static class LibraryCatalog
                         }
                     }
                     var source =
-                        from item in db.Items.AsNoTracking()
-                        join metadata in db.Metadata.AsNoTracking()
-                            on item.Id equals metadata.MediaItemId
-                            into details
-                        from metadata in details.DefaultIfEmpty()
-                        let name = metadata == null
-                            ? null
-                            : MediaDb.MetadataText(metadata.DocumentJson, "$.Series")
-                        let season = metadata == null
-                            ? null
-                            : MediaDb.MetadataNumber(metadata.DocumentJson, "$.Season")
-                        let episode = metadata == null
-                            ? null
-                            : MediaDb.MetadataNumber(metadata.DocumentJson, "$.Episode")
-                        let series = name != null
-                        && name != ""
-                        && season >= 0
-                        && season <= 99
-                        && episode >= 1
-                        && episode <= 999
-                            ? name
-                            : null
+                        from entry in Identify(db)
+                        let item = entry.Media
+                        let series = entry.Series
                         where
                             (!libraryId.HasValue || item.LibraryId == libraryId.Value)
                             && (

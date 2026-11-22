@@ -21,6 +21,7 @@ The [client ecosystem](docs/clients/README.md) adds a shared Tauri desktop clien
 | Direct Play | Implemented | Authenticated byte ranges through validated handles on Windows/Linux/macOS; controls, resume and playback diagnostics |
 | Optional features | Implemented alpha | Web Settings → Customize; per-account visibility and admin smart-collection policy; saved data retained |
 | Continue Watching | Implemented | Per-user persisted position; completed titles excluded |
+| Time-budget picker | Implemented (web/desktop) | Find unwatched movies and the next available episodes that fit your time, using your own resume position |
 | SQLite schema migrations | Implemented | Versioned EF Core migration, applied at startup |
 | REST/OpenAPI and scan status | Implemented | Protected OpenAPI; scan polling and SignalR event transport |
 | Automated quality checks | Implemented configuration | Backend, frontend, browser integration, audits and Docker build |

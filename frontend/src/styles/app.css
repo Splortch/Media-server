@@ -810,6 +810,16 @@ h2:focus {
 .panel > form:not(.settings-form) button {
   justify-self: start;
 }
+.time-budget-fields,
+.time-budget-results li {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  align-items: center;
+}
+.time-budget-results button {
+  text-align: left;
+}
 .settings-form {
   display: grid;
   gap: 18px;
