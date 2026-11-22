@@ -33,44 +33,47 @@ If you forget the administrator password:
 5. Restart normally and sign in. All administrator sessions have been revoked; libraries, progress
    and media remain intact. No HTTP password-recovery endpoint is provided.
 
-## Streaming handles
+## Streaming and scan handles
 
 PathPolicy still rejects traversal, outside-root paths, symbolic links and junctions. Streaming now
 uses a validated open handle instead of reopening a checked pathname. Linux walks every component
 with openat/O_NOFOLLOW and validates the inode is a regular file with statx; nonblocking open avoids
-hanging on FIFOs. Windows opens with FILE_FLAG_OPEN_REPARSE_POINT, refuses non-disk/reparse/directory
-handles, compares the final handle path and denies write/delete sharing while the stream is open.
-Unsupported operating systems fail closed. Linux requires a modern kernel/glibc with statx.
+hanging on FIFOs. macOS walks components with its own openat/O_NOFOLLOW flags and checks the
+opened file with fstat. Windows opens with FILE_FLAG_OPEN_REPARSE_POINT, refuses
+non-disk/reparse/directory handles, compares the final handle path and denies write/delete
+sharing while the stream is open. Linux requires a modern kernel/glibc with statx.
 
-Linux library scans now keep one validated no-follow handle open for fingerprinting, probing,
-size and modification time. FFprobe opens `/proc/<server-pid>/fd/<descriptor>` for both metadata
-and HDR frame inspection. Replacing a filename or ancestor with another file/symlink cannot
-redirect those reads. The input remains seekable without copying whole movies into temporary
-storage. The descriptor is retained until every probe subprocess has exited, including on
-cancellation. A changed size/modification time rejects the scan result rather than persisting
-an inconsistent fingerprint. Alternative Linux scan probes must explicitly implement pinned
-input; there is no silent pathname fallback.
+Library scans retain one validated handle for fingerprinting, size, modification time and probe
+input. Replacing an already opened source's pathname cannot redirect those reads. On Linux,
+FFprobe opens `/proc/<server-pid>/fd/<descriptor>` for metadata and HDR frame inspection. Both
+passes use a seekable input, and the descriptor stays open until every probe subprocess exits.
+This requires procfs access from the same-user FFprobe child. If container or procfs policy
+denies access, the scan fails.
 
-This requires procfs access to the server's descriptor from its same-user FFprobe child. If
-container/LSM/procfs permissions deny access, the probe fails; do not relax isolation or add
-ptrace privileges to make it pass. Windows and macOS scans still use pathname-based FFprobe
-input while holding the validated source open; eliminating their remaining pathname boundary
-requires a separate platform-specific implementation and tests.
+Windows and macOS copy from the validated handle to a seekable file in the private server data
+directory. Scans stage one file at a time. They need room for the largest source plus 64 MiB
+of free space on that volume, and each scan reads the full source to make the copy. The server
+deletes the copy after FFprobe exits, including after cancellation, and reclaims an interrupted
+copy at startup. Keep the data directory private, including its inherited ACLs on Windows.
+Alternative scan probes must explicitly support open-file input. The scanner rejects a result
+if the source handle's size or modification time changes during the operation.
 
-These checks do not sandbox FFprobe, freeze file contents against in-place writes, or make
-hostile shared filesystems safe. Size/timestamp checks are best-effort mutation detection, not
-an immutable snapshot. Media roots and their ancestors must remain controlled by the operator;
-uploads/untrusted writable roots remain unsupported. Kernel process isolation, the remaining
-platform scan boundaries and both-maintainer review stay open under #1; no internet-facing
-readiness or independent security audit is claimed.
+The operator must control the media roots, their ancestors and the data directory. Size and
+timestamp checks detect some in-place changes. Codec sandboxing and physical Windows filesystem
+validation remain open under #1, including SMB/UNC and case-sensitive directories.
 
 ## Request policy review
 
-- Host filtering defaults to localhost, 127.0.0.1 and ::1; configure exact hosts explicitly.
-- Kestrel limits request bodies to 64 KiB; no upload API exists.
-- Cookie and antiforgery defaults remain HttpOnly/Strict, with HTTPS secure-cookie guidance unchanged.
-- Login, setup and password changes share the existing per-IP 10/minute limiter. Forwarded headers
-  are not trusted implicitly. Use a private network/VPN; do not put this alpha on an open listener.
+- Host filtering defaults to localhost, 127.0.0.1 and ::1. The HTTPS remote-access profile
+  requires an explicit external hostname in the allowlist.
+- Kestrel defaults to a 64 KiB request body limit. The administrator artwork upload has
+  its own 6 MiB limit.
+- Session cookies are HttpOnly and SameSite Strict. API writes validate the antiforgery cookie
+  and `X-CSRF-TOKEN` header. HTTPS remote access requires Secure cookies.
+- Login, setup and password changes share the 10-per-minute per-IP limiter across both API
+  prefixes. The proxy configuration accepts forwarded client IP and scheme from one explicitly
+  trusted hop. Limits are per process. Test the actual proxy configuration and use a private
+  network or VPN.
 - Probe arguments are passed separately, network protocols are disabled, output is bounded and the
   process tree is killed on timeout. This is a process lifetime limit, not an OS sandbox.
 - Source FFprobe invocations (library scan, download import, staged-source validation and HDR frame
@@ -81,6 +84,6 @@ readiness or independent security audit is claimed.
   A separate generated-HLS probe permits only HLS/MPEG-TS for server-authored manifests in the
   private conversion cache. Source files never use that policy; real HLS session tests cover it.
 
-The two maintainers should review these policies and Windows filesystem behavior before enabling
-remote deployment. Physical Windows, SMB/UNC, case-sensitive Windows directory and screen-reader
-coverage are not implied by a passing Linux test run.
+Both maintainers should record sign-off in #1 after confirming the request policies on the
+intended proxy, testing the Windows filesystem cases above, and agreeing on OS-level isolation
+for FFprobe and FFmpeg before handling media from untrusted writers.
