@@ -7,6 +7,7 @@ The first registry contains shipped functionality only:
 
 | Key | Default | Personal preference | Server policy |
 | --- | --- | --- | --- |
+| `library-provenance` | Enabled, shown | Hide/show explanations and report creation | Admin may disable explanations, reports and review; saved reports retained |
 | `smart-collections` | Enabled, shown | Hide/show the library filter and collection settings | Admin may disable new collection creation and collection-filter queries |
 | `watch-history` | Shown | Hide/show the navigation entry | No server-wide switch; hiding is not private playback and does not delete or disable watch history |
 

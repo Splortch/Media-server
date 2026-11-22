@@ -24,7 +24,7 @@ Signed-in non-guest users can mark a title watched/unwatched or remove it from C
 
 Hover over the seek bar or focus/use it with the keyboard to display a debounced image preview and timestamp. Frames are sampled in buckets (at least ten seconds, approximately 120 buckets per title) so previews are approximate and repeated movement reuses generated output. Image errors never stop playback.
 
-Automatic next-episode playback is **off by default**. The player offers an opt-in checkbox when another accessible episode exists. The preference is saved locally by account and server. On completion, opted-in playback shows a ten-second countdown with Cancel and Play next controls, including in fullscreen. Without opt-in, only the explicit Play next action is offered. Leaving playback cancels the countdown, and progress writes finish before advancing. Next follows actual accessible season/episode numbers; it is not a recommendation algorithm or automatic season completion. The broader spoiler preferences and season-wide catch-up work in #45 remain separate.
+Automatic next-episode playback is **off by default**. The player offers an opt-in checkbox when another accessible episode exists. The preference is saved locally by account and server. On completion, opted-in playback shows a ten-second countdown with Cancel and Play next controls, including in fullscreen. Without opt-in, only the explicit Play next action is offered. Leaving playback cancels the countdown, and progress writes finish before advancing. Next follows actual accessible season/episode numbers; it is not a recommendation algorithm or automatic season completion. Spoiler preferences and season catch-up are documented in [EPISODE-TRACKING.md](EPISODE-TRACKING.md).
 
 ## Generated-image limits
 

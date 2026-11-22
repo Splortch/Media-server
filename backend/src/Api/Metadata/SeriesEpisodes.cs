@@ -21,7 +21,9 @@ public record SeriesNavigation(
     int? Season,
     SeriesEpisode[] Episodes,
     int? NextOffset,
-    SeriesEpisode? NextEpisode
+    SeriesEpisode? NextEpisode,
+    SeriesEpisode? NextUnwatched = null,
+    SeasonWatchView? SeasonProgress = null
 );
 
 public static class SeriesEpisodes
@@ -129,6 +131,34 @@ public static class SeriesEpisodes
                             x.Completed
                         ))
                         .FirstOrDefaultAsync(ct);
+                    // Specials are deliberately separate: their numeric zero does not
+                    // make them a prerequisite to a regular season.
+                    var nextUnwatched = await episodes
+                        .Where(x => !x.Completed && (selected == 0 ? x.Season == 0 : x.Season > 0))
+                        .OrderBy(x => x.Season)
+                        .ThenBy(x => x.Episode)
+                        .ThenBy(x => x.Id)
+                        .Select(x => new SeriesEpisode(
+                            x.Id,
+                            x.Title,
+                            x.Season,
+                            x.Episode,
+                            x.Duration,
+                            x.Seconds,
+                            x.Completed
+                        ))
+                        .FirstOrDefaultAsync(ct);
+                    var seasonPositions = (
+                        await SeasonWatchActions.Read(db, id, selected, uid, ct)
+                    )!;
+                    var summary = SeasonWatchActions.View(selected, seasonPositions) with
+                    {
+                        Total = await episodes.CountAsync(x => x.Season == selected, ct),
+                        Watched = await episodes.CountAsync(
+                            x => x.Season == selected && x.Completed,
+                            ct
+                        ),
+                    };
                     return Results.Ok(
                         new SeriesNavigation(
                             value.Series,
@@ -146,7 +176,9 @@ public static class SeriesEpisodes
                                 ))
                                 .ToArray(),
                             page.Length > 200 ? (offset ?? 0) + 200 : null,
-                            next
+                            next,
+                            nextUnwatched,
+                            summary
                         )
                     );
                 }

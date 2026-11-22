@@ -1793,3 +1793,8 @@ textarea {
   opacity: 0;
   pointer-events: none;
 }
+
+.library-provenance dd,
+.match-report-investigation dd {
+  overflow-wrap: anywhere;
+}

@@ -5,6 +5,7 @@ using MediaServer.Core;
 using MediaServer.Infrastructure;
 using MediaServer.Media;
 using MediaServer.Services;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Xunit;
@@ -237,6 +238,66 @@ public sealed class PlaybackLifecycleTests
         {
             Directory.Delete(root, true);
         }
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task InvalidLoginFreesOnlyItsUnsharedConversionSlot(bool expire)
+    {
+        var probe = new GatedProbe();
+        using var server = CreateServer(probe);
+        using var admin = await server.Admin();
+        await Seed(server);
+        var abandoned = await Start(admin, 1);
+        var shared = await Start(admin, 2);
+        await probe.For(1).Started.Task.WaitAsync(TimeSpan.FromSeconds(10));
+        await probe.For(2).Started.Task.WaitAsync(TimeSpan.FromSeconds(10));
+        using var other = server.CreateClient();
+        await Server.Csrf(other);
+        using var login = await other.PostAsJsonAsync(
+            "/api/v1/auth/login",
+            new
+            {
+                name = "admin",
+                password = "twelve-character-password",
+                deviceName = "Second device",
+            }
+        );
+        Assert.Equal(HttpStatusCode.OK, login.StatusCode);
+        await Server.Csrf(other);
+        Assert.Equal(shared.Id, (await Start(other, 2)).Id);
+        using var full = await other.PostAsJsonAsync(
+            "/api/v1/media/3/playback-sessions",
+            new PlaybackSelection()
+        );
+        Assert.Equal(HttpStatusCode.Conflict, full.StatusCode);
+
+        if (expire)
+        {
+            using var scope = server.Services.CreateScope();
+            var db = scope.ServiceProvider.GetRequiredService<MediaDb>();
+            var expired = await db
+                .Sessions.Where(session => session.DeviceName != "Second device")
+                .ExecuteUpdateAsync(update =>
+                    update.SetProperty(session => session.ExpiresAt, DateTime.UtcNow.AddSeconds(-1))
+                );
+            Assert.Equal(1, expired);
+        }
+        else
+        {
+            using var logout = await admin.PostAsync("/api/v1/auth/logout", null);
+            Assert.Equal(HttpStatusCode.NoContent, logout.StatusCode);
+        }
+        var next = await Start(other, 3);
+        await probe.For(1).Cancelled.Task.WaitAsync(TimeSpan.FromSeconds(10));
+        Assert.False(
+            Directory.Exists(Path.Combine(server.DataPath, "playback-cache", abandoned.Id))
+        );
+        Assert.False(probe.For(2).Cancelled.Task.IsCompleted);
+        using var sharedStatus = await other.GetAsync("/api/v1/playback-sessions/" + shared.Id);
+        Assert.Equal(HttpStatusCode.OK, sharedStatus.StatusCode);
+        Assert.NotEqual(abandoned.Id, next.Id);
     }
 
     [Fact]

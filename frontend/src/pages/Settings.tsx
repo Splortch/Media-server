@@ -12,6 +12,7 @@ import {
 import Icon, { type IconName } from '../components/Icon';
 import Monitoring from '../features/admin/Monitoring';
 import LibraryTools from '../features/admin/LibraryTools';
+import MatchReports from '../features/admin/MatchReports';
 import { Collections, Sessions } from '../features/Personal';
 import { api, type Library } from '../services/api';
 type ScanIssue = { fileName: string; code: string; correlationId: string };
@@ -493,6 +494,9 @@ export default function Settings({
                 ))}
               </section>
               <LibraryTools libraries={libraries} />
+              {featureVisible(features, 'library-provenance') && (
+                <MatchReports />
+              )}
               <div
                 id="settings-people"
                 className="settings-target"
@@ -546,6 +550,8 @@ function scanReason(code: string) {
       {
         probe_unavailable: 'FFprobe is not installed or could not start.',
         probe_timeout: 'Identification timed out.',
+        probe_insufficient_storage:
+          'Free space in the server data directory to scan this file.',
         invalid_media: 'FFprobe could not read this media file.',
         no_video: 'No video track was found.',
         file_missing: 'The file or library is unavailable.',

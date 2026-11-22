@@ -14,7 +14,7 @@ namespace Api.Tests;
 
 public sealed class ScanProbeHandleTests
 {
-    private sealed class ReplacingProbe(Action replace, bool real = true) : IMediaProbe
+    private sealed class ReplacingProbe(Action replace, Func<Ffprobe>? probe = null) : IMediaProbe
     {
         public Task<ProbeResult> ProbeAsync(string path, CancellationToken ct)
         {
@@ -25,9 +25,9 @@ public sealed class ScanProbeHandleTests
         public Task<ProbeResult> ProbeFileAsync(FileStream source, CancellationToken ct)
         {
             replace();
-            return real
-                ? new Ffprobe("ffprobe").ProbeFileAsync(source, ct)
-                : Task.FromResult(new ProbeResult(1, "mp4", "h264", ""));
+            return probe is null
+                ? Task.FromResult(new ProbeResult(1, "mp4", "h264", ""))
+                : probe().ProbeFileAsync(source, ct);
         }
     }
 
@@ -39,36 +39,45 @@ public sealed class ScanProbeHandleTests
     }
 
     [Theory]
-    [InlineData("file-link")]
-    [InlineData("directory-link")]
-    [InlineData("replacement")]
-    public async Task ScanProbesTheOpenedInodeAfterItsPathIsReplaced(string replacement)
+    [InlineData("file-link", false)]
+    [InlineData("directory-link", false)]
+    [InlineData("replacement", false)]
+    [InlineData("file-link", true)]
+    [InlineData("directory-link", true)]
+    [InlineData("replacement", true)]
+    public async Task ScanProbesTheOpenedInodeAfterItsPathIsReplaced(string replacement, bool stage)
     {
-        if (!OperatingSystem.IsLinux())
+        // Windows' validated handle denies rename/delete sharing on the source.
+        if (!(OperatingSystem.IsLinux() || (stage && OperatingSystem.IsMacOS())))
             return;
         string path = "",
             directory = "",
             outside = "",
             parked = "";
-        var probe = new ReplacingProbe(() =>
-        {
-            if (replacement == "directory-link")
+        string? stagingPath = null;
+        var probe = new ReplacingProbe(
+            () =>
             {
-                Directory.Move(directory, parked);
-                Directory.CreateSymbolicLink(directory, Path.GetDirectoryName(outside)!);
-            }
-            else
-            {
-                File.Move(path, parked);
-                if (replacement == "file-link")
-                    File.CreateSymbolicLink(path, outside);
+                if (replacement == "directory-link")
+                {
+                    Directory.Move(directory, parked);
+                    Directory.CreateSymbolicLink(directory, Path.GetDirectoryName(outside)!);
+                }
                 else
-                    File.Copy(outside, path);
-            }
-        });
+                {
+                    File.Move(path, parked);
+                    if (replacement == "file-link")
+                        File.CreateSymbolicLink(path, outside);
+                    else
+                        File.Copy(outside, path);
+                }
+            },
+            () => new Ffprobe("ffprobe", stagingPath)
+        );
         using var server = new Server(configure: services =>
             services.Replace(ServiceDescriptor.Singleton<IMediaProbe>(probe))
         );
+        stagingPath = stage ? Path.Combine(server.DataPath, "scan-probe.tmp") : null;
         directory = Path.Combine(server.MediaPath, "folder");
         Directory.CreateDirectory(directory);
         path = Path.Combine(directory, "movie.mp4");
@@ -98,6 +107,8 @@ public sealed class ScanProbeHandleTests
         Assert.Equal(modified, item.ModifiedTicks);
         Assert.Equal(Convert.ToHexString(SHA256.HashData(bytes)), item.Fingerprint);
         Assert.Contains("h264", item.VideoCodec);
+        if (stage)
+            Assert.False(File.Exists(stagingPath));
     }
 
     [Fact]
@@ -106,7 +117,7 @@ public sealed class ScanProbeHandleTests
         if (!OperatingSystem.IsLinux())
             return;
         string path = "";
-        var probe = new ReplacingProbe(() => File.AppendAllText(path, "changed"), real: false);
+        var probe = new ReplacingProbe(() => File.AppendAllText(path, "changed"));
         using var server = new Server(configure: services =>
             services.Replace(ServiceDescriptor.Singleton<IMediaProbe>(probe))
         );
@@ -127,8 +138,6 @@ public sealed class ScanProbeHandleTests
     [Fact]
     public async Task ScanFailsClosedForAPathnameOnlyProbe()
     {
-        if (!OperatingSystem.IsLinux())
-            return;
         using var server = new Server(configure: services =>
             services.Replace(ServiceDescriptor.Singleton<IMediaProbe>(new PathnameOnlyProbe()))
         );
@@ -140,6 +149,56 @@ public sealed class ScanProbeHandleTests
         var db = scope.ServiceProvider.GetRequiredService<MediaDb>();
         Assert.Empty(await db.Items.IgnoreQueryFilters().ToListAsync());
         Assert.Equal("pinned_probe_unavailable", (await db.ScanIssues.SingleAsync()).Code);
+    }
+
+    [Fact]
+    public async Task StagedProbeUsesTheOpenFileAndCleansUpAfterSuccessAndFailure()
+    {
+        using var server = new Server();
+        Directory.CreateDirectory(server.DataPath);
+        var path = Path.Combine(server.MediaPath, "movie.mp4");
+        var stagedPath = Path.Combine(server.DataPath, "scan-probe.tmp");
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+        await CreateVideo(path, "Original title", timeout.Token);
+        // Allow rename on Windows to exercise the probe independently of the
+        // sharing protections of PathPolicy.OpenRead.
+        using var source = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Delete);
+        source.Position = source.Length;
+        File.Move(path, Path.Combine(server.MediaPath, "original.mp4"));
+        await File.WriteAllTextAsync(path, "invalid replacement", timeout.Token);
+        var probe = new Ffprobe("ffprobe", stagedPath);
+        var result = await probe.ProbeFileAsync(source, timeout.Token);
+        Assert.Equal("Original title", result.Metadata?.Title);
+        Assert.False(File.Exists(stagedPath));
+
+        using var invalid = new PathPolicy([server.MediaPath]).OpenRead(
+            server.MediaPath,
+            "movie.mp4"
+        );
+        var error = await Assert.ThrowsAsync<MediaProbeException>(() =>
+            probe.ProbeFileAsync(invalid, timeout.Token)
+        );
+        Assert.Equal("invalid_media", error.Code);
+        Assert.False(File.Exists(stagedPath));
+    }
+
+    [Fact]
+    public async Task NativeStagedScanReclaimsAnInterruptedCopyOnStartup()
+    {
+        if (!(OperatingSystem.IsWindows() || OperatingSystem.IsMacOS()))
+            return;
+        using var server = new Server(realProbe: true);
+        Directory.CreateDirectory(server.DataPath);
+        var stagedPath = Path.Combine(server.DataPath, "scan-probe.tmp");
+        await File.WriteAllTextAsync(stagedPath, "interrupted scan");
+        using var admin = await server.Admin();
+        Assert.False(File.Exists(stagedPath));
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+        await CreateVideo(Path.Combine(server.MediaPath, "movie.mp4"), "Movie", timeout.Token);
+        var job = await Scan(server, admin);
+        Assert.Equal(1, job.GetProperty("discovered").GetInt32());
+        Assert.Equal(0, job.GetProperty("failed").GetInt32());
+        Assert.False(File.Exists(stagedPath));
     }
 
     private static async Task<JsonElement> Scan(Server server, HttpClient admin)

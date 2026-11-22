@@ -5,7 +5,7 @@ using MediaServer.Core;
 
 namespace MediaServer.Media;
 
-public sealed class Ffprobe(string executable) : IMediaProbe
+public sealed class Ffprobe(string executable, string? scanStagingPath = null) : IMediaProbe
 {
     // Extensions are only discovery hints. Never let a renamed playlist or other
     // indirect-input demuxer open additional files under the file protocol policy.
@@ -16,6 +16,8 @@ public sealed class Ffprobe(string executable) : IMediaProbe
 
     public async Task<ProbeResult> ProbeFileAsync(FileStream source, CancellationToken ct)
     {
+        if (scanStagingPath is not null)
+            return await ProbeStagedFileAsync(source, scanStagingPath, ct);
         if (!OperatingSystem.IsLinux())
             throw new MediaProbeException("pinned_probe_unavailable");
         var handle = source.SafeFileHandle;
@@ -36,6 +38,62 @@ public sealed class Ffprobe(string executable) : IMediaProbe
         {
             if (retained)
                 handle.DangerousRelease();
+        }
+    }
+
+    private async Task<ProbeResult> ProbeStagedFileAsync(
+        FileStream source,
+        string path,
+        CancellationToken ct
+    )
+    {
+        ct.ThrowIfCancellationRequested();
+        var length = source.Length;
+        const long storageMargin = 64 * 1024 * 1024;
+        if (new DriveInfo(Path.GetDirectoryName(path)!).AvailableFreeSpace - storageMargin < length)
+            throw new MediaProbeException("probe_insufficient_storage");
+        var options = new FileStreamOptions
+        {
+            Mode = FileMode.CreateNew,
+            Access = FileAccess.Write,
+            Share = FileShare.None,
+            Options = FileOptions.Asynchronous,
+            PreallocationSize = length,
+        };
+        if (!OperatingSystem.IsWindows())
+            options.UnixCreateMode = UnixFileMode.UserRead | UnixFileMode.UserWrite;
+        // Only the single scan worker uses this slot in the private data directory.
+        // CreateNew refuses to overwrite any file already there.
+        var staged = new FileStream(path, options);
+        try
+        {
+            await using (staged)
+            {
+                var handle = source.SafeFileHandle;
+                var buffer = new byte[128 * 1024];
+                long offset = 0;
+                while (offset < length)
+                {
+                    var count = (int)Math.Min(buffer.Length, length - offset);
+                    var read = await RandomAccess.ReadAsync(
+                        handle,
+                        buffer.AsMemory(0, count),
+                        offset,
+                        ct
+                    );
+                    if (read == 0)
+                        throw new IOException("Media was truncated during probe staging.");
+                    await staged.WriteAsync(buffer.AsMemory(0, read), ct);
+                    offset += read;
+                }
+            }
+            // Both probe passes see the same seekable copy. Closing its writer first
+            // allows FFprobe to open it with its normal sharing mode on Windows.
+            return await ProbeWithPolicyAsync(path, ct, AllowedFormats);
+        }
+        finally
+        {
+            File.Delete(path);
         }
     }
 

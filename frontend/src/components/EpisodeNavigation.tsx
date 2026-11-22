@@ -1,4 +1,8 @@
 import { useEffect, useState } from 'react';
+import SeasonWatchControls, {
+  type SeasonProgress,
+} from './SeasonWatchControls';
+import EpisodeSpoilerPreference from './EpisodeSpoilerPreference';
 import { api, duration } from '../services/api';
 
 export type SeriesEpisode = {
@@ -17,17 +21,25 @@ type Navigation = {
   episodes: SeriesEpisode[];
   nextOffset: number | null;
   nextEpisode: SeriesEpisode | null;
+  nextUnwatched?: SeriesEpisode | null;
+  seasonProgress?: SeasonProgress;
 };
 export default function EpisodeNavigation({
   id,
   request = api,
   onEpisode,
   busy = false,
+  canManage = false,
+  onPreferenceChange,
+  onWatchChange,
 }: {
   id: number;
   request?: typeof api;
   onEpisode: (id: number) => void;
   busy?: boolean;
+  canManage?: boolean;
+  onPreferenceChange?: () => void;
+  onWatchChange?: () => void;
 }) {
   const [value, setValue] = useState<Navigation>();
   const [season, setSeason] = useState<number>();
@@ -114,6 +126,43 @@ export default function EpisodeNavigation({
               ))}
             </select>
           </label>
+          {value.seasonProgress && (
+            <p role="status">
+              {value.seasonProgress.watched} of {value.seasonProgress.total}{' '}
+              accessible episodes watched in{' '}
+              {value.season === 0 ? 'Specials' : `Season ${value.season}`}.
+            </p>
+          )}
+          {value.nextUnwatched && (
+            <button
+              disabled={busy || loading}
+              onClick={() => onEpisode(value.nextUnwatched!.id)}
+            >
+              View next unwatched: Season {value.nextUnwatched.season}, Episode{' '}
+              {value.nextUnwatched.episode} · {value.nextUnwatched.title}
+            </button>
+          )}
+          {canManage && (
+            <EpisodeSpoilerPreference
+              request={request}
+              onChanged={() => onPreferenceChange?.()}
+            />
+          )}
+          {canManage && value.seasonProgress && (
+            <SeasonWatchControls
+              key={`${id}:${value.season}`}
+              id={id}
+              progress={value.seasonProgress}
+              request={request}
+              disabled={busy || loading}
+              onChanged={() => {
+                setOffset(0);
+                setLoading(true);
+                setRetry((x) => x + 1);
+                onWatchChange?.();
+              }}
+            />
+          )}
           <ol className="episode-list">
             {value.episodes.map((episode) => (
               <li key={episode.id}>

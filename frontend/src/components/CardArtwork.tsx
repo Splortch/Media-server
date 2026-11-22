@@ -19,15 +19,23 @@ export default function CardArtwork({
       try {
         const options = await request<{
           posterUrl: string | null;
-          thumbnailUrl: string;
+          thumbnailUrl: string | null;
+          spoilerHidden?: boolean;
         }>(`/media/${id}/images`);
+        if (
+          options.spoilerHidden ||
+          (!options.posterUrl && !options.thumbnailUrl)
+        ) {
+          if (active) setSource(undefined);
+          return;
+        }
         const kind = !fallback && options?.posterUrl ? 'poster' : 'thumbnail';
         const url = imageUrl
           ? await imageUrl(id, kind)
           : kind === 'poster'
             ? options.posterUrl!
             : options.thumbnailUrl;
-        if (active) setSource(url);
+        if (active) setSource(url ?? undefined);
       } catch {
         /* The letter remains a usable fallback. */
       }
