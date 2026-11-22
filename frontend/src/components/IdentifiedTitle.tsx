@@ -1,8 +1,9 @@
-import { useEffect, useState, type ComponentProps } from 'react';
+import { useEffect, useState, useRef, type ComponentProps } from 'react';
 import TitleDetails from './TitleDetails';
 import EpisodeNavigation from './EpisodeNavigation';
 import ArtworkManager from './ArtworkManager';
 import WatchControls from './WatchControls';
+import LibraryProvenance from './LibraryProvenance';
 import { api } from '../services/api';
 
 type Details = {
@@ -57,6 +58,7 @@ export default function IdentifiedTitle({
   artworkUrl?: (kind: 'poster' | 'backdrop') => Promise<string>;
   onEpisode?: (id: number) => void;
 }) {
+  const editor = useRef<HTMLDetailsElement>(null);
   const [watchState, setWatchState] = useState<{
     completed: boolean;
     seconds: number;
@@ -142,6 +144,17 @@ export default function IdentifiedTitle({
             : props.resume
         }
       />
+      <LibraryProvenance
+        id={id}
+        admin={admin}
+        request={request}
+        onCorrect={() => {
+          if (editor.current) {
+            editor.current.open = true;
+            editor.current.querySelector<HTMLInputElement>('input')?.focus();
+          }
+        }}
+      />
       {onEpisode &&
         value?.details.series &&
         value.details.season !== null &&
@@ -166,7 +179,7 @@ export default function IdentifiedTitle({
       )}
       {error && <p role="alert">{error}</p>}
       {admin && (
-        <details className="title-admin metadata-editor">
+        <details ref={editor} className="title-admin metadata-editor">
           <summary>Identify or correct title</summary>
           <p>
             Read adjacent NFO and artwork files, enter details yourself, or

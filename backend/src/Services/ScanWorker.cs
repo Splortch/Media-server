@@ -177,6 +177,7 @@ public sealed class ScanWorker(
                             {
                                 LibraryId = library.Id,
                                 RelativePath = relative,
+                                FirstSeenAt = DateTime.UtcNow,
                             };
                             db.Items.Add(item);
                         }
@@ -200,6 +201,7 @@ public sealed class ScanWorker(
                         item.IsMissing = false;
                         item.Fingerprint = fingerprint;
                         item.ModifiedTicks = modifiedTicks;
+                        item.LastScannedAt = DateTime.UtcNow;
                         item.Duration = metadata.Duration;
                         item.Container = metadata.Container;
                         item.VideoCodec = metadata.VideoCodec;

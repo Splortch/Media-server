@@ -23,6 +23,8 @@ public class Library
 
 public class MediaItem
 {
+    public DateTime? FirstSeenAt { get; set; }
+    public DateTime? LastScannedAt { get; set; }
     public int Id { get; set; }
     public int LibraryId { get; set; }
     public string RelativePath { get; set; } = "";

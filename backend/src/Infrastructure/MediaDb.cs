@@ -19,6 +19,7 @@ public class MediaDb(DbContextOptions<MediaDb> options, IUserContext? context = 
     public static string Fold(string value) => throw new NotSupportedException();
 
     private int? CurrentUserId => context?.UserId;
+    public DbSet<MetadataMatchReport> MatchReports => Set<MetadataMatchReport>();
     public DbSet<MediaArtworkOption> ArtworkOptions => Set<MediaArtworkOption>();
     public DbSet<MediaMetadata> Metadata => Set<MediaMetadata>();
     public DbSet<DownloadJob> Downloads => Set<DownloadJob>();
@@ -44,6 +45,19 @@ public class MediaDb(DbContextOptions<MediaDb> options, IUserContext? context = 
 
     protected override void OnModelCreating(ModelBuilder b)
     {
+        b.Entity<MetadataMatchReport>().HasIndex(x => new { x.UserId, x.MediaItemId }).IsUnique();
+        b.Entity<MetadataMatchReport>().Property(x => x.Revision).IsConcurrencyToken();
+        b.Entity<MetadataMatchReport>()
+            .HasOne<User>()
+            .WithMany()
+            .HasForeignKey(x => x.UserId)
+            .OnDelete(DeleteBehavior.Cascade);
+        b.Entity<MetadataMatchReport>()
+            .HasOne<MediaItem>()
+            .WithMany()
+            .HasForeignKey(x => x.MediaItemId)
+            .OnDelete(DeleteBehavior.Cascade);
+        b.Entity<MetadataMatchReport>().HasIndex(x => new { x.State, x.Id });
         b.Entity<MediaArtworkOption>().HasKey(x => new { x.MediaItemId, x.Key });
         b.Entity<MediaArtworkOption>()
             .HasOne<MediaItem>()

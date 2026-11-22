@@ -81,6 +81,7 @@ public static class ClientV1
                             "library-artwork",
                             "seek-previews",
                             "watch-state",
+                            "library-provenance",
                             "hls-conversion",
                             "track-selection",
                             "library-removal",

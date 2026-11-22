@@ -13,6 +13,7 @@ public static class MetadataEndpoints
             var group = app.MapGroup(prefix).RequireAuthorization();
             if (prefix.EndsWith("v1"))
                 group.WithGroupName("client-v1");
+            group.MapLibraryProvenance();
             group.MapSeriesEpisodes();
             group.MapLibraryCatalog();
             group.MapImages(prefix);
