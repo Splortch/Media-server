@@ -56,6 +56,11 @@ runpy.run_path(sys.argv[0], run_name='__main__')
         for kind in ('desktop', 'windows'):
             self.assertTrue(module.component_changed(kind, {'before': 'base'}, 'head', lambda *a, **k: self.result(['scripts/desktop-inventory.py'])))
 
+    def test_vendored_matcher_runs_all_javascript_consumers(self):
+        for kind in ('web', 'windows', 'desktop'):
+            self.assertTrue(module.component_changed(kind, {'before': 'base'}, 'head', lambda *a, **k: self.result(['vendor/picomatch/lib/parse.js'])))
+        self.assertFalse(module.component_changed('backend', {'before': 'base'}, 'head', lambda *a, **k: self.result(['vendor/picomatch/lib/parse.js'])))
+
     def test_missing_history_runs_checks(self):
         self.assertTrue(module.component_changed('backend', {'before': 'base'}, 'head', lambda *a, **k: self.result([], 128)))
 

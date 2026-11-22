@@ -1,11 +1,12 @@
 FROM node:26-bookworm-slim@sha256:add5c17c14752c54d2f3d519ec46a3815684d41c33f198bcb09fb998f7dcbf68 AS web
 WORKDIR /source/frontend
+COPY vendor/picomatch /source/vendor/picomatch
 COPY frontend/package*.json ./
 RUN npm ci
 COPY frontend/ ./
 COPY shared/api/src/generated.ts /source/shared/api/src/generated.ts
 RUN npm run build
-FROM mcr.microsoft.com/dotnet/sdk:10.0.403-noble@sha256:212fe4cb74627d5adf9817a4088906ae3edff1bd853bb27565d4b46731efe61e AS build
+FROM mcr.microsoft.com/dotnet/sdk:10.0.404-noble@sha256:fe0fd4e93bd2fbb47c883b7a6369e5c8d3db8bf01cdc5981f6ee35fbdf3ff4fb AS build
 WORKDIR /source
 ARG VERSION=0.2.0-alpha.1
 COPY Directory.Build.props global.json ./
