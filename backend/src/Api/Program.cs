@@ -208,7 +208,9 @@ builder.Services.AddSingleton(sp => new PlaybackSessions(
     sp.GetRequiredService<EncoderDiscovery>(),
     sp.GetRequiredService<IHostApplicationLifetime>(),
     sp.GetRequiredService<TranscodeSettings>(),
-    sp.GetRequiredService<IMediaProbe>()
+    sp.GetRequiredService<IMediaProbe>(),
+    sp.GetRequiredService<IServiceScopeFactory>(),
+    sp.GetRequiredService<ILogger<PlaybackSessions>>()
 ));
 builder.Services.AddHostedService(sp => sp.GetRequiredService<PlaybackSessions>());
 builder.Services.AddSingleton<ScanQueue>();
