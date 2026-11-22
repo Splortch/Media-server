@@ -123,6 +123,21 @@ async fn real_server_cookie_login_ranges_resume_conflicts_revocation_and_disconn
         .await
         .unwrap();
     assert_eq!(metadata["details"]["synopsis"], "Local native fixture");
+    let explanation = first
+        .request("GET", &format!("/api/v1/media/{id}/provenance"), None)
+        .await
+        .unwrap();
+    assert_eq!(explanation["identification"], "Local NFO metadata");
+    assert!(!explanation.to_string().contains(&root));
+    let report = first
+        .request(
+            "POST",
+            &format!("/api/v1/media/{id}/match-report"),
+            Some(json!({"kind":"title","note":"Native fixture match"})),
+        )
+        .await
+        .unwrap();
+    assert_eq!(report["state"], "Open");
     let episodes = first
         .request(
             "GET",
@@ -143,6 +158,25 @@ async fn real_server_cookie_login_ranges_resume_conflicts_revocation_and_disconn
         .unwrap();
     assert_eq!(catalog["items"][0]["series"], "Synthetic series");
     assert_eq!(catalog["items"][0]["episodeCount"], 1);
+    let preference = first
+        .request("GET", "/api/v1/preferences/episodes", None)
+        .await
+        .unwrap();
+    assert_eq!(preference["revealSpoilers"], false);
+    let hidden = first
+        .request("GET", &format!("/api/v1/media/{id}/images"), None)
+        .await
+        .unwrap();
+    assert_eq!(hidden["spoilerHidden"], true);
+    assert!(hidden["posterUrl"].is_null());
+    first
+        .request(
+            "PUT",
+            "/api/v1/preferences/episodes",
+            Some(json!({"revealSpoilers":true})),
+        )
+        .await
+        .unwrap();
     let images = first
         .request("GET", &format!("/api/v1/media/{id}/images"), None)
         .await

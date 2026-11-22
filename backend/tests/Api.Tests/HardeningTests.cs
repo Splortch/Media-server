@@ -38,6 +38,31 @@ public sealed class HardeningTests
     }
 
     [Fact]
+    public async Task AuthRateLimitIsSharedBySetupAndLoginAliases()
+    {
+        using var server = new Server();
+        using var client = server.CreateClient();
+        await Server.Csrf(client);
+        var credentials = new
+        {
+            name = "unknown",
+            password = "twelve-character-password",
+            token = "incorrect",
+        };
+        for (var i = 0; i < 10; i++)
+        {
+            var endpoint = i % 2 == 0 ? "/api/setup" : "/api/v1/auth/login";
+            using var response = await client.PostAsJsonAsync(endpoint, credentials);
+            Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+        }
+        using var setup = await client.PostAsJsonAsync("/api/v1/setup", credentials);
+        using var login = await client.PostAsJsonAsync("/api/auth/login", credentials);
+        Assert.Equal(HttpStatusCode.TooManyRequests, setup.StatusCode);
+        Assert.Equal(HttpStatusCode.TooManyRequests, login.StatusCode);
+        Assert.True(File.Exists(Path.Combine(server.DataPath, "setup-token")));
+    }
+
+    [Fact]
     public async Task ConcurrentLegacyAndVersionedSetupCreatesOneAdministratorAndConsumesToken()
     {
         using var server = new Server();

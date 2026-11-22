@@ -2,9 +2,14 @@ using System.Diagnostics;
 using System.Runtime.InteropServices;
 using System.Text.Json;
 using MediaServer.Core;
+using MediaServer.Infrastructure;
 using MediaServer.Media;
 using MediaServer.Services;
+using Microsoft.Data.Sqlite;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging.Abstractions;
 
 return await Benchmark.RunAsync(args);
 
@@ -201,13 +206,35 @@ static class Benchmark
                 codec = metadata.VideoCodec,
                 color = sourceColor,
             };
+            using var database = new SqliteConnection("Data Source=:memory:");
+            await database.OpenAsync(deadline.Token);
+            using var services = new ServiceCollection()
+                .AddDbContext<MediaDb>(options => options.UseSqlite(database))
+                .BuildServiceProvider();
+            using (var scope = services.CreateScope())
+            {
+                var db = scope.ServiceProvider.GetRequiredService<MediaDb>();
+                await db.Database.EnsureCreatedAsync(deadline.Token);
+                db.Users.Add(new User { Id = 1, Name = "Synthetic benchmark" });
+                db.Sessions.Add(
+                    new Session
+                    {
+                        Id = "benchmark-a",
+                        UserId = 1,
+                        ExpiresAt = DateTime.UtcNow.AddHours(1),
+                    }
+                );
+                await db.SaveChangesAsync(deadline.Token);
+            }
             using var sessions = new PlaybackSessions(
                 Path.Combine(root, "data"),
                 runner,
                 discovery,
                 lifetime,
                 settings,
-                probe
+                probe,
+                services.GetRequiredService<IServiceScopeFactory>(),
+                NullLogger<PlaybackSessions>.Instance
             );
             await sessions.StartAsync(deadline.Token);
             try

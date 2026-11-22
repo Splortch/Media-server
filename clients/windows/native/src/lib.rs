@@ -548,6 +548,9 @@ fn allowed_request(method: &str, path: &str) -> bool {
     if parts.len() == 2 && parts[0] == "playback-sessions" && valid_session(parts[1]) {
         return matches!(method, "GET" | "DELETE");
     }
+    if path == "/api/v1/preferences/episodes" {
+        return matches!(method, "GET" | "PUT");
+    }
     if parts.len() >= 2 && parts[0] == "media" && parts[1].parse::<u64>().is_ok_and(|n| n > 0) {
         if parts.get(2) == Some(&"bookmarks") {
             return match (method, parts.len()) {
@@ -572,9 +575,14 @@ fn allowed_request(method: &str, path: &str) -> bool {
                             | "metadata"
                             | "images"
                             | "watch-state"
+                            | "provenance"
                     )
                 )
-                | ("POST", 3, Some("watch-state"))
+                | (
+                    "POST",
+                    3,
+                    Some("watch-state" | "season-watch-state" | "match-report")
+                )
                 | ("PUT", 3, Some("progress-sync"))
                 | ("POST", 3, Some("playback-errors" | "playback-sessions"))
         );
@@ -988,6 +996,11 @@ mod tests {
             ("GET", "/api/v1/media/4/metadata"),
             ("GET", "/api/v1/media/4/images"),
             ("GET", "/api/v1/catalog?prefix=Series&limit=200&offset=0"),
+            ("GET", "/api/v1/preferences/episodes"),
+            ("PUT", "/api/v1/preferences/episodes"),
+            ("POST", "/api/v1/media/4/season-watch-state"),
+            ("GET", "/api/v1/media/4/provenance"),
+            ("POST", "/api/v1/media/4/match-report"),
             ("GET", "/api/v1/media/4/watch-state"),
             ("POST", "/api/v1/media/4/watch-state"),
             ("GET", "/api/v1/media/4/episodes"),
@@ -1013,7 +1026,13 @@ mod tests {
             ("GET", "/api/v1/catalog?url=https://evil.example"),
             ("GET", "/api/v1/catalog?limit=100000"),
             ("GET", "/api/v1/catalog?offset=0&offset=1"),
+            ("GET", "/api/v1/admin/media/4/provenance"),
+            ("POST", "/api/v1/admin/match-reports/1/review"),
+            ("GET", "/api/v1/media/4/provenance?user=2"),
             ("GET", "/api/v1/media/4/metadata?url=https://evil.example"),
+            ("GET", "/api/v1/preferences/episodes?user=2"),
+            ("POST", "/api/v1/preferences/episodes"),
+            ("GET", "/api/v1/media/4/season-watch-state"),
             ("GET", "/api/v1/media/4/episodes?season=100"),
             ("GET", "/api/v1/media/4/episodes?season=1&season=2"),
             ("GET", "/api/v1/media/4/episodes?offset=-1"),

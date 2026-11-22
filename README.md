@@ -15,7 +15,7 @@ The [client ecosystem](docs/clients/README.md) adds a shared Tauri desktop clien
 | Capability | Status | Scope |
 |---|---|---|
 | First-run setup and login | Implemented | One local administrator; Argon2id, password change/local recovery, session revocation, consumed setup token, CSRF |
-| Libraries and scanning | Implemented | Explicit allowed roots, background jobs, FFprobe metadata, idempotent updates, admin-only scan failure references |
+| Libraries and scanning | Implemented | Explicit allowed roots, validated file handles for FFprobe input on Windows/Linux/macOS, background jobs, idempotent updates, admin-only scan failure references |
 | Media browsing | Implemented | Responsive React UI, search, technical details, honest empty states |
 | Title information before playback | Implemented alpha | Web/desktop cards open details without a player or stream request; explicit Play/Resume; web local NFO/manual identification and optional TMDB matching |
 | Direct Play | Implemented | Authenticated byte ranges through validated handles on Windows/Linux/macOS; controls, resume and playback diagnostics |
@@ -28,6 +28,8 @@ The [client ecosystem](docs/clients/README.md) adds a shared Tauri desktop clien
 | HLS conversion / quality / audio / text subtitles | Implemented alpha | Bounded full-video preparation; FFmpeg required; Auto/manual quality in web, desktop and Android clients |
 | Hardware encoders / HDR | Partial alpha | Opt-in NVENC/QSV/VAAPI/AMF adapters and software fallback; explicit SDR tone mapping; synthetic PQ/HLG HEVC/AV1 validation; physical GPU/HDR validation pending |
 | Library artwork / playback completion | Implemented alpha (web/desktop) | [Posters, generated thumbnails, grouped TV cards, seek previews, watch-state undo and optional next-episode countdown](docs/clients/LIBRARY-ARTWORK.md) |
+| Spoiler-safe episode tracking | Implemented alpha (web/desktop) | [Next unwatched episode, per-season progress, account spoiler preference and confirmed season changes with conflict-safe Undo](docs/clients/EPISODE-TRACKING.md) |
+| Library explanations / match reports | Implemented alpha (web/desktop) | [Private provenance, unknown-date fallbacks, wrong-match reporting and administrator review](docs/clients/LIBRARY-PROVENANCE.md) |
 | Title information / series navigation | Implemented alpha (web/desktop) | [Metadata-first details, seasons/episodes, explicit Play/Resume and next-episode information](docs/clients/TITLE-NAVIGATION.md); no streaming on details entry |
 | Artwork / online metadata / TV matching | Implemented alpha (web) | [Local NFO, manual corrections and explicit opt-in TMDB matching](docs/architecture/METADATA.md); bounded offline artwork cache; native editor pending |
 | Accounts / permissions / ratings | Implemented alpha | Admin-managed accounts, library grants, explicit content ratings; unknown ratings denied to restricted viewers |

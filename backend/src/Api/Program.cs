@@ -181,8 +181,12 @@ builder.Services.AddSingleton(
         builder.Configuration.GetSection("MediaServer:AllowedRoots").Get<string[]>() ?? []
     )
 );
+var scanStagingPath =
+    OperatingSystem.IsWindows() || OperatingSystem.IsMacOS()
+        ? Path.Combine(data, "scan-probe.tmp")
+        : null;
 builder.Services.AddSingleton<IMediaProbe>(
-    new Ffprobe(builder.Configuration["MediaServer:FfprobePath"] ?? "ffprobe")
+    new Ffprobe(builder.Configuration["MediaServer:FfprobePath"] ?? "ffprobe", scanStagingPath)
 );
 builder.Services.AddSingleton<IPlaybackPlanner, DirectPlaybackPlanner>();
 builder.Services.AddSingleton(
@@ -208,7 +212,9 @@ builder.Services.AddSingleton(sp => new PlaybackSessions(
     sp.GetRequiredService<EncoderDiscovery>(),
     sp.GetRequiredService<IHostApplicationLifetime>(),
     sp.GetRequiredService<TranscodeSettings>(),
-    sp.GetRequiredService<IMediaProbe>()
+    sp.GetRequiredService<IMediaProbe>(),
+    sp.GetRequiredService<IServiceScopeFactory>(),
+    sp.GetRequiredService<ILogger<PlaybackSessions>>()
 ));
 builder.Services.AddHostedService(sp => sp.GetRequiredService<PlaybackSessions>());
 builder.Services.AddSingleton<ScanQueue>();
@@ -290,6 +296,32 @@ builder.Services.AddRateLimiter(o =>
             )
     );
     o.AddPolicy(
+        "season-watch",
+        context =>
+            RateLimitPartition.GetFixedWindowLimiter(
+                context.User.FindFirstValue(ClaimTypes.NameIdentifier) ?? "anonymous",
+                _ => new FixedWindowRateLimiterOptions
+                {
+                    PermitLimit = 20,
+                    Window = TimeSpan.FromMinutes(1),
+                    QueueLimit = 0,
+                }
+            )
+    );
+    o.AddPolicy(
+        "match-reports",
+        context =>
+            RateLimitPartition.GetFixedWindowLimiter(
+                context.User.FindFirstValue(ClaimTypes.NameIdentifier) ?? "anonymous",
+                _ => new FixedWindowRateLimiterOptions
+                {
+                    PermitLimit = 10,
+                    Window = TimeSpan.FromMinutes(1),
+                    QueueLimit = 0,
+                }
+            )
+    );
+    o.AddPolicy(
         "requests",
         context =>
             RateLimitPartition.GetFixedWindowLimiter(
@@ -357,6 +389,9 @@ using (var scope = app.Services.CreateScope())
         }
         return;
     }
+    // Recover the single scan scratch slot under the exclusive data-directory lease.
+    if (scanStagingPath is not null)
+        File.Delete(scanStagingPath);
     if (!await db.Users.AnyAsync() && !File.Exists(setupPath))
     {
         var tokenOptions = new FileStreamOptions

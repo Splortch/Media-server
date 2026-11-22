@@ -94,11 +94,12 @@ SHA256SUMS. Container images are smoke-tested, saved, then the identical image i
 `ghcr.io/splortch/media-server:v0.2.0-alpha.N`. The `alpha` tag advances only after publication;
 `latest` is never written. Containers do not update themselves on a user's machine.
 
-All platform assets upload to one private draft. Only after every upload succeeds and main
-still points to the validated source commit does the publisher make that release visible.
+All platform assets upload to one private draft. The publisher compares GitHub's reported
+SHA-256 digests against the expected digest for every file, including `SHA256SUMS`, and
+confirms main still points to the validated source commit before making the release visible.
 A retry replaces files only in a same-source draft; published assets are not overwritten.
 Another-source tag is an error. The planner checks the single combined tag to avoid duplicate
-builds. A failed build or upload cannot expose a partially uploaded release. The Docker alpha
+builds. An upload failure, missing asset or digest mismatch leaves the release private. The Docker alpha
 channel advances only after the combined release publishes.
 
 The shared `release.json` records the exact source commit, server/desktop/Android component

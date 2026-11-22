@@ -31,6 +31,7 @@ public static class Features
     [
         new("downloads", "Download center", false, false),
         new("movie-requests", "Movie requests", true, false),
+        new("library-provenance", "Library explanations and match reports", true),
         new("smart-collections", "Smart collections", true),
         new("watch-history", "Watch history navigation", false),
     ];

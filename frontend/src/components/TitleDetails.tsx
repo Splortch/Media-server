@@ -18,9 +18,11 @@ export default function TitleDetails({
   tracks,
   metadata,
   seriesView = false,
+  hideSpoilers = false,
 }: {
   item: Media;
   seriesView?: boolean;
+  hideSpoilers?: boolean;
   tracks?: {
     type: string;
     codec: string;
@@ -38,6 +40,7 @@ export default function TitleDetails({
       episode: number | null;
       attribution: string;
     };
+    spoilerHidden?: boolean;
     posterUrl: string | null;
     backdropUrl: string | null;
   } | null;
@@ -58,7 +61,7 @@ export default function TitleDetails({
   return (
     <section className="title-overview" aria-label="Title information">
       <div ref={artwork} className="cover title-art tone-0" aria-hidden="true">
-        {metadata?.posterUrl ? (
+        {!hideSpoilers && !metadata?.spoilerHidden && metadata?.posterUrl ? (
           <img src={metadata.posterUrl} alt="" className="metadata-poster" />
         ) : (
           <span className="monogram">
@@ -79,9 +82,11 @@ export default function TitleDetails({
         <p className="muted">
           {seriesView
             ? 'Select a season and episode to view its information.'
-            : metadata?.details.synopsis ||
-              item.metadata?.description ||
-              'No description is embedded in this file.'}
+            : hideSpoilers || metadata?.spoilerHidden
+              ? 'Episode summary and artwork are hidden until you start watching or reveal spoilers.'
+              : metadata?.details.synopsis ||
+                item.metadata?.description ||
+                'No description is embedded in this file.'}
         </p>
         {metadata && (
           <>
@@ -100,14 +105,17 @@ export default function TitleDetails({
                 .join(' · ')}
             </p>
             <p className="muted">{metadata.details.attribution}</p>
-            {!seriesView && metadata.backdropUrl && (
-              <img
-                className="metadata-backdrop"
-                src={metadata.backdropUrl}
-                alt=""
-                loading="lazy"
-              />
-            )}
+            {!seriesView &&
+              !hideSpoilers &&
+              !metadata.spoilerHidden &&
+              metadata.backdropUrl && (
+                <img
+                  className="metadata-backdrop"
+                  src={metadata.backdropUrl}
+                  alt=""
+                  loading="lazy"
+                />
+              )}
           </>
         )}
         {!seriesView && (

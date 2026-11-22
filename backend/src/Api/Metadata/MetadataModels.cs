@@ -18,7 +18,8 @@ public record MetadataView(
     MetadataValue Details,
     string? PosterUrl,
     string? BackdropUrl,
-    long Revision
+    long Revision,
+    bool SpoilerHidden = false
 );
 
 public record MetadataSearch(string Query, string Kind);

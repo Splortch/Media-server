@@ -1,10 +1,15 @@
 using System.Collections.Concurrent;
+using System.Data.Common;
 using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using MediaServer.Core;
+using MediaServer.Infrastructure;
 using MediaServer.Media;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 
 namespace MediaServer.Services;
 
@@ -52,7 +57,9 @@ public sealed class PlaybackSessions(
     EncoderDiscovery discovery,
     IHostApplicationLifetime lifetime,
     TranscodeSettings settings,
-    IMediaProbe probe
+    IMediaProbe probe,
+    IServiceScopeFactory scopes,
+    ILogger<PlaybackSessions> logger
 ) : BackgroundService
 {
     public const long MaxSourceBytes = 8L * 1024 * 1024 * 1024;
@@ -60,6 +67,7 @@ public sealed class PlaybackSessions(
     private readonly string root = Path.Combine(dataDirectory, "playback-cache");
     private readonly ConcurrentDictionary<string, Job> jobs = new();
     private readonly SemaphoreSlim admission = new(1, 1);
+    private static readonly TimeSpan LeaseLifetime = TimeSpan.FromMinutes(30);
 
     private sealed record Lease(int User, DateTime Touched);
 
@@ -173,6 +181,8 @@ public sealed class PlaybackSessions(
         await admission.WaitAsync(ct);
         try
         {
+            await ReapAsync(ct);
+            ct.ThrowIfCancellationRequested();
             var key =
                 $"{item.Id}:{item.ModifiedTicks}:{item.Size}:{JsonSerializer.Serialize(selection)}:{(captionBytes is null ? "" : Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(captionBytes)))}";
             var existing = jobs.Values.FirstOrDefault(x =>
@@ -195,6 +205,7 @@ public sealed class PlaybackSessions(
                 if (jobs.Count >= 2)
                     return null;
             }
+            ct.ThrowIfCancellationRequested();
             var source = policy.OpenRead(library.Path, item.RelativePath);
             try
             {
@@ -239,7 +250,11 @@ public sealed class PlaybackSessions(
             return null;
         // Parallel manifest, segment and caption reads may all refresh the same lease.
         // Retry a timestamp collision, but never recreate a lease removed by logout/expiry.
-        while (job.Leases.TryGetValue(session, out var lease) && lease.User == user)
+        while (
+            job.Leases.TryGetValue(session, out var lease)
+            && lease.User == user
+            && DateTime.UtcNow - lease.Touched < LeaseLifetime
+        )
         {
             if (job.Leases.TryUpdate(session, new Lease(user, DateTime.UtcNow), lease))
                 return job;
@@ -251,6 +266,7 @@ public sealed class PlaybackSessions(
         jobs.TryGetValue(id, out var job)
         && job.Leases.TryGetValue(session, out var lease)
         && lease.User == user
+        && DateTime.UtcNow - lease.Touched < LeaseLifetime
             ? job.Media
             : null;
 
@@ -665,6 +681,41 @@ public sealed class PlaybackSessions(
         }
     }
 
+    // Admission must be held so a removed lease cannot be re-added during the sweep.
+    private async Task ReapAsync(CancellationToken ct)
+    {
+        var now = DateTime.UtcNow;
+        var sessionIds = jobs.Values.SelectMany(job => job.Leases.Keys).Distinct().ToArray();
+        var validSessions = new HashSet<string>(StringComparer.Ordinal);
+        if (sessionIds.Length > 0)
+        {
+            using var scope = scopes.CreateScope();
+            var db = scope.ServiceProvider.GetRequiredService<MediaDb>();
+            validSessions = (
+                await db
+                    .Sessions.Where(session =>
+                        sessionIds.Contains(session.Id)
+                        && session.ExpiresAt > now
+                        && db.Users.Any(user => user.Id == session.UserId && !user.Disabled)
+                    )
+                    .Select(session => session.Id)
+                    .ToListAsync(ct)
+            ).ToHashSet(StringComparer.Ordinal);
+        }
+        foreach (var job in jobs.Values)
+        {
+            foreach (var lease in job.Leases)
+            {
+                if (!validSessions.Contains(lease.Key))
+                    job.Leases.TryRemove(lease.Key, out _);
+                else if (now - lease.Value.Touched >= LeaseLifetime)
+                    job.Leases.TryRemove(lease);
+            }
+            if (job.Leases.IsEmpty || job.State == "cancelled")
+                await StopAsync(job);
+        }
+    }
+
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         Directory.CreateDirectory(root);
@@ -684,21 +735,20 @@ public sealed class PlaybackSessions(
                 await admission.WaitAsync(stoppingToken);
                 try
                 {
-                    foreach (var job in jobs.Values)
-                    {
-                        foreach (
-                            var lease in job
-                                .Leases.Where(x =>
-                                    DateTime.UtcNow - x.Value.Touched > TimeSpan.FromMinutes(30)
-                                )
-                                .ToArray()
+                    await ReapAsync(stoppingToken);
+                    foreach (
+                        var job in jobs.Values.Where(job =>
+                            job.State == "failed" && job.Work.IsCompleted
                         )
-                            ((ICollection<KeyValuePair<string, Lease>>)job.Leases).Remove(lease);
-                        if (job.Leases.IsEmpty || job.State == "cancelled")
-                            await StopAsync(job);
-                        else if (job.State == "failed" && job.Work.IsCompleted)
-                            DeleteCache(job);
-                    }
+                    )
+                        DeleteCache(job);
+                }
+                catch (DbException ex)
+                {
+                    logger.LogWarning(
+                        "Playback lease cleanup will retry ({ErrorType}).",
+                        ex.GetType().Name
+                    );
                 }
                 finally
                 {

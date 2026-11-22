@@ -195,7 +195,7 @@ public sealed class PreviewImages(IConfiguration config, FfmpegRunner runner)
 
 public sealed record ArtworkUploadLimit;
 
-public record ImageOptions(string? PosterUrl, string ThumbnailUrl);
+public record ImageOptions(string? PosterUrl, string? ThumbnailUrl, bool SpoilerHidden = false);
 
 public record ArtworkUpload(string Kind, string Data, long ExpectedRevision);
 
@@ -210,10 +210,17 @@ public static class ImageEndpoints
         group
             .MapGet(
                 "/media/{id:int}/images",
-                async (int id, MediaDb db, CancellationToken ct) =>
+                async (
+                    int id,
+                    MediaDb db,
+                    System.Security.Claims.ClaimsPrincipal user,
+                    CancellationToken ct
+                ) =>
                 {
                     if (!await db.Items.AnyAsync(x => x.Id == id, ct))
                         return Results.NotFound();
+                    if (await EpisodePrivacy.Hidden(db, id, user, ct))
+                        return Results.Ok(new ImageOptions(null, null, true));
                     var row = await db.Metadata.SingleOrDefaultAsync(x => x.MediaItemId == id, ct);
                     return Results.Ok(
                         new ImageOptions(

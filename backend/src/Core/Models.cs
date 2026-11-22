@@ -7,6 +7,7 @@ public class User
     public string PasswordHash { get; set; } = "";
     public string Role { get; set; } = "Admin";
     public bool Disabled { get; set; }
+    public bool RevealEpisodeSpoilers { get; set; }
     public bool AllLibraries { get; set; } = true;
     public int? MaximumRating { get; set; }
 }
@@ -23,6 +24,8 @@ public class Library
 
 public class MediaItem
 {
+    public DateTime? FirstSeenAt { get; set; }
+    public DateTime? LastScannedAt { get; set; }
     public int Id { get; set; }
     public int LibraryId { get; set; }
     public string RelativePath { get; set; } = "";
@@ -101,7 +104,7 @@ public interface IMediaProbe
 {
     Task<ProbeResult> ProbeAsync(string path, CancellationToken ct);
 
-    // Linux library scans must keep the validated inode pinned through both
+    // Library scans must use the validated open file through both
     // metadata and HDR inspection. Alternative probes must opt in explicitly.
     Task<ProbeResult> ProbeFileAsync(FileStream source, CancellationToken ct) =>
         throw new MediaProbeException("pinned_probe_unavailable");

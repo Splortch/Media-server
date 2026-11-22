@@ -12,7 +12,8 @@ module.exports = async function publish({github, context}) {
   const folder = path.resolve('artifacts/release');
   const manifest = JSON.parse(fs.readFileSync(path.join(folder, 'release.json'), 'utf8'));
   if (manifest.commit !== sha || manifest.channel !== 'alpha' || `v${manifest.serverVersion}` !== tag) throw new Error('Artifact provenance does not match the release.');
-  const entries = fs.readFileSync(path.join(folder, 'SHA256SUMS'), 'utf8').trim().split('\n').map(line => {
+  const checksums = fs.readFileSync(path.join(folder, 'SHA256SUMS'));
+  const entries = checksums.toString('utf8').trim().split('\n').map(line => {
     const match = /^([0-9a-f]{64})  ([A-Za-z0-9._-]+)$/.exec(line);
     if (!match) throw new Error('Invalid checksum entry.');
     return {hash:match[1], name:match[2]};
@@ -24,6 +25,8 @@ module.exports = async function publish({github, context}) {
     for await (const chunk of fs.createReadStream(path.join(folder, entry.name))) hash.update(chunk);
     if (hash.digest('hex') !== entry.hash) throw new Error(`Checksum mismatch: ${entry.name}`);
   }
+  const expectedDigests = new Map(entries.map(({name, hash}) => [name, 'sha256:' + hash]));
+  expectedDigests.set('SHA256SUMS', 'sha256:' + crypto.createHash('sha256').update(checksums).digest('hex'));
   // Keep every platform private until the entire release has uploaded successfully.
   let release;
   try { release = (await github.rest.repos.getReleaseByTag({...context.repo,tag})).data; }
@@ -35,10 +38,18 @@ module.exports = async function publish({github, context}) {
   const existing = await github.paginate(github.rest.repos.listReleaseAssets,{...context.repo,release_id:release.id,per_page:100});
   // A retry replaces only a same-source draft. Published releases stay immutable.
   for (const asset of existing) await github.rest.repos.deleteReleaseAsset({...context.repo,asset_id:asset.id});
-  for (const name of [...entries.map(e=>e.name), 'SHA256SUMS']) {
-    const data = fs.readFileSync(path.join(folder,name));
+  for (const name of expectedDigests.keys()) {
+    const data = name === 'SHA256SUMS' ? checksums : fs.readFileSync(path.join(folder,name));
     await github.rest.repos.uploadReleaseAsset({...context.repo,release_id:release.id,name,data,headers:{'content-type':'application/octet-stream','content-length':data.length}});
   }
+  const uploaded = await github.paginate(github.rest.repos.listReleaseAssets,{...context.repo,release_id:release.id,per_page:100});
+  for (const asset of uploaded) {
+    if (asset.state !== 'uploaded' || !expectedDigests.has(asset.name) || asset.digest !== expectedDigests.get(asset.name)) {
+      throw new Error('Draft release asset verification failed. The release is still private.');
+    }
+    expectedDigests.delete(asset.name);
+  }
+  if (expectedDigests.size > 0) throw new Error('Draft release assets are missing. The release is still private.');
   if ((await github.rest.repos.getBranch({...context.repo,branch:'main'})).data.commit.sha !== sha) return false;
   await github.rest.repos.updateRelease({...context.repo,release_id:release.id,draft:false,prerelease:true,body,make_latest:'false'});
   return true;

@@ -1,8 +1,9 @@
-import { useEffect, useState, type ComponentProps } from 'react';
+import { useEffect, useState, useRef, type ComponentProps } from 'react';
 import TitleDetails from './TitleDetails';
 import EpisodeNavigation from './EpisodeNavigation';
 import ArtworkManager from './ArtworkManager';
 import WatchControls from './WatchControls';
+import LibraryProvenance from './LibraryProvenance';
 import { api } from '../services/api';
 
 type Details = {
@@ -23,6 +24,7 @@ type Metadata = {
   posterUrl: string | null;
   backdropUrl: string | null;
   revision: number;
+  spoilerHidden?: boolean;
 };
 type Candidate = {
   id: string;
@@ -57,11 +59,13 @@ export default function IdentifiedTitle({
   artworkUrl?: (kind: 'poster' | 'backdrop') => Promise<string>;
   onEpisode?: (id: number) => void;
 }) {
+  const editor = useRef<HTMLDetailsElement>(null);
   const [watchState, setWatchState] = useState<{
     completed: boolean;
     seconds: number;
   }>();
   const [reload, setReload] = useState(0);
+  const [metadataLoaded, setMetadataLoaded] = useState<string>();
   const [value, setValue] = useState<Metadata | null>(null);
   const [draft, setDraft] = useState<Details>({
     ...empty,
@@ -80,7 +84,7 @@ export default function IdentifiedTitle({
     let active = true;
     void request<Metadata | null>(`/media/${id}/metadata`)
       .then(async (row) => {
-        if (row && artworkUrl) {
+        if (row && artworkUrl && !row.spoilerHidden) {
           const [posterUrl, backdropUrl] = await Promise.all([
             row.posterUrl ? artworkUrl('poster').catch(() => null) : null,
             row.backdropUrl ? artworkUrl('backdrop').catch(() => null) : null,
@@ -88,6 +92,7 @@ export default function IdentifiedTitle({
           row = { ...row, posterUrl, backdropUrl };
         }
         if (active) {
+          setMetadataLoaded(`${id}:${reload}`);
           setValue(row);
           setDraft(row?.details ?? { ...empty, title: props.item.title });
         }
@@ -134,6 +139,9 @@ export default function IdentifiedTitle({
             : (value?.details.title ?? props.item.title),
         }}
         metadata={value}
+        hideSpoilers={
+          metadataLoaded !== `${id}:${reload}` || value?.spoilerHidden === true
+        }
         resume={
           watchState
             ? watchState.completed
@@ -142,20 +150,49 @@ export default function IdentifiedTitle({
             : props.resume
         }
       />
+      <LibraryProvenance
+        id={id}
+        admin={admin}
+        request={request}
+        onCorrect={() => {
+          if (editor.current) {
+            editor.current.open = true;
+            editor.current.querySelector<HTMLInputElement>('input')?.focus();
+          }
+        }}
+      />
       {onEpisode &&
         value?.details.series &&
         value.details.season !== null &&
         value.details.episode !== null && (
           <EpisodeNavigation
-            key={`${id}:${value.revision}`}
+            key={`${id}:${value.revision}:${watchState?.completed}:${watchState?.seconds}`}
             id={id}
             request={request}
             onEpisode={onEpisode}
             busy={props.busy}
+            canManage={!!props.bookmarks}
+            onPreferenceChange={() => setReload((x) => x + 1)}
+            onWatchChange={() => {
+              setReload((x) => x + 1);
+              if (!seriesView)
+                void request<{
+                  progress: { completed: boolean; seconds: number };
+                }>(`/media/${id}/watch-state`)
+                  .then((row) => setWatchState(row.progress))
+                  .catch(() => {});
+            }}
           />
         )}
       {!seriesView && props.bookmarks && (
-        <WatchControls id={id} request={request} onChange={setWatchState} />
+        <WatchControls
+          id={id}
+          request={request}
+          onChange={(progress) => {
+            setWatchState(progress);
+            setReload((x) => x + 1);
+          }}
+        />
       )}
       {admin && !seriesView && (
         <ArtworkManager
@@ -166,7 +203,7 @@ export default function IdentifiedTitle({
       )}
       {error && <p role="alert">{error}</p>}
       {admin && (
-        <details className="title-admin metadata-editor">
+        <details ref={editor} className="title-admin metadata-editor">
           <summary>Identify or correct title</summary>
           <p>
             Read adjacent NFO and artwork files, enter details yourself, or
