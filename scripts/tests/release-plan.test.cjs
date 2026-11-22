@@ -88,18 +88,42 @@ test('publisher uploads all platforms to one draft and safely retries interrupte
  for(const target of targets)for(const name of target.files)fs.writeFileSync(path.join(folder,name),'fixture '+name);
  fs.writeFileSync(path.join(folder,'release.json'),JSON.stringify({commit:sha,channel:'alpha',serverVersion:'0.2.0-alpha.50',windowsClientVersion:'0.1.0-alpha.50',image:'test-image'}));
  fs.writeFileSync(path.join(folder,'SHA256SUMS'),fs.readdirSync(folder).sort().map(name=>crypto.createHash('sha256').update(fs.readFileSync(path.join(folder,name))).digest('hex')+'  '+name).join('\n')+'\n');
- const releases=new Map();const assets=new Map();let next=1,fail=true;
- const github={paginate:async(_fn,p)=>[...(assets.get(p.release_id)||[])].map(([name])=>({id:name,name})),rest:{repos:{
+ const releases=new Map();const assets=new Map();let next=1,fail=true,verificationFault,verifyNextListing=false;
+ const github={paginate:async(_fn,p)=>{
+ const reported=[...(assets.get(p.release_id)||[])].map(([name,data])=>({
+   id:name,name,state:'uploaded',digest:'sha256:'+crypto.createHash('sha256').update(data).digest('hex'),
+ }));
+ if (verifyNextListing) {
+   verifyNextListing=false;
+   if (verificationFault==='checksum') reported.find(asset=>asset.name==='SHA256SUMS').digest='sha256:'+'0'.repeat(64);
+   if (verificationFault==='incomplete') reported.pop();
+   if (verificationFault==='starter') reported[0].state='starter';
+   if (verificationFault==='duplicate') reported[1]=reported[0];
+ }
+ return reported;
+ },rest:{repos:{
  getBranch:async()=>({data:{commit:{sha}}}),
  getReleaseByTag:async p=>{if(releases.has(p.tag))return{data:releases.get(p.tag)};throw Object.assign(new Error('missing'),{status:404});},
  createRelease:async p=>{assert.equal(p.tag_name,'v0.2.0-alpha.50');const r={id:next++,target_commitish:p.target_commitish,draft:true};releases.set(p.tag_name,r);assets.set(r.id,new Map());return{data:r};},
  listReleaseAssets:()=>{},deleteReleaseAsset:async p=>{for(const a of assets.values())a.delete(p.asset_id);},
- uploadReleaseAsset:async p=>{if(p.name.endsWith('.msi')&&fail){fail=false;throw new Error('interrupted upload');}assets.get(p.release_id).set(p.name,Buffer.from(p.data));},
+ uploadReleaseAsset:async p=>{
+   if(p.name.endsWith('.msi')&&fail){fail=false;throw new Error('interrupted upload');}
+   const draftAssets=assets.get(p.release_id);
+   assert.equal(draftAssets.has(p.name),false);
+   draftAssets.set(p.name,Buffer.from(p.data));
+   if(p.name==='SHA256SUMS')verifyNextListing=true;
+ },
  updateRelease:async p=>{assert.equal(assets.get(p.release_id).size,22);assert.match(p.body,/Android Phone Client/);for(const r of releases.values())if(r.id===p.release_id)r.draft=p.draft;}
  }}};
  try{process.chdir(temporary);process.env.SOURCE_SHA=sha;process.env.RELEASE_TAG='v0.2.0-alpha.50';
  await assert.rejects(publish({github,context:{repo:{owner:'Splortch',repo:'Media-server'}}}),/interrupted upload/);
  assert.equal(releases.size,1);assert.equal(releases.get('v0.2.0-alpha.50').draft,true);
+ for (const fault of ['checksum','incomplete','starter','duplicate']) {
+   verificationFault=fault;
+   await assert.rejects(publish({github,context:{repo:{owner:'Splortch',repo:'Media-server'}}}),/release asset/);
+   assert.equal(releases.get('v0.2.0-alpha.50').draft,true);
+ }
+ verificationFault=undefined;
  assert.equal(await publish({github,context:{repo:{owner:'Splortch',repo:'Media-server'}}}),true);assert.equal(releases.size,1);
  const uploaded=[...assets.get(1).values()];
  assert.equal(await publish({github,context:{repo:{owner:'Splortch',repo:'Media-server'}}}),true);
