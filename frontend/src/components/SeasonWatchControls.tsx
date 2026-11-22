@@ -56,6 +56,7 @@ export default function SeasonWatchControls({
   }
   return (
     <div
+      role="group"
       className="season-watch-controls"
       aria-label="Season watch state"
       aria-busy={busy}
