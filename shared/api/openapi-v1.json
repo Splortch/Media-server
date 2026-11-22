@@ -2067,6 +2067,51 @@
         }
       }
     },
+    "/api/v1/time-budget": {
+      "get": {
+        "tags": [
+          "Api"
+        ],
+        "parameters": [
+          {
+            "name": "minutes",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "speed",
+            "in": "query",
+            "schema": {
+              "type": "number",
+              "format": "double"
+            }
+          },
+          {
+            "name": "includeStarted",
+            "in": "query",
+            "schema": {
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TimeBudgetPage"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/media/{id}/images": {
       "get": {
         "tags": [
@@ -6087,6 +6132,72 @@
               "null",
               "string"
             ]
+          }
+        }
+      },
+      "TimeBudgetMatch": {
+        "required": [
+          "id",
+          "title",
+          "series",
+          "season",
+          "episode",
+          "remainingSeconds",
+          "started"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "title": {
+            "type": "string"
+          },
+          "series": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "season": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int32"
+          },
+          "episode": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int32"
+          },
+          "remainingSeconds": {
+            "type": "number",
+            "format": "double"
+          },
+          "started": {
+            "type": "boolean"
+          }
+        }
+      },
+      "TimeBudgetPage": {
+        "required": [
+          "items",
+          "hasMore"
+        ],
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TimeBudgetMatch"
+            }
+          },
+          "hasMore": {
+            "type": "boolean"
           }
         }
       },

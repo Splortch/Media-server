@@ -48,6 +48,7 @@ import Player from '../../../frontend/src/components/Player';
 import Icon from '../../../frontend/src/components/Icon';
 import IdentifiedTitle from '../../../frontend/src/components/IdentifiedTitle';
 import CardArtwork from '../../../frontend/src/components/CardArtwork';
+import TimeBudgetPicker from '../../../frontend/src/components/TimeBudgetPicker';
 import { duration } from '../../../frontend/src/services/api';
 type Selection = {
   item: Detail;
@@ -908,6 +909,12 @@ export default function App() {
                   </div>
                   <MediaCards list={continueItems} onOpen={open} />
                 </section>
+              )}
+              {!search && (
+                <TimeBudgetPicker
+                  request={bookmarkRequest}
+                  onOpen={(id) => void open({ id })}
+                />
               )}
               <div className="section-heading">
                 <h2>Library</h2>

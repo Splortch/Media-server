@@ -18,6 +18,7 @@ public static class MetadataEndpoints
             group.MapEpisodePreferences();
             group.MapSeasonWatchActions();
             group.MapLibraryCatalog();
+            group.MapTimeBudget();
             group.MapImages(prefix);
             group
                 .MapGet(

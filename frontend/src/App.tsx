@@ -18,6 +18,7 @@ import ThemePicker from './components/ThemePicker';
 import Icon from './components/Icon';
 import IdentifiedTitle from './components/IdentifiedTitle';
 import CardArtwork from './components/CardArtwork';
+import TimeBudgetPicker from './components/TimeBudgetPicker';
 import {
   featureVisible,
   loadFeatures,
@@ -897,6 +898,15 @@ export default function App() {
                   </div>
                   {cards(watching)}
                 </section>
+              )}
+              {route === 'home' && (
+                <TimeBudgetPicker
+                  request={api}
+                  onOpen={(id) => {
+                    setReturnTo({ route, mediaId: id, scroll: window.scrollY });
+                    location.hash = `media/${id}`;
+                  }}
+                />
               )}
               <section>
                 <div className="section-heading">

@@ -495,6 +495,23 @@ fn allowed_request(method: &str, path: &str) -> bool {
     }
     let p = url.path().strip_prefix("/api/v1/").unwrap_or("");
     let parts = p.split('/').collect::<Vec<_>>();
+    if method == "GET" && p == "time-budget" {
+        let mut seen = std::collections::HashSet::new();
+        return url.query_pairs().all(|(key, value)| {
+            if !seen.insert(key.to_string()) {
+                return false;
+            }
+            match key.as_ref() {
+                "minutes" => value.parse::<u32>().is_ok_and(|n| (1..=720).contains(&n)),
+                "speed" => matches!(
+                    value.as_ref(),
+                    "0.5" | "0.75" | "1" | "1.25" | "1.5" | "1.75" | "2"
+                ),
+                "includeStarted" => matches!(value.as_ref(), "true" | "false"),
+                _ => false,
+            }
+        }) && seen.contains("minutes");
+    }
     if method == "GET" && p == "catalog" {
         let mut seen = std::collections::HashSet::new();
         return url.query_pairs().all(|(key, value)| {
@@ -996,6 +1013,10 @@ mod tests {
             ("GET", "/api/v1/media/4/metadata"),
             ("GET", "/api/v1/media/4/images"),
             ("GET", "/api/v1/catalog?prefix=Series&limit=200&offset=0"),
+            (
+                "GET",
+                "/api/v1/time-budget?minutes=45&speed=1.25&includeStarted=false",
+            ),
             ("GET", "/api/v1/preferences/episodes"),
             ("PUT", "/api/v1/preferences/episodes"),
             ("POST", "/api/v1/media/4/season-watch-state"),
@@ -1023,6 +1044,14 @@ mod tests {
             ("GET", "//evil.example/api/v1/media"),
             ("PUT", "/api/v1/media/4/metadata"),
             ("POST", "/api/v1/catalog"),
+            ("POST", "/api/v1/time-budget?minutes=45"),
+            ("GET", "/api/v1/time-budget?minutes=721"),
+            ("GET", "/api/v1/time-budget?speed=1.25"),
+            ("GET", "/api/v1/time-budget?minutes=45&speed=9"),
+            (
+                "GET",
+                "/api/v1/time-budget?minutes=45&includeStarted=true&includeStarted=false",
+            ),
             ("GET", "/api/v1/catalog?url=https://evil.example"),
             ("GET", "/api/v1/catalog?limit=100000"),
             ("GET", "/api/v1/catalog?offset=0&offset=1"),
