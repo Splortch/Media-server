@@ -181,8 +181,12 @@ builder.Services.AddSingleton(
         builder.Configuration.GetSection("MediaServer:AllowedRoots").Get<string[]>() ?? []
     )
 );
+var scanStagingPath =
+    OperatingSystem.IsWindows() || OperatingSystem.IsMacOS()
+        ? Path.Combine(data, "scan-probe.tmp")
+        : null;
 builder.Services.AddSingleton<IMediaProbe>(
-    new Ffprobe(builder.Configuration["MediaServer:FfprobePath"] ?? "ffprobe")
+    new Ffprobe(builder.Configuration["MediaServer:FfprobePath"] ?? "ffprobe", scanStagingPath)
 );
 builder.Services.AddSingleton<IPlaybackPlanner, DirectPlaybackPlanner>();
 builder.Services.AddSingleton(
@@ -383,6 +387,9 @@ using (var scope = app.Services.CreateScope())
         }
         return;
     }
+    // Recover the single scan scratch slot under the exclusive data-directory lease.
+    if (scanStagingPath is not null)
+        File.Delete(scanStagingPath);
     if (!await db.Users.AnyAsync() && !File.Exists(setupPath))
     {
         var tokenOptions = new FileStreamOptions

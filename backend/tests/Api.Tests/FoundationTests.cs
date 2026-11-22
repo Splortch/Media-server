@@ -44,11 +44,11 @@ public sealed class Server : WebApplicationFactory<Program>
         builder.UseEnvironment("Testing");
         builder.ConfigureServices(services =>
         {
-            services.RemoveAll<IMediaProbe>();
-            if (realProbe)
-                services.AddSingleton<IMediaProbe>(new Ffprobe("ffprobe"));
-            else
+            if (!realProbe)
+            {
+                services.RemoveAll<IMediaProbe>();
                 services.AddSingleton<IMediaProbe, TestProbe>();
+            }
             if (hardware is not null)
                 services.Replace(
                     ServiceDescriptor.Singleton(

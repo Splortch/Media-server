@@ -104,7 +104,7 @@ public interface IMediaProbe
 {
     Task<ProbeResult> ProbeAsync(string path, CancellationToken ct);
 
-    // Linux library scans must keep the validated inode pinned through both
+    // Library scans must use the validated open file through both
     // metadata and HDR inspection. Alternative probes must opt in explicitly.
     Task<ProbeResult> ProbeFileAsync(FileStream source, CancellationToken ct) =>
         throw new MediaProbeException("pinned_probe_unavailable");

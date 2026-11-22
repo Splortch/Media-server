@@ -139,9 +139,7 @@ public sealed class ScanWorker(
                                 await SHA256.HashDataAsync(source, stoppingToken)
                             );
                         }
-                        var metadata = OperatingSystem.IsLinux()
-                            ? await probe.ProbeFileAsync(source, stoppingToken)
-                            : await probe.ProbeAsync(path, stoppingToken);
+                        var metadata = await probe.ProbeFileAsync(source, stoppingToken);
                         if (
                             source.Length != size
                             || File.GetLastWriteTimeUtc(source.SafeFileHandle).Ticks

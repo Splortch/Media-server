@@ -242,11 +242,14 @@ public sealed class PlaybackPipelineTests
             await runner.RunAsync(args, root, timeout.Token);
             var probe = new Ffprobe("ffprobe");
             var result = await probe.ProbeAsync(Path.Combine(root, "hdr.mkv"), timeout.Token);
+            using var source = new PathPolicy([root]).OpenRead(root, "hdr.mkv");
+            var stagedProbe = new Ffprobe("ffprobe", Path.Combine(root, "scan-probe.tmp"));
+            var pinned = await stagedProbe.ProbeFileAsync(source, timeout.Token);
+            Assert.Equal(result.ColorJson, pinned.ColorJson);
             if (OperatingSystem.IsLinux())
             {
-                using var source = new PathPolicy([root]).OpenRead(root, "hdr.mkv");
-                var pinned = await probe.ProbeFileAsync(source, timeout.Token);
-                Assert.Equal(result.ColorJson, pinned.ColorJson);
+                var descriptor = await probe.ProbeFileAsync(source, timeout.Token);
+                Assert.Equal(result.ColorJson, descriptor.ColorJson);
             }
             Assert.Equal(codec, result.VideoCodec);
             var color = JsonSerializer.Deserialize<VideoColor>(result.ColorJson)!;

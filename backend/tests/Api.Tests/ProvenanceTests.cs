@@ -46,6 +46,8 @@ public sealed class ProvenanceTests
                     ContentRating = id == 3 ? 18 : 10,
                     IsMissing = id == 4,
                     PendingImport = id == 5,
+                    FirstSeenAt =
+                        id == 6 ? new DateTime(2026, 11, 20, 12, 0, 0, DateTimeKind.Utc) : null,
                     MetadataJson =
                         id == 6
                             ? JsonSerializer.Serialize(
@@ -123,6 +125,10 @@ public sealed class ProvenanceTests
                 await viewer.GetFromJsonAsync<LibraryProvenanceView>(prefix + "/media/6/provenance")
             )!.Identification
         );
+        using var dated = JsonDocument.Parse(
+            await viewer.GetStringAsync(prefix + "/media/6/provenance")
+        );
+        Assert.Equal("2026-11-20T12:00:00Z", dated.RootElement.GetProperty("addedAt").GetString());
         foreach (var id in new[] { 2, 3, 4, 5 })
         {
             Assert.Equal(

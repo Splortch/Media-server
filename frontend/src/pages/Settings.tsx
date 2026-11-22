@@ -550,6 +550,8 @@ function scanReason(code: string) {
       {
         probe_unavailable: 'FFprobe is not installed or could not start.',
         probe_timeout: 'Identification timed out.',
+        probe_insufficient_storage:
+          'Free space in the server data directory to scan this file.',
         invalid_media: 'FFprobe could not read this media file.',
         no_video: 'No video track was found.',
         file_missing: 'The file or library is unavailable.',

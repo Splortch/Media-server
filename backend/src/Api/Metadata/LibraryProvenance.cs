@@ -66,6 +66,9 @@ public static class LibraryProvenance
     private static int Uid(ClaimsPrincipal user) =>
         int.Parse(user.FindFirstValue(ClaimTypes.NameIdentifier)!);
 
+    private static DateTime? Utc(DateTime? value) =>
+        value is DateTime at ? DateTime.SpecifyKind(at, DateTimeKind.Utc) : null;
+
     private static MatchReportView View(MetadataMatchReport report) =>
         new(
             report.Id,
@@ -73,8 +76,8 @@ public static class LibraryProvenance
             report.Note,
             report.State,
             report.Revision,
-            report.CreatedAt,
-            report.UpdatedAt
+            DateTime.SpecifyKind(report.CreatedAt, DateTimeKind.Utc),
+            DateTime.SpecifyKind(report.UpdatedAt, DateTimeKind.Utc)
         );
 
     private static string Source(MediaItem item, MediaMetadata? row)
@@ -140,8 +143,8 @@ public static class LibraryProvenance
                     return Results.Ok(
                         new LibraryProvenanceView(
                             library,
-                            item.FirstSeenAt,
-                            item.LastScannedAt,
+                            Utc(item.FirstSeenAt),
+                            Utc(item.LastScannedAt),
                             Source(item, metadata),
                             !user.IsInRole("Guest"),
                             report is null ? null : View(report)
@@ -259,7 +262,7 @@ public static class LibraryProvenance
                             row?.Revision,
                             details?.ProviderId,
                             scan?.State,
-                            scan?.CreatedAt
+                            Utc(scan?.CreatedAt)
                         )
                     );
                 }
