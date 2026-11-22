@@ -117,6 +117,29 @@ test('identified seasons remain information-first through keyboard selection and
   ).json();
   expect(grouped.items).toHaveLength(1);
   expect(grouped.items[0].episodeCount).toBe(2);
+  const hidden = await (
+    await page.request.get(`/api/media/${titles[0]}/images`)
+  ).json();
+  expect(hidden.spoilerHidden).toBe(true);
+  expect(hidden.posterUrl).toBeNull();
+  expect(hidden.thumbnailUrl).toBeNull();
+  await page.goto(`/#media/${titles[0]}`);
+  await expect(
+    page.getByText(/Episode summary and artwork are hidden/),
+  ).toBeVisible();
+  await expect(
+    page.locator('.metadata-poster, .metadata-backdrop'),
+  ).toHaveCount(0);
+  const reveal = page.getByLabel(
+    'Reveal summaries and artwork for unseen episodes',
+  );
+  await expect(reveal).not.toBeChecked();
+  await reveal.check();
+  await expect(
+    page
+      .locator('.title-copy')
+      .getByText('A synthetic episode for information-first navigation.'),
+  ).toBeVisible();
   await page.goto('/#library');
   await page.getByLabel('Search library').fill('Series fixture');
   const first = page.locator(`[data-media-id="${titles[0]}"]`);
@@ -138,6 +161,25 @@ test('identified seasons remain information-first through keyboard selection and
   ).toHaveCount(0);
   await expect(page.locator('video')).toHaveCount(0);
   expect(streams).toEqual([]);
+  await page
+    .getByRole('button', { name: 'Mark season watched', exact: true })
+    .click();
+  await page
+    .getByRole('button', { name: 'Confirm season change', exact: true })
+    .click();
+  await expect(
+    page.getByText('1 of 1 accessible episodes watched in Season 1.', {
+      exact: true,
+    }),
+  ).toBeVisible();
+  await page
+    .getByRole('button', { name: 'Undo season change', exact: true })
+    .click();
+  await expect(
+    page.getByText('0 of 1 accessible episodes watched in Season 1.', {
+      exact: true,
+    }),
+  ).toBeVisible();
   await page
     .getByRole('combobox', { name: 'Season', exact: true })
     .selectOption('2');

@@ -49,6 +49,7 @@ beforeEach(() => {
     if (path.startsWith('/catalog'))
       return { items: [media], nextCursor: null };
     if (path === '/media/7') return media;
+    if (path === '/media/7/metadata') return null;
     if (path === '/v1/media/7/tracks')
       return {
         tracks: [

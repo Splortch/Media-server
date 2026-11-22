@@ -229,4 +229,291 @@ public sealed class SeriesEpisodeTests
         Assert.Null(rest.NextOffset);
         Assert.Empty(page.Episodes.Select(x => x.Id).Intersect(rest.Episodes.Select(x => x.Id)));
     }
+
+    [Theory]
+    [InlineData("/api")]
+    [InlineData("/api/v1")]
+    public async Task SeasonChangesAreAtomicPrivateAndRevisionChecked(string prefix)
+    {
+        using var server = new Server();
+        using var admin = await server.Admin();
+        await Seed(server);
+        var created = await admin.PostAsJsonAsync(
+            "/api/users",
+            new
+            {
+                name = "viewer",
+                password = "season-fixture-password",
+                libraries = new[] { 1 },
+                maximumRating = 13,
+            }
+        );
+        var uid = (await created.Content.ReadFromJsonAsync<JsonElement>())
+            .GetProperty("id")
+            .GetInt32();
+        using (var scope = server.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<MediaDb>();
+            foreach (var id in new[] { 4, 5, 8 })
+            {
+                var row = db.Metadata.Single(x => x.MediaItemId == id);
+                var details = JsonSerializer.Deserialize<MetadataValue>(row.DocumentJson)!;
+                row.DocumentJson = JsonSerializer.Serialize(details with { Season = 1 });
+            }
+            db.Progress.AddRange(
+                new PlaybackProgress
+                {
+                    UserId = uid,
+                    MediaItemId = 1,
+                    Seconds = 30,
+                    Revision = 4,
+                    HiddenFromContinueWatching = true,
+                },
+                new PlaybackProgress
+                {
+                    UserId = uid,
+                    MediaItemId = 2,
+                    Seconds = 120,
+                    Revision = 7,
+                    Completed = true,
+                },
+                new PlaybackProgress
+                {
+                    UserId = 1,
+                    MediaItemId = 1,
+                    Seconds = 50,
+                    Revision = 3,
+                }
+            );
+            await db.SaveChangesAsync();
+        }
+        using var viewer = server.CreateClient();
+        await Server.Csrf(viewer);
+        await viewer.PostAsJsonAsync(
+            "/api/auth/login",
+            new { name = "viewer", password = "season-fixture-password" }
+        );
+        await Server.Csrf(viewer);
+        var navigation = (
+            await viewer.GetFromJsonAsync<SeriesNavigation>(prefix + "/media/1/episodes")
+        )!;
+        Assert.Equal(1, navigation.NextUnwatched!.Id);
+        Assert.Equal(2, navigation.SeasonProgress!.Total);
+        Assert.Equal(1, navigation.SeasonProgress.Watched);
+        var path = prefix + "/media/1/season-watch-state";
+        var change = new SeasonWatchChange(1, "watched", navigation.SeasonProgress.Revision);
+        var response = await viewer.PostAsJsonAsync(path, change);
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var ack = (await response.Content.ReadFromJsonAsync<SeasonWatchResult>())!;
+        Assert.Equal(2, ack.Progress.Watched);
+        Assert.Equal(
+            HttpStatusCode.Conflict,
+            (await viewer.PostAsJsonAsync(path, change)).StatusCode
+        );
+        Assert.Equal(
+            HttpStatusCode.Conflict,
+            (
+                await admin.PostAsJsonAsync(
+                    path,
+                    new SeasonWatchChange(1, "undo", UndoToken: ack.UndoToken)
+                )
+            ).StatusCode
+        );
+        using (var scope = server.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<MediaDb>();
+            Assert.Equal(50, db.Progress.Single(x => x.UserId == 1 && x.MediaItemId == 1).Seconds);
+            Assert.Equal(
+                new[] { 1, 2 },
+                db.Progress.Where(x => x.UserId == uid)
+                    .OrderBy(x => x.MediaItemId)
+                    .Select(x => x.MediaItemId)
+            );
+        }
+        var undone = await viewer.PostAsJsonAsync(
+            path,
+            new SeasonWatchChange(1, "undo", UndoToken: ack.UndoToken)
+        );
+        Assert.Equal(HttpStatusCode.OK, undone.StatusCode);
+        Assert.Equal(
+            HttpStatusCode.Conflict,
+            (
+                await viewer.PostAsJsonAsync(
+                    path,
+                    new SeasonWatchChange(1, "undo", UndoToken: ack.UndoToken)
+                )
+            ).StatusCode
+        );
+        var current = (await viewer.GetFromJsonAsync<WatchState>(prefix + "/media/1/watch-state"))!;
+        Assert.Equal(30, current.Progress.Seconds);
+        Assert.True(current.Hidden);
+        var fresh = (
+            await viewer.GetFromJsonAsync<SeriesNavigation>(prefix + "/media/1/episodes")
+        )!;
+        var second = (
+            await (
+                await viewer.PostAsJsonAsync(
+                    path,
+                    new SeasonWatchChange(1, "unwatched", fresh.SeasonProgress!.Revision)
+                )
+            ).Content.ReadFromJsonAsync<SeasonWatchResult>()
+        )!;
+        // A newer write on even one episode prevents all of the undo, preserving the rest.
+        var progress = (
+            await viewer.GetFromJsonAsync<WatchState>(prefix + "/media/1/watch-state")
+        )!;
+        await viewer.PostAsJsonAsync(
+            prefix + "/media/1/watch-state",
+            new WatchChange("watched", progress.Progress.Revision)
+        );
+        Assert.Equal(
+            HttpStatusCode.Conflict,
+            (
+                await viewer.PostAsJsonAsync(
+                    path,
+                    new SeasonWatchChange(1, "undo", UndoToken: second.UndoToken)
+                )
+            ).StatusCode
+        );
+        Assert.False(
+            (await viewer.GetFromJsonAsync<WatchState>(prefix + "/media/2/watch-state"))!
+                .Progress
+                .Completed
+        );
+        Assert.Equal(
+            HttpStatusCode.NotFound,
+            (
+                await viewer.PostAsJsonAsync(prefix + "/media/5/season-watch-state", change)
+            ).StatusCode
+        );
+        Assert.Equal(
+            HttpStatusCode.BadRequest,
+            (await viewer.PostAsJsonAsync(path, new SeasonWatchChange(-1, "watched"))).StatusCode
+        );
+        fresh = (await viewer.GetFromJsonAsync<SeriesNavigation>(prefix + "/media/1/episodes"))!;
+        var expiring = (
+            await (
+                await viewer.PostAsJsonAsync(
+                    path,
+                    new SeasonWatchChange(1, "watched", fresh.SeasonProgress!.Revision)
+                )
+            ).Content.ReadFromJsonAsync<SeasonWatchResult>()
+        )!;
+        using (var scope = server.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<MediaDb>();
+            db.SeasonWatchUndos.Single(x => x.UserId == uid).ExpiresAt = DateTime.UtcNow.AddMinutes(
+                -1
+            );
+            await db.SaveChangesAsync();
+        }
+        Assert.Equal(
+            HttpStatusCode.Conflict,
+            (
+                await viewer.PostAsJsonAsync(
+                    path,
+                    new SeasonWatchChange(1, "undo", UndoToken: expiring.UndoToken)
+                )
+            ).StatusCode
+        );
+        fresh = (await viewer.GetFromJsonAsync<SeriesNavigation>(prefix + "/media/1/episodes"))!;
+        var rematching = (
+            await (
+                await viewer.PostAsJsonAsync(
+                    path,
+                    new SeasonWatchChange(1, "unwatched", fresh.SeasonProgress!.Revision)
+                )
+            ).Content.ReadFromJsonAsync<SeasonWatchResult>()
+        )!;
+        using (var scope = server.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<MediaDb>();
+            db.Metadata.Single(x => x.MediaItemId == 2).Revision++;
+            await db.SaveChangesAsync();
+        }
+        Assert.Equal(
+            HttpStatusCode.Conflict,
+            (
+                await viewer.PostAsJsonAsync(
+                    path,
+                    new SeasonWatchChange(1, "undo", UndoToken: rematching.UndoToken)
+                )
+            ).StatusCode
+        );
+    }
+
+    [Fact]
+    public async Task SpoilersDefaultToHiddenAndPreferenceAndProgressAreAccountScoped()
+    {
+        using var server = new Server();
+        using var admin = await server.Admin();
+        await Seed(server);
+        foreach (var prefix in new[] { "/api", "/api/v1" })
+        {
+            var metadata = (
+                await admin.GetFromJsonAsync<MetadataView>(prefix + "/media/1/metadata")
+            )!;
+            Assert.True(metadata.SpoilerHidden);
+            var images = (await admin.GetFromJsonAsync<ImageOptions>(prefix + "/media/1/images"))!;
+            Assert.True(images.SpoilerHidden);
+            Assert.Null(images.PosterUrl);
+            Assert.Null(images.ThumbnailUrl);
+        }
+        Assert.False(
+            (
+                await admin.GetFromJsonAsync<EpisodePreferences>("/api/preferences/episodes")
+            )!.RevealSpoilers
+        );
+        Assert.Equal(
+            HttpStatusCode.OK,
+            (
+                await admin.PutAsJsonAsync(
+                    "/api/v1/preferences/episodes",
+                    new EpisodePreferences(true)
+                )
+            ).StatusCode
+        );
+        Assert.False(
+            (await admin.GetFromJsonAsync<MetadataView>("/api/media/1/metadata"))!.SpoilerHidden
+        );
+        await admin.PutAsJsonAsync("/api/preferences/episodes", new EpisodePreferences(false));
+        await admin.PostAsJsonAsync("/api/media/1/watch-state", new WatchChange("watched", 0));
+        Assert.False(
+            (await admin.GetFromJsonAsync<MetadataView>("/api/media/1/metadata"))!.SpoilerHidden
+        );
+        Assert.True(
+            (await admin.GetFromJsonAsync<MetadataView>("/api/media/2/metadata"))!.SpoilerHidden
+        );
+        var navigation = (await admin.GetFromJsonAsync<SeriesNavigation>("/api/media/1/episodes"))!;
+        Assert.Equal(2, navigation.NextUnwatched!.Id);
+        Assert.Equal(1, navigation.SeasonProgress!.Watched);
+        var specials = (
+            await admin.GetFromJsonAsync<SeriesNavigation>("/api/media/1/episodes?season=0")
+        )!;
+        Assert.Equal(7, specials.NextUnwatched!.Id);
+        await admin.PutAsJsonAsync(
+            "/api/experiments/guests",
+            new { enabled = true, libraries = new[] { 1 } }
+        );
+        using var guest = server.CreateClient();
+        await Server.Csrf(guest);
+        await guest.PostAsync("/api/auth/guest", null);
+        await Server.Csrf(guest);
+        Assert.True(
+            (await guest.GetFromJsonAsync<MetadataView>("/api/media/1/metadata"))!.SpoilerHidden
+        );
+        Assert.Equal(
+            HttpStatusCode.Forbidden,
+            (await guest.GetAsync("/api/preferences/episodes")).StatusCode
+        );
+        Assert.Equal(
+            HttpStatusCode.Forbidden,
+            (
+                await guest.PostAsJsonAsync(
+                    "/api/media/1/season-watch-state",
+                    new SeasonWatchChange(1, "watched", navigation.SeasonProgress.Revision)
+                )
+            ).StatusCode
+        );
+    }
 }

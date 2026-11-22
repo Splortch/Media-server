@@ -225,6 +225,7 @@ public static class Experiments
                 or "/media"
                 or "/media-page"
                 or "/catalog"
+                or "/media/{id:int}/provenance"
                 or "/media/{id:int}/images"
                 or "/media/{id:int}/thumbnail"
                 or "/media/{id:int}/metadata"

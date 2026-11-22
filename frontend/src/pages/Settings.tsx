@@ -12,6 +12,7 @@ import {
 import Icon, { type IconName } from '../components/Icon';
 import Monitoring from '../features/admin/Monitoring';
 import LibraryTools from '../features/admin/LibraryTools';
+import MatchReports from '../features/admin/MatchReports';
 import { Collections, Sessions } from '../features/Personal';
 import { api, type Library } from '../services/api';
 type ScanIssue = { fileName: string; code: string; correlationId: string };
@@ -493,6 +494,9 @@ export default function Settings({
                 ))}
               </section>
               <LibraryTools libraries={libraries} />
+              {featureVisible(features, 'library-provenance') && (
+                <MatchReports />
+              )}
               <div
                 id="settings-people"
                 className="settings-target"

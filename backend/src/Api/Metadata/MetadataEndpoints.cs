@@ -13,13 +13,21 @@ public static class MetadataEndpoints
             var group = app.MapGroup(prefix).RequireAuthorization();
             if (prefix.EndsWith("v1"))
                 group.WithGroupName("client-v1");
+            group.MapLibraryProvenance();
             group.MapSeriesEpisodes();
+            group.MapEpisodePreferences();
+            group.MapSeasonWatchActions();
             group.MapLibraryCatalog();
             group.MapImages(prefix);
             group
                 .MapGet(
                     "/media/{id:int}/metadata",
-                    async (int id, MediaDb db, CancellationToken ct) =>
+                    async (
+                        int id,
+                        MediaDb db,
+                        System.Security.Claims.ClaimsPrincipal user,
+                        CancellationToken ct
+                    ) =>
                     {
                         if (!await db.Items.AnyAsync(x => x.Id == id, ct))
                             return Results.NotFound();
@@ -29,7 +37,12 @@ public static class MetadataEndpoints
                         );
                         return row is null
                             ? Results.Text("null", "application/json")
-                            : Results.Json(MetadataService.View(row, id, prefix));
+                            : Results.Json(
+                                MetadataService.View(row, id, prefix) with
+                                {
+                                    SpoilerHidden = await EpisodePrivacy.Hidden(db, id, user, ct),
+                                }
+                            );
                     }
                 )
                 .Produces<MetadataView>();

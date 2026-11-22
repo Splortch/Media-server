@@ -243,6 +243,8 @@ public sealed class FoundationTests
         var library = (await response.Content.ReadFromJsonAsync<JsonElement>())
             .GetProperty("id")
             .GetInt32();
+        DateTime? firstSeen = null;
+        DateTime? lastScan = null;
         for (var i = 0; i < 2; i++)
         {
             var scan = await client.PostAsync($"/api/libraries/{library}/scan", null);
@@ -263,6 +265,14 @@ public sealed class FoundationTests
                 await Task.Delay(50);
             }
             Assert.True(complete, "Background scan did not complete");
+            using var scope = server.Services.CreateScope();
+            var scanned = scope.ServiceProvider.GetRequiredService<MediaDb>().Items.Single();
+            Assert.NotNull(scanned.FirstSeenAt);
+            Assert.NotNull(scanned.LastScannedAt);
+            firstSeen ??= scanned.FirstSeenAt;
+            Assert.Equal(firstSeen, scanned.FirstSeenAt);
+            Assert.True(lastScan is null || scanned.LastScannedAt >= lastScan);
+            lastScan = scanned.LastScannedAt;
         }
         var items = await client.GetFromJsonAsync<JsonElement>("/api/media");
         Assert.Single(items.EnumerateArray());
