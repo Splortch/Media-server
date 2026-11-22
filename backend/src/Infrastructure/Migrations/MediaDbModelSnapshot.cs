@@ -15,7 +15,7 @@ namespace Infrastructure.Migrations
         protected override void BuildModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
-            modelBuilder.HasAnnotation("ProductVersion", "10.0.14");
+            modelBuilder.HasAnnotation("ProductVersion", "10.0.15");
 
             modelBuilder.Entity("MediaServer.Core.DownloadJob", b =>
                 {
@@ -293,11 +293,17 @@ namespace Infrastructure.Migrations
                         .IsRequired()
                         .HasColumnType("TEXT");
 
+                    b.Property<DateTime?>("FirstSeenAt")
+                        .HasColumnType("TEXT");
+
                     b.Property<string>("ImportJobId")
                         .HasColumnType("TEXT");
 
                     b.Property<bool>("IsMissing")
                         .HasColumnType("INTEGER");
+
+                    b.Property<DateTime?>("LastScannedAt")
+                        .HasColumnType("TEXT");
 
                     b.Property<int>("LibraryId")
                         .HasColumnType("INTEGER");
@@ -369,6 +375,52 @@ namespace Infrastructure.Migrations
                     b.HasKey("MediaItemId");
 
                     b.ToTable("Metadata");
+                });
+
+            modelBuilder.Entity("MediaServer.Core.MetadataMatchReport", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("MediaItemId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Note")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<long>("Revision")
+                        .IsConcurrencyToken()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("State")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("UserId")
+                        .HasColumnType("INTEGER");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("MediaItemId");
+
+                    b.HasIndex("State", "Id");
+
+                    b.HasIndex("UserId", "MediaItemId")
+                        .IsUnique();
+
+                    b.ToTable("MatchReports");
                 });
 
             modelBuilder.Entity("MediaServer.Core.MovieRequest", b =>
@@ -804,6 +856,21 @@ namespace Infrastructure.Migrations
                     b.HasOne("MediaServer.Core.MediaItem", null)
                         .WithOne()
                         .HasForeignKey("MediaServer.Core.MediaMetadata", "MediaItemId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("MediaServer.Core.MetadataMatchReport", b =>
+                {
+                    b.HasOne("MediaServer.Core.MediaItem", null)
+                        .WithMany()
+                        .HasForeignKey("MediaItemId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("MediaServer.Core.User", null)
+                        .WithMany()
+                        .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
                 });

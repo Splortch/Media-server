@@ -2039,6 +2039,84 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/media/{id}/provenance": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: number;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["LibraryProvenanceView"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/media/{id}/match-report": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: number;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["MatchReportInput"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["MatchReportView"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/media/{id}/episodes": {
         parameters: {
             query?: never;
@@ -2542,6 +2620,123 @@ export interface paths {
         };
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/media/{id}/provenance": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: number;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ProvenanceDiagnostics"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/match-reports": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: {
+                    mediaId?: number;
+                    offset?: number;
+                    closed?: boolean;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["MatchReportPage"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/match-reports/{id}/review": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: number;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["MatchReportReview"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["MatchReportView"];
+                    };
+                };
+            };
+        };
         delete?: never;
         options?: never;
         head?: never;
@@ -3542,6 +3737,19 @@ export interface components {
             maximumRating: null | number;
             libraries: number[];
         };
+        AdminMatchReport: {
+            /** Format: int32 */
+            id: number;
+            /** Format: int32 */
+            mediaId: number;
+            title: string;
+            reporter: string;
+            kind: string;
+            note: string;
+            state: string;
+            /** Format: int64 */
+            revision: number;
+        };
         AnonymousTypeOfintAndstring: {
             /** Format: int32 */
             id: number;
@@ -3851,6 +4059,16 @@ export interface components {
             watchEnabled: boolean;
             computeHashes: boolean;
         };
+        LibraryProvenanceView: {
+            library: string;
+            /** Format: date-time */
+            addedAt: null | string;
+            /** Format: date-time */
+            lastScannedAt: null | string;
+            identification: string;
+            canReport: boolean;
+            report: null | components["schemas"]["MatchReportView"];
+        };
         LibraryRequest: {
             name: string;
             path: string;
@@ -3865,6 +4083,33 @@ export interface components {
             name: string;
             password: string;
             deviceName?: null | string;
+        };
+        MatchReportInput: {
+            kind: string;
+            note: null | string;
+        };
+        MatchReportPage: {
+            items: components["schemas"]["AdminMatchReport"][];
+            /** Format: int32 */
+            nextOffset: null | number;
+        };
+        MatchReportReview: {
+            state: string;
+            /** Format: int64 */
+            expectedRevision: number;
+        };
+        MatchReportView: {
+            /** Format: int32 */
+            id: number;
+            kind: string;
+            note: string;
+            state: string;
+            /** Format: int64 */
+            revision: number;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
         };
         MediaChapter: {
             title: string;
@@ -4087,6 +4332,25 @@ export interface components {
             expectedRevision: number;
             /** @default false */
             completed: boolean;
+        };
+        ProvenanceDiagnostics: {
+            /** Format: int32 */
+            mediaId: number;
+            title: string;
+            relativePath: string;
+            filePath: null | string;
+            missing: boolean;
+            pendingImport: boolean;
+            /** Format: int64 */
+            size: number;
+            fingerprint: string;
+            identification: string;
+            /** Format: int64 */
+            metadataRevision: null | number;
+            providerId: null | string;
+            lastLibraryScanState: null | string;
+            /** Format: date-time */
+            lastLibraryScanAt: null | string;
         };
         RatingInput: {
             /** Format: int32 */

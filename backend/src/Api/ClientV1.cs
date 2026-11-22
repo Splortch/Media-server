@@ -83,6 +83,7 @@ public static class ClientV1
                             "watch-state",
                             "episode-tracking",
                             "spoiler-preferences",
+                            "library-provenance",
                             "hls-conversion",
                             "track-selection",
                             "library-removal",

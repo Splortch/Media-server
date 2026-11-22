@@ -323,6 +323,7 @@ public sealed class DownloadImporter(
                         LibraryId = job.TargetLibraryId!.Value,
                         RelativePath = job.ImportRelativePath!,
                         PendingImport = true,
+                        FirstSeenAt = DateTime.UtcNow,
                         IsMissing = true,
                         ImportJobId = job.Id,
                         Title = job.ImportTitle!,

@@ -1791,6 +1791,76 @@
         }
       }
     },
+    "/api/v1/media/{id}/provenance": {
+      "get": {
+        "tags": [
+          "Api"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LibraryProvenanceView"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/media/{id}/match-report": {
+      "post": {
+        "tags": [
+          "Api"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MatchReportInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MatchReportView"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/media/{id}/episodes": {
       "get": {
         "tags": [
@@ -2297,6 +2367,120 @@
         "responses": {
           "200": {
             "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/v1/admin/media/{id}/provenance": {
+      "get": {
+        "tags": [
+          "Api"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProvenanceDiagnostics"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/admin/match-reports": {
+      "get": {
+        "tags": [
+          "Api"
+        ],
+        "parameters": [
+          {
+            "name": "mediaId",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "closed",
+            "in": "query",
+            "schema": {
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MatchReportPage"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/admin/match-reports/{id}/review": {
+      "post": {
+        "tags": [
+          "Api"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MatchReportReview"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MatchReportView"
+                }
+              }
+            }
           }
         }
       }
@@ -3238,6 +3422,48 @@
               "type": "integer",
               "format": "int32"
             }
+          }
+        }
+      },
+      "AdminMatchReport": {
+        "required": [
+          "id",
+          "mediaId",
+          "title",
+          "reporter",
+          "kind",
+          "note",
+          "state",
+          "revision"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "mediaId": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "title": {
+            "type": "string"
+          },
+          "reporter": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string"
+          },
+          "note": {
+            "type": "string"
+          },
+          "state": {
+            "type": "string"
+          },
+          "revision": {
+            "type": "integer",
+            "format": "int64"
           }
         }
       },
@@ -4387,6 +4613,52 @@
           }
         }
       },
+      "LibraryProvenanceView": {
+        "required": [
+          "library",
+          "addedAt",
+          "lastScannedAt",
+          "identification",
+          "canReport",
+          "report"
+        ],
+        "type": "object",
+        "properties": {
+          "library": {
+            "type": "string"
+          },
+          "addedAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "lastScannedAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "identification": {
+            "type": "string"
+          },
+          "canReport": {
+            "type": "boolean"
+          },
+          "report": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/MatchReportView"
+              }
+            ]
+          }
+        }
+      },
       "LibraryRequest": {
         "required": [
           "name",
@@ -4432,6 +4704,101 @@
               "null",
               "string"
             ]
+          }
+        }
+      },
+      "MatchReportInput": {
+        "required": [
+          "kind",
+          "note"
+        ],
+        "type": "object",
+        "properties": {
+          "kind": {
+            "type": "string"
+          },
+          "note": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        }
+      },
+      "MatchReportPage": {
+        "required": [
+          "items",
+          "nextOffset"
+        ],
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AdminMatchReport"
+            }
+          },
+          "nextOffset": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int32"
+          }
+        }
+      },
+      "MatchReportReview": {
+        "required": [
+          "state",
+          "expectedRevision"
+        ],
+        "type": "object",
+        "properties": {
+          "state": {
+            "type": "string"
+          },
+          "expectedRevision": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
+      "MatchReportView": {
+        "required": [
+          "id",
+          "kind",
+          "note",
+          "state",
+          "revision",
+          "createdAt",
+          "updatedAt"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "kind": {
+            "type": "string"
+          },
+          "note": {
+            "type": "string"
+          },
+          "state": {
+            "type": "string"
+          },
+          "revision": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
           }
         }
       },
@@ -5252,6 +5619,84 @@
           "completed": {
             "type": "boolean",
             "default": false
+          }
+        }
+      },
+      "ProvenanceDiagnostics": {
+        "required": [
+          "mediaId",
+          "title",
+          "relativePath",
+          "filePath",
+          "missing",
+          "pendingImport",
+          "size",
+          "fingerprint",
+          "identification",
+          "metadataRevision",
+          "providerId",
+          "lastLibraryScanState",
+          "lastLibraryScanAt"
+        ],
+        "type": "object",
+        "properties": {
+          "mediaId": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "title": {
+            "type": "string"
+          },
+          "relativePath": {
+            "type": "string"
+          },
+          "filePath": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "missing": {
+            "type": "boolean"
+          },
+          "pendingImport": {
+            "type": "boolean"
+          },
+          "size": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "fingerprint": {
+            "type": "string"
+          },
+          "identification": {
+            "type": "string"
+          },
+          "metadataRevision": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int64"
+          },
+          "providerId": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "lastLibraryScanState": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "lastLibraryScanAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
           }
         }
       },
