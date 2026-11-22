@@ -596,6 +596,37 @@ namespace Infrastructure.Migrations
                     b.ToTable("Jobs");
                 });
 
+            modelBuilder.Entity("MediaServer.Core.SeasonWatchUndo", b =>
+                {
+                    b.Property<int>("UserId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateTime>("ExpiresAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("MediaItemId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Revision")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("Season")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("SnapshotJson")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Token")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("UserId");
+
+                    b.ToTable("SeasonWatchUndos");
+                });
+
             modelBuilder.Entity("MediaServer.Core.Session", b =>
                 {
                     b.Property<string>("Id")
@@ -677,6 +708,9 @@ namespace Infrastructure.Migrations
                     b.Property<string>("PasswordHash")
                         .IsRequired()
                         .HasColumnType("TEXT");
+
+                    b.Property<bool>("RevealEpisodeSpoilers")
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("Role")
                         .IsRequired()
@@ -863,6 +897,15 @@ namespace Infrastructure.Migrations
                     b.HasOne("MediaServer.Core.Library", null)
                         .WithMany()
                         .HasForeignKey("LibraryId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("MediaServer.Core.SeasonWatchUndo", b =>
+                {
+                    b.HasOne("MediaServer.Core.User", null)
+                        .WithOne()
+                        .HasForeignKey("MediaServer.Core.SeasonWatchUndo", "UserId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
                 });

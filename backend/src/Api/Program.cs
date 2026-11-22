@@ -290,6 +290,19 @@ builder.Services.AddRateLimiter(o =>
             )
     );
     o.AddPolicy(
+        "season-watch",
+        context =>
+            RateLimitPartition.GetFixedWindowLimiter(
+                context.User.FindFirstValue(ClaimTypes.NameIdentifier) ?? "anonymous",
+                _ => new FixedWindowRateLimiterOptions
+                {
+                    PermitLimit = 20,
+                    Window = TimeSpan.FromMinutes(1),
+                    QueueLimit = 0,
+                }
+            )
+    );
+    o.AddPolicy(
         "requests",
         context =>
             RateLimitPartition.GetFixedWindowLimiter(

@@ -7,6 +7,7 @@ public class User
     public string PasswordHash { get; set; } = "";
     public string Role { get; set; } = "Admin";
     public bool Disabled { get; set; }
+    public bool RevealEpisodeSpoilers { get; set; }
     public bool AllLibraries { get; set; } = true;
     public int? MaximumRating { get; set; }
 }

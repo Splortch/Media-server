@@ -1837,6 +1837,92 @@
         }
       }
     },
+    "/api/v1/preferences/episodes": {
+      "get": {
+        "tags": [
+          "Api"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EpisodePreferences"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "Api"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EpisodePreferences"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EpisodePreferences"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/media/{id}/season-watch-state": {
+      "post": {
+        "tags": [
+          "Api"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SeasonWatchChange"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SeasonWatchResult"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/catalog": {
       "get": {
         "tags": [
@@ -4072,6 +4158,17 @@
           }
         }
       },
+      "EpisodePreferences": {
+        "required": [
+          "revealSpoilers"
+        ],
+        "type": "object",
+        "properties": {
+          "revealSpoilers": {
+            "type": "boolean"
+          }
+        }
+      },
       "FeatureCapability": {
         "required": [
           "key",
@@ -4216,7 +4313,14 @@
             ]
           },
           "thumbnailUrl": {
-            "type": "string"
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "spoilerHidden": {
+            "type": "boolean",
+            "default": false
           }
         }
       },
@@ -4734,6 +4838,10 @@
           "revision": {
             "type": "integer",
             "format": "int64"
+          },
+          "spoilerHidden": {
+            "type": "boolean",
+            "default": false
           }
         }
       },
@@ -5230,6 +5338,81 @@
           }
         }
       },
+      "SeasonWatchChange": {
+        "required": [
+          "season",
+          "action"
+        ],
+        "type": "object",
+        "properties": {
+          "season": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "action": {
+            "type": "string"
+          },
+          "expectedRevision": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "undoToken": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        }
+      },
+      "SeasonWatchResult": {
+        "required": [
+          "progress",
+          "undoToken"
+        ],
+        "type": "object",
+        "properties": {
+          "progress": {
+            "$ref": "#/components/schemas/SeasonWatchView"
+          },
+          "undoToken": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        }
+      },
+      "SeasonWatchView": {
+        "required": [
+          "season",
+          "total",
+          "watched",
+          "revision"
+        ],
+        "type": "object",
+        "properties": {
+          "season": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "total": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "watched": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "revision": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        }
+      },
       "SeriesEpisode": {
         "required": [
           "id",
@@ -5321,6 +5504,26 @@
               },
               {
                 "$ref": "#/components/schemas/SeriesEpisode"
+              }
+            ]
+          },
+          "nextUnwatched": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/SeriesEpisode"
+              }
+            ]
+          },
+          "seasonProgress": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/SeasonWatchView"
               }
             ]
           }

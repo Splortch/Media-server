@@ -2079,6 +2079,105 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/preferences/episodes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["EpisodePreferences"];
+                    };
+                };
+            };
+        };
+        put: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["EpisodePreferences"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["EpisodePreferences"];
+                    };
+                };
+            };
+        };
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/media/{id}/season-watch-state": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: number;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["SeasonWatchChange"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["SeasonWatchResult"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/catalog": {
         parameters: {
             query?: never;
@@ -3692,6 +3791,9 @@ export interface components {
             available: boolean;
             diagnostic: string;
         };
+        EpisodePreferences: {
+            revealSpoilers: boolean;
+        };
         FeatureCapability: {
             key: string;
             name: string;
@@ -3725,7 +3827,9 @@ export interface components {
         };
         ImageOptions: {
             posterUrl: null | string;
-            thumbnailUrl: string;
+            thumbnailUrl: null | string;
+            /** @default false */
+            spoilerHidden: boolean;
         };
         Library: {
             /** Format: int32 */
@@ -3873,6 +3977,8 @@ export interface components {
             backdropUrl: null | string;
             /** Format: int64 */
             revision: number;
+            /** @default false */
+            spoilerHidden: boolean;
         };
         MovieMetadata: {
             title: null | string;
@@ -4006,6 +4112,26 @@ export interface components {
             code: string;
             correlationId: string;
         };
+        SeasonWatchChange: {
+            /** Format: int32 */
+            season: number;
+            action: string;
+            expectedRevision?: null | string;
+            undoToken?: null | string;
+        };
+        SeasonWatchResult: {
+            progress: components["schemas"]["SeasonWatchView"];
+            undoToken: null | string;
+        };
+        SeasonWatchView: {
+            /** Format: int32 */
+            season: number;
+            /** Format: int32 */
+            total: number;
+            /** Format: int32 */
+            watched: number;
+            revision: null | string;
+        };
         SeriesEpisode: {
             /** Format: int32 */
             id: number;
@@ -4029,6 +4155,8 @@ export interface components {
             /** Format: int32 */
             nextOffset: null | number;
             nextEpisode: null | components["schemas"]["SeriesEpisode"];
+            nextUnwatched?: null | components["schemas"]["SeriesEpisode"];
+            seasonProgress?: null | components["schemas"]["SeasonWatchView"];
         };
         ServerInfo: {
             name: string;

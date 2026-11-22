@@ -19,6 +19,7 @@ public class MediaDb(DbContextOptions<MediaDb> options, IUserContext? context = 
     public static string Fold(string value) => throw new NotSupportedException();
 
     private int? CurrentUserId => context?.UserId;
+    public DbSet<SeasonWatchUndo> SeasonWatchUndos => Set<SeasonWatchUndo>();
     public DbSet<MediaArtworkOption> ArtworkOptions => Set<MediaArtworkOption>();
     public DbSet<MediaMetadata> Metadata => Set<MediaMetadata>();
     public DbSet<DownloadJob> Downloads => Set<DownloadJob>();
@@ -44,6 +45,12 @@ public class MediaDb(DbContextOptions<MediaDb> options, IUserContext? context = 
 
     protected override void OnModelCreating(ModelBuilder b)
     {
+        b.Entity<SeasonWatchUndo>().HasKey(x => x.UserId);
+        b.Entity<SeasonWatchUndo>()
+            .HasOne<User>()
+            .WithOne()
+            .HasForeignKey<SeasonWatchUndo>(x => x.UserId)
+            .OnDelete(DeleteBehavior.Cascade);
         b.Entity<MediaArtworkOption>().HasKey(x => new { x.MediaItemId, x.Key });
         b.Entity<MediaArtworkOption>()
             .HasOne<MediaItem>()
