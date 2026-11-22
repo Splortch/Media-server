@@ -138,3 +138,28 @@ it('does not render poster, backdrop or embedded synopsis while spoilers are hid
     screen.getByRole('button', { name: /Play from beginning/ }),
   ).toBeEnabled();
 });
+it('keeps a pending checkbox choice visible and rolls it back when saving fails', async () => {
+  let rejectSave!: (reason: Error) => void;
+  const pending = new Promise((_, reject) => {
+    rejectSave = reject;
+  });
+  const request = vi
+    .fn<typeof api>()
+    .mockResolvedValueOnce({ revealSpoilers: false } as never)
+    .mockReturnValueOnce(pending as never);
+  render(
+    <EpisodeSpoilerPreference
+      request={request as typeof api}
+      onChanged={vi.fn()}
+    />,
+  );
+  const checkbox = screen.getByRole('checkbox');
+  await waitFor(() => expect(checkbox).toBeEnabled());
+  fireEvent.click(checkbox);
+  expect(checkbox).toBeChecked();
+  expect(checkbox).toBeDisabled();
+  rejectSave(new Error('Disconnected'));
+  await waitFor(() => expect(checkbox).toBeEnabled());
+  expect(checkbox).not.toBeChecked();
+  expect(screen.getByRole('status')).toHaveTextContent('could not be saved');
+});

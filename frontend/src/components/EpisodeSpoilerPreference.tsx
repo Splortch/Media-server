@@ -36,6 +36,7 @@ export default function EpisodeSpoilerPreference({
           disabled={!ready || busy}
           onChange={(event) => {
             const next = event.target.checked;
+            setReveal(next);
             setBusy(true);
             setError('');
             void request<{ revealSpoilers: boolean }>(
@@ -47,7 +48,10 @@ export default function EpisodeSpoilerPreference({
                 setReveal(value.revealSpoilers);
                 onChanged();
               })
-              .catch(() => setError('Spoiler preference could not be saved.'))
+              .catch(() => {
+                setReveal(!next);
+                setError('Spoiler preference could not be saved.');
+              })
               .finally(() => setBusy(false));
           }}
         />{' '}
