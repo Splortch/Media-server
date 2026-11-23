@@ -128,6 +128,9 @@ it('offers original-quality HLS for an eligible audio track and requests stream 
   await screen.findByRole('option', { name: /aac/ });
   const label = 'Prepare HLS at original quality';
   const audio = screen.getByLabelText('Audio track');
+  expect(screen.getByLabelText('Subtitles')).toHaveAccessibleDescription(
+    /bitmap subtitles are unavailable/,
+  );
   expect(audio).toHaveAccessibleDescription(/Prepare HLS playback/);
   expect(audio).not.toHaveAccessibleDescription(
     /Prepare HLS at original quality/,
