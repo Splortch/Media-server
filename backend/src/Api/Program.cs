@@ -188,7 +188,7 @@ var scanStagingPath =
 builder.Services.AddSingleton<IMediaProbe>(
     new Ffprobe(builder.Configuration["MediaServer:FfprobePath"] ?? "ffprobe", scanStagingPath)
 );
-builder.Services.AddSingleton<IPlaybackPlanner, DirectPlaybackPlanner>();
+builder.Services.AddSingleton<IPlaybackPlanner, MediaPlaybackPlanner>();
 builder.Services.AddSingleton(
     new FfmpegRunner(builder.Configuration["MediaServer:FfmpegPath"] ?? "ffmpeg")
 );
@@ -213,6 +213,7 @@ builder.Services.AddSingleton(sp => new PlaybackSessions(
     sp.GetRequiredService<IHostApplicationLifetime>(),
     sp.GetRequiredService<TranscodeSettings>(),
     sp.GetRequiredService<IMediaProbe>(),
+    sp.GetRequiredService<IPlaybackPlanner>(),
     sp.GetRequiredService<IServiceScopeFactory>(),
     sp.GetRequiredService<ILogger<PlaybackSessions>>()
 ));

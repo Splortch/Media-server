@@ -26,7 +26,7 @@ The [client ecosystem](docs/clients/README.md) adds a shared Tauri desktop clien
 | REST/OpenAPI and scan status | Implemented | Protected OpenAPI; scan polling and SignalR event transport |
 | Automated quality checks | Implemented configuration | Backend, frontend, browser integration, audits and Docker build |
 | Native alpha releases | Implemented workflow | Self-contained Windows/Linux/macOS servers, native desktop packages, bundled web UI, one automatic alpha release for all platforms |
-| HLS conversion / quality / audio / text subtitles | Implemented alpha | Bounded full-video preparation; FFmpeg required; Auto/manual quality in web, desktop and Android clients |
+| HLS remux / conversion / audio / text subtitles | Implemented alpha | Bounded full-video preparation with FFmpeg. Original-quality HLS on web and desktop, plus Auto/manual converted quality on web, desktop and Android |
 | Hardware encoders / HDR | Partial alpha | Opt-in NVENC/QSV/VAAPI/AMF adapters and software fallback; explicit SDR tone mapping; synthetic PQ/HLG HEVC/AV1 validation; physical GPU/HDR validation pending |
 | Library artwork / playback completion | Implemented alpha (web/desktop) | [Posters, generated thumbnails, grouped TV cards, seek previews, watch-state undo and optional next-episode countdown](docs/clients/LIBRARY-ARTWORK.md) |
 | Spoiler-safe episode tracking | Implemented alpha (web/desktop) | [Next unwatched episode, per-season progress, account spoiler preference and confirmed season changes with conflict-safe Undo](docs/clients/EPISODE-TRACKING.md) |

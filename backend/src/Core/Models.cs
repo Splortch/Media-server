@@ -121,9 +121,24 @@ public interface IMediaProbe
 
 public record PlaybackPlan(string Mode, string MimeType, string? Warning);
 
+public enum HlsMode
+{
+    Remux,
+    Transcode,
+}
+
+public record HlsPlan(bool RemuxAvailable, int[] RemuxAudioTracks)
+{
+    public HlsMode ModeFor(int? audioTrack) =>
+        (audioTrack is int index ? RemuxAudioTracks.Contains(index) : RemuxAvailable)
+            ? HlsMode.Remux
+            : HlsMode.Transcode;
+}
+
 public interface IPlaybackPlanner
 {
     PlaybackPlan Plan(MediaItem item);
+    HlsPlan PlanHls(ProbeResult source);
 }
 
 public interface IScanEvents

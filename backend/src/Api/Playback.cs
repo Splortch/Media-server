@@ -12,7 +12,9 @@ public record PlaybackOptions(
     bool ExternalWebVtt,
     Rendition[] Qualities,
     string[] Encoders,
-    string ConversionNotice
+    string ConversionNotice,
+    bool RemuxAvailable = false,
+    int[]? RemuxAudioTracks = null
 );
 
 public static class PlaybackApi
@@ -28,7 +30,13 @@ public static class PlaybackApi
             .RequireAuthorization("admin");
         api.MapGet(
                 "/media/{id:int}/playback-options",
-                async (int id, MediaDb db, PathPolicy policy, TranscodeSettings settings) =>
+                async (
+                    int id,
+                    MediaDb db,
+                    PathPolicy policy,
+                    TranscodeSettings settings,
+                    IPlaybackPlanner planner
+                ) =>
                 {
                     var item = await db.Items.FindAsync(id);
                     if (item is null)
@@ -43,17 +51,18 @@ public static class PlaybackApi
                     catch (Exception ex)
                         when (ex is IOException or ArgumentException or UnauthorizedAccessException)
                     { }
+                    var tracks = JsonSerializer.Deserialize<MediaTrack[]>(item.TracksJson) ?? [];
+                    var plan = planner.PlanHls(TranscodeProfile.CatalogSource(item, tracks));
                     return Results.Ok(
                         new PlaybackOptions(
                             TranscodeProfile.Color(item),
-                            [
-                                .. JsonSerializer.Deserialize<MediaTrack[]>(item.TracksJson) ?? [],
-                                .. captions.Select(x => x.Track),
-                            ],
+                            [.. tracks, .. captions.Select(x => x.Track)],
                             captions.Any(x => x.Index == -1),
                             TranscodeProfile.Ladder,
                             settings.AllowedEncoders,
-                            "Alpha HLS prepares the whole video before playback. Up to 8 GiB source, six hours, two jobs and 30 minutes conversion. HDR is explicitly tone-mapped to SDR. Direct Play remains available."
+                            "HLS prepares the whole video before playback. Up to 8 GiB source, six hours, two jobs and 30 minutes of processing. HLS conversion tone-maps HDR to SDR.",
+                            plan.RemuxAvailable,
+                            plan.RemuxAudioTracks
                         )
                     );
                 }

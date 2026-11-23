@@ -15,6 +15,8 @@ type Options = {
   encoders: string[];
   color?: { hdr: boolean };
   conversionNotice: string;
+  remuxAvailable?: boolean;
+  remuxAudioTracks?: number[] | null;
 };
 type Session = {
   id: string;
@@ -52,6 +54,14 @@ function validOptions(value: Options): Options {
         (t.language != null &&
           (typeof t.language !== 'string' || t.language.length > 64)),
     ) ||
+    (value.remuxAvailable !== undefined &&
+      typeof value.remuxAvailable !== 'boolean') ||
+    (value.remuxAudioTracks != null &&
+      (!Array.isArray(value.remuxAudioTracks) ||
+        value.remuxAudioTracks.length > 256 ||
+        value.remuxAudioTracks.some(
+          (index) => !Number.isSafeInteger(index),
+        ))) ||
     !Array.isArray(value.encoders) ||
     value.encoders.length > 5 ||
     value.encoders.some(
@@ -256,7 +266,7 @@ export default function PlaybackSettings({
       return () => element.removeEventListener('loadedmetadata', restore);
     }
   }, [source, video, request, id, desktop]);
-  async function convert() {
+  async function convert(remux = false) {
     if (
       !Hls.isSupported() &&
       !video.current?.canPlayType('application/vnd.apple.mpegurl')
@@ -280,7 +290,8 @@ export default function PlaybackSettings({
         {
           audioTrack: audio === '' ? null : Number(audio),
           subtitleTrack: subtitle === '' ? null : Number(subtitle),
-          encoder,
+          encoder: remux ? 'libx264' : encoder,
+          ...(remux ? { remux: true } : {}),
         },
       );
       validSession(created);
@@ -309,6 +320,8 @@ export default function PlaybackSettings({
               ? description(subtitleTrack)
               : 'External WebVTT',
       });
+      setLevels([]);
+      setQuality(-1);
       setSession(validSession(created));
     } catch (e) {
       setError((e as Error).message);
@@ -323,7 +336,11 @@ export default function PlaybackSettings({
         .then(async (next) => {
           setSession(validSession(next, session.id));
           if (next.state === 'failed')
-            setError(next.error || 'Conversion failed.');
+            setError(
+              next.error === 'remux_requires_conversion'
+                ? 'The source format changed. Choose Prepare HLS playback to convert it.'
+                : next.error || 'Conversion failed.',
+            );
         })
         .catch((e) => {
           setError((e as Error).message);
@@ -372,6 +389,11 @@ export default function PlaybackSettings({
         setError((e as Error).message),
       );
   }
+  const canRemux =
+    audio === ''
+      ? options?.remuxAvailable
+      : options?.remuxAudioTracks?.includes(Number(audio));
+  const adaptivePlayback = session?.encoder !== 'copy' && levels.length > 0;
   return (
     <details
       className="panel"
@@ -388,7 +410,7 @@ export default function PlaybackSettings({
           requires a compatible HDR display and decoder.
         </p>
       )}
-      {levels.length > 0 && (
+      {adaptivePlayback && (
         <p
           aria-label="Adaptive playback diagnostics"
           data-height={adaptive.height}
@@ -404,8 +426,10 @@ export default function PlaybackSettings({
         </p>
       )}
       <p id={trackHelp}>
-        Choose tracks, then select Prepare HLS playback to apply them. Text
-        subtitles are supported; bitmap subtitles are unavailable.
+        Choose Prepare HLS playback to apply the selected tracks.
+        {canRemux &&
+          ' Choose Prepare HLS at original quality to keep the original video and audio.'}{' '}
+        Text subtitles are supported and bitmap subtitles are unavailable.
       </p>
       <label>
         Audio track
@@ -497,12 +521,23 @@ export default function PlaybackSettings({
       >
         Prepare HLS playback
       </button>
+      {canRemux && (
+        <button
+          className="secondary"
+          disabled={busy || session?.state === 'preparing'}
+          onClick={() => void convert(true)}
+        >
+          Prepare HLS at original quality
+        </button>
+      )}
       <button className="secondary" onClick={() => void direct()}>
         Direct Play
       </button>
       {session && (
         <p role="status" aria-atomic="true">
-          Conversion: {session.state} · {session.encoder}
+          {session.encoder === 'copy' ? 'Original-quality HLS' : 'Conversion'}:{' '}
+          {session.state}
+          {session.encoder !== 'copy' && ` · ${session.encoder}`}
           {session.state === 'ready'
             ? ` · ${session.encodeSeconds.toFixed(1)} seconds`
             : ''}
@@ -515,7 +550,7 @@ export default function PlaybackSettings({
           )}
         </p>
       )}
-      {!!levels.length && (
+      {adaptivePlayback && (
         <label>
           Playback quality
           <select

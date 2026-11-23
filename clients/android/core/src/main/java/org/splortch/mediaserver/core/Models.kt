@@ -161,14 +161,17 @@ data class PlaybackOptions(
     val externalWebVtt: Boolean,
     val qualities: List<Rendition>,
     val encoders: List<String>,
-    val conversionNotice: String
+    val conversionNotice: String,
+    val remuxAvailable: Boolean = false,
+    val remuxAudioTracks: List<Int>? = null
 )
 
 @Serializable
 data class PlaybackSelection(
     val audioTrack: Int? = null,
     val subtitleTrack: Int? = null,
-    val encoder: String = "libx264"
+    val encoder: String = "libx264",
+    val remux: Boolean = false
 )
 
 @Serializable

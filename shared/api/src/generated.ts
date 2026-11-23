@@ -4335,6 +4335,9 @@ export interface components {
             qualities: components["schemas"]["Rendition"][];
             encoders: string[];
             conversionNotice: string;
+            /** @default false */
+            remuxAvailable: boolean;
+            remuxAudioTracks?: null | number[];
         };
         PlaybackPlan: {
             mode: string;
@@ -4348,6 +4351,8 @@ export interface components {
             subtitleTrack?: null | number;
             /** @default libx264 */
             encoder: string;
+            /** @default false */
+            remux: boolean;
         };
         ProgressRequest: {
             /** Format: double */

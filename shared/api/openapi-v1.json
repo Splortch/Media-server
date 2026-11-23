@@ -5552,6 +5552,20 @@
           },
           "conversionNotice": {
             "type": "string"
+          },
+          "remuxAvailable": {
+            "type": "boolean",
+            "default": false
+          },
+          "remuxAudioTracks": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "type": "integer",
+              "format": "int32"
+            }
           }
         }
       },
@@ -5597,6 +5611,10 @@
           "encoder": {
             "type": "string",
             "default": "libx264"
+          },
+          "remux": {
+            "type": "boolean",
+            "default": false
           }
         }
       },

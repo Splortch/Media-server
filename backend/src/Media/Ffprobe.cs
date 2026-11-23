@@ -410,8 +410,26 @@ public sealed class Ffprobe(string executable, string? scanStagingPath = null) :
     }
 }
 
-public sealed class DirectPlaybackPlanner : IPlaybackPlanner
+public sealed class MediaPlaybackPlanner : IPlaybackPlanner
 {
+    public HlsPlan PlanHls(ProbeResult source)
+    {
+        if (
+            source.VideoCodec != "h264"
+            || TranscodeProfile.Color(source.ColorJson)
+                is not { Hdr: false, BitDepth: 8, PixelFormat: "yuv420p" }
+        )
+            return new(false, []);
+        return new(
+            source.AudioCodec is "" or "aac",
+            source
+                .Tracks?.Where(track => track.Type == "audio" && track.Codec == "aac")
+                .Select(track => track.Index)
+                .ToArray()
+                ?? []
+        );
+    }
+
     public PlaybackPlan Plan(MediaItem item)
     {
         var ext = Path.GetExtension(item.RelativePath).ToLowerInvariant();
@@ -435,6 +453,12 @@ public sealed class DirectPlaybackPlanner : IPlaybackPlanner
                 "direct",
                 mime,
                 "HDR source: display compatibility is unverified. Choose HLS SDR conversion to tone-map explicitly."
+            );
+        if (!compatible && PlanHls(TranscodeProfile.CatalogSource(item, [])).RemuxAvailable)
+            return new(
+                "direct",
+                mime,
+                "This container may not play in your browser. Prepare HLS at original quality to copy the video and audio into HLS."
             );
         return new(
             "direct",

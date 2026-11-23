@@ -16,7 +16,8 @@ namespace MediaServer.Services;
 public record PlaybackSelection(
     int? AudioTrack = null,
     int? SubtitleTrack = null,
-    string Encoder = "libx264"
+    string Encoder = "libx264",
+    bool Remux = false
 );
 
 public record ConversionState(
@@ -58,6 +59,7 @@ public sealed class PlaybackSessions(
     IHostApplicationLifetime lifetime,
     TranscodeSettings settings,
     IMediaProbe probe,
+    IPlaybackPlanner planner,
     IServiceScopeFactory scopes,
     ILogger<PlaybackSessions> logger
 ) : BackgroundService
@@ -86,7 +88,7 @@ public sealed class PlaybackSessions(
         public ConcurrentDictionary<string, Lease> Leases { get; } = new();
         public PlaybackSelection Selection = selection;
         public volatile string State = "preparing";
-        public string Encoder = "libx264";
+        public string Encoder = selection.Remux ? "copy" : "libx264";
         public string? Error;
         public double Seconds;
         public volatile string Phase = "staging";
@@ -162,6 +164,18 @@ public sealed class PlaybackSessions(
             )
         )
             throw new ArgumentException("Only text subtitles can be converted to WebVTT.");
+        if (selection.Remux)
+        {
+            if (
+                planner
+                    .PlanHls(TranscodeProfile.CatalogSource(item, tracks))
+                    .ModeFor(selection.AudioTrack) != HlsMode.Remux
+            )
+                throw new ArgumentException(
+                    "This video or audio track requires HLS conversion. Rescan if its format changed."
+                );
+            selection = selection with { Encoder = "libx264" };
+        }
         byte[]? captionBytes = null;
         string? captionCodec = null;
         if (selection.SubtitleTrack is < 0)
@@ -278,7 +292,7 @@ public sealed class PlaybackSessions(
             job?.State != "ready"
             || !Regex.IsMatch(
                 file,
-                @"\A(?:master\.m3u8|(?:360p|480p|720p)\.m3u8|(?:360p|480p|720p)_\d{5,}\.ts|captions\.vtt)\z"
+                @"\A(?:master\.m3u8|(?:360p|480p|720p)\.m3u8|(?:360p|480p|720p|original)_[0-9]{5,10}\.ts|captions\.vtt)\z"
             )
         )
             return null;
@@ -377,6 +391,11 @@ public sealed class PlaybackSessions(
             // Reprobe the pinned staged bytes, so old catalogs cannot silently misclassify HDR.
             job.Phase = "probing";
             var metadata = await probe.ProbeAsync(Path.Combine(job.Directory, "source.bin"), ct);
+            if (
+                job.Selection.Remux
+                && planner.PlanHls(metadata).ModeFor(job.Selection.AudioTrack) != HlsMode.Remux
+            )
+                throw new MediaProbeException("remux_requires_conversion");
             item.ColorJson = metadata.ColorJson;
             job.Phase = "captions";
             if (captions is not null)
@@ -447,29 +466,13 @@ public sealed class PlaybackSessions(
                     ct
                 );
             }
-            job.Phase = "capability-probe";
-            var available = await discovery.GetAsync(ct);
-            var encoder = available.Any(x => x.Encoder == job.Selection.Encoder && x.Available)
-                ? job.Selection.Encoder
-                : "libx264";
-            try
-            {
-                await Encode(job, item, encoder, ct);
-            }
-            catch (IOException) when (encoder != "libx264" && !ct.IsCancellationRequested)
-            {
-                // Never publish partial playlists after hardware failure.
-                foreach (
-                    var file in Directory
-                        .EnumerateFiles(job.Directory)
-                        .Where(x =>
-                            x.EndsWith(".ts", StringComparison.Ordinal)
-                            || x.EndsWith(".m3u8", StringComparison.Ordinal)
-                        )
-                )
-                    File.Delete(file);
-                await Encode(job, item, "libx264", ct);
-            }
+            if (job.Selection.Remux)
+                await Remux(job, metadata.AudioCodec != "", ct);
+            else
+                await Transcode(job, item, ct);
+            if (ExceedsOutputQuota(job.Directory))
+                timeout.Cancel();
+            ct.ThrowIfCancellationRequested();
             File.Delete(Path.Combine(job.Directory, "source.bin"));
             job.Seconds = watch.Elapsed.TotalSeconds;
             job.Phase = "ready";
@@ -486,8 +489,10 @@ public sealed class PlaybackSessions(
                         or RegexMatchTimeoutException
             )
         {
-            job.Error = ct.IsCancellationRequested
-                ? "conversion_cancelled_or_quota_exceeded"
+            job.Error =
+                ct.IsCancellationRequested ? "conversion_cancelled_or_quota_exceeded"
+                : ex is MediaProbeException { Code: "remux_requires_conversion" }
+                    ? "remux_requires_conversion"
                 : "conversion_failed_check_ffmpeg_and_filters";
             job.Seconds = watch.Elapsed.TotalSeconds;
             job.Phase = "failed";
@@ -502,6 +507,76 @@ public sealed class PlaybackSessions(
             // partial output now, while preserving the safe error for polling.
             if (job.State == "failed")
                 DeleteCache(job);
+        }
+    }
+
+    private async Task Remux(Job job, bool hasAudio, CancellationToken ct)
+    {
+        job.Phase = "remuxing";
+        await runner.RunAsync(
+            [
+                "-protocol_whitelist",
+                "file",
+                "-format_whitelist",
+                "mov,matroska,webm,avi",
+                "-i",
+                "source.bin",
+                "-map",
+                "0:v:0",
+                "-map",
+                job.Selection.AudioTrack is int audio ? $"0:{audio}" : "0:a:0?",
+                "-c",
+                "copy",
+                "-sn",
+                "-map_metadata",
+                "-1",
+                "-f",
+                "hls",
+                "-hls_time",
+                "4",
+                "-hls_playlist_type",
+                "vod",
+                "-hls_segment_filename",
+                "original_%05d.ts",
+                "master.m3u8",
+            ],
+            job.Directory,
+            ct
+        );
+        job.Phase = "verifying";
+        var output = await probe.ProbeGeneratedHlsAsync(
+            Path.Combine(job.Directory, "master.m3u8"),
+            ct
+        );
+        if (output.VideoCodec != "h264" || output.AudioCodec != (hasAudio ? "aac" : ""))
+            throw new IOException("Invalid remuxed streams.");
+        Interlocked.Increment(ref job.CompletedRenditions);
+    }
+
+    private async Task Transcode(Job job, MediaItem item, CancellationToken ct)
+    {
+        job.Phase = "capability-probe";
+        var available = await discovery.GetAsync(ct);
+        var encoder = available.Any(x => x.Encoder == job.Selection.Encoder && x.Available)
+            ? job.Selection.Encoder
+            : "libx264";
+        try
+        {
+            await Encode(job, item, encoder, ct);
+        }
+        catch (IOException) when (encoder != "libx264" && !ct.IsCancellationRequested)
+        {
+            // Never publish partial playlists after hardware failure.
+            foreach (
+                var file in Directory
+                    .EnumerateFiles(job.Directory)
+                    .Where(x =>
+                        x.EndsWith(".ts", StringComparison.Ordinal)
+                        || x.EndsWith(".m3u8", StringComparison.Ordinal)
+                    )
+            )
+                File.Delete(file);
+            await Encode(job, item, "libx264", ct);
         }
     }
 
@@ -647,6 +722,12 @@ public sealed class PlaybackSessions(
         return result.ToString();
     }
 
+    private static bool ExceedsOutputQuota(string path) =>
+        Directory
+            .EnumerateFiles(path)
+            .Where(x => Path.GetFileName(x) != "source.bin")
+            .Sum(x => new FileInfo(x).Length) > MaxOutputBytes;
+
     private static async Task MonitorQuota(
         string path,
         CancellationTokenSource stop,
@@ -658,12 +739,7 @@ public sealed class PlaybackSessions(
             while (!ct.IsCancellationRequested)
             {
                 await Task.Delay(500, ct);
-                if (
-                    Directory
-                        .EnumerateFiles(path)
-                        .Where(x => Path.GetFileName(x) != "source.bin")
-                        .Sum(x => new FileInfo(x).Length) > MaxOutputBytes
-                )
+                if (ExceedsOutputQuota(path))
                 {
                     stop.Cancel();
                     return;

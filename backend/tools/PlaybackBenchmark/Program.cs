@@ -233,6 +233,7 @@ static class Benchmark
                 lifetime,
                 settings,
                 probe,
+                new MediaPlaybackPlanner(),
                 services.GetRequiredService<IServiceScopeFactory>(),
                 NullLogger<PlaybackSessions>.Instance
             );
