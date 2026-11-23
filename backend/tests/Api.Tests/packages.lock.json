@@ -566,7 +566,7 @@
           "Core": "[0.2.0-alpha.1, )",
           "Infrastructure": "[0.2.0-alpha.1, )",
           "Media": "[0.2.0-alpha.1, )",
-          "Microsoft.Extensions.Hosting.Abstractions": "[10.0.14, )"
+          "Microsoft.Extensions.Hosting.Abstractions": "[10.0.15, )"
         }
       }
     }
