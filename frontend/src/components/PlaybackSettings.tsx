@@ -426,8 +426,10 @@ export default function PlaybackSettings({
         </p>
       )}
       <p id={trackHelp}>
-        Choose tracks before preparing HLS. Text subtitles are supported; bitmap
-        subtitles are unavailable.
+        Choose Prepare HLS playback to apply the selected tracks.
+        {canRemux &&
+          ' Choose Prepare HLS at original quality to keep the original video and audio.'}{' '}
+        Text subtitles are supported. Bitmap subtitles are unavailable.
       </p>
       <label>
         Audio track

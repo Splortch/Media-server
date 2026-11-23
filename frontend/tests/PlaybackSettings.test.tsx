@@ -127,10 +127,18 @@ it('offers original-quality HLS for an eligible audio track and requests stream 
   fireEvent(details, new Event('toggle'));
   await screen.findByRole('option', { name: /aac/ });
   const label = 'Prepare HLS at original quality';
+  const audio = screen.getByLabelText('Audio track');
+  expect(audio).toHaveAccessibleDescription(/Prepare HLS playback/);
+  expect(audio).not.toHaveAccessibleDescription(
+    /Prepare HLS at original quality/,
+  );
   expect(screen.queryByRole('button', { name: label })).not.toBeInTheDocument();
-  fireEvent.change(screen.getByLabelText('Audio track'), {
+  fireEvent.change(audio, {
     target: { value: '2' },
   });
+  expect(audio).toHaveAccessibleDescription(
+    /Prepare HLS playback.*Prepare HLS at original quality/,
+  );
   fireEvent.change(screen.getByLabelText('Encoder preference'), {
     target: { value: 'h264_nvenc' },
   });
