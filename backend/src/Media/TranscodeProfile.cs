@@ -29,17 +29,29 @@ public static class TranscodeProfile
         new("720p", 720, 2800),
     ];
 
-    public static VideoColor? Color(MediaItem item)
+    public static VideoColor? Color(MediaItem item) => Color(item.ColorJson);
+
+    public static VideoColor? Color(string colorJson)
     {
         try
         {
-            return JsonSerializer.Deserialize<VideoColor>(item.ColorJson);
+            return JsonSerializer.Deserialize<VideoColor>(colorJson);
         }
         catch (JsonException)
         {
             return null;
         }
     }
+
+    public static ProbeResult CatalogSource(MediaItem item, IReadOnlyList<MediaTrack> tracks) =>
+        new(
+            item.Duration,
+            item.Container,
+            item.VideoCodec,
+            item.AudioCodec,
+            tracks,
+            item.ColorJson
+        );
 
     public static string Filter(Rendition rendition, bool hdr) =>
         (

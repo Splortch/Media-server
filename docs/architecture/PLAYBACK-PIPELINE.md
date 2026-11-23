@@ -2,10 +2,11 @@
 
 ## Status
 
-This alpha adds an operational, bounded HLS conversion path alongside unchanged Direct Play. It implements the software prerequisite in #4 and working portions of #5–#9. Do not close those roadmap issues solely because these APIs exist: the remaining device, network and visual validation below is required.
+Direct Play, original-quality HLS remuxing and HLS conversion share the playback planner. Remux and conversion use the same bounded, authenticated session cache. The table records the remaining device, network and visual validation for related issues.
 
 | Area | Implemented | Still requires validation or follow-up |
 | --- | --- | --- |
+| #4 software playback | Direct Play, original-quality single-rendition HLS, software HLS conversion and authenticated session leases | Representative playback and seek testing on physical clients |
 | #5 adaptive playback | 360p/480p/720p ceiling ladder, hls.js automatic bandwidth selection, manual override, reuse through separately authorized session leases | Representative real-world network/device testing; source-resolution-specific ladders (automated CDP measurements are provided) |
 | #6 NVIDIA | Runtime synthetic encode probe, opt-in NVENC encoder, retry the complete conversion in software if hardware fails | Real NVIDIA device/driver tests and throughput benchmarks |
 | #7 Intel/AMD | Runtime QSV, VAAPI and AMF adapters through FFmpeg; configured VAAPI/QSV render nodes and NVENC adapter selection; explicit fallback | Physical Linux/Windows GPU matrix and AMF adapter selection |
@@ -22,8 +23,8 @@ Web and desktop clients share the HLS/quality/audio/subtitle controls. Desktop r
 3. Sign in as an administrator, add a library in Settings and scan it. Rescan existing media to populate color and track metadata. Conversion also reprobes its staged source to prevent stale HDR classification.
 4. Open a video in the web client. Expand **Quality, audio and subtitles**. Direct Play is still the default.
 5. Select an audio track, optional text subtitle, and encoder preference. Put an external caption alongside a video using the exact same basename, e.g. `Movie.mkv` and `Movie.vtt`.
-6. Choose **Prepare HLS playback**. This version prepares the **whole video and all three renditions** before it is playable. Long movies may exceed the alpha time/disk quota; use Direct Play instead. No live/progressive transcoding is claimed.
-7. When ready, play normally. Choose **Auto (network aware)** or a specific quality. All variants are H.264/AAC SDR, at most the source height; small sources are not upscaled. Captions use the selected converted WebVTT track. Direct Play returns to the original file.
+6. Choose **Prepare HLS playback** for all three converted renditions or **Prepare HLS at original quality** for a single rendition with copied audio and video. Original quality requires 8-bit SDR H.264 4:2:0 video and AAC or silent audio. Both choices prepare the whole video before playback. Long movies may exceed the time or disk quota.
+7. Converted playback offers **Auto (network aware)** and manual quality selection. All converted variants use H.264/AAC SDR at or below the source height. Captions use the selected WebVTT track. Direct Play returns to the original file.
 8. Closing the player requests cache cancellation/removal. If the request cannot reach the server, an idle lease expires after 30 minutes. Signing out or expiring a login also releases that login's lease on the next conversion request or background sweep. Restart clears stale conversion directories.
 
 Limits: two conversion/cache jobs globally, 8 GiB source per job, six-hour source duration, 4 GiB output per job, two encoder threads and 30-minute conversion deadline. Files are sampled for output quota every 500 ms; reserve extra disk space for that interval. At most 24 GiB plus quota overshoot is required for two full staged+output jobs. Full-file staging costs time and disk but keeps FFmpeg away from attacker-replaceable library paths. There is no source modification, download authorization shortcut or public cache directory.
@@ -63,8 +64,8 @@ Consult [FFmpeg's hardware documentation](https://ffmpeg.org/ffmpeg-codecs.html)
 
 The generated contract lives in `shared/api/openapi-v1.json` and `shared/api/src/generated.ts`.
 
-- `GET /api/v1/media/{id}/playback-options`: color metadata, tracks, external-caption presence, allowed encoders and conversion limits.
-- `POST /api/v1/media/{id}/playback-sessions`: `{ audioTrack: number|null, subtitleTrack: number|null, encoder: string }`. Subtitle `-1` selects the same-basename external WebVTT file; other advertised negative track IDs select external language files. Never derive a filename from the submitted index. Returns 202 with conversion state; 409 when capacity is occupied.
+- `GET /api/v1/media/{id}/playback-options` returns color metadata, tracks, allowed encoders, limits, and remux eligibility for default audio and selectable AAC tracks.
+- `POST /api/v1/media/{id}/playback-sessions` accepts `{ audioTrack: number|null, subtitleTrack: number|null, encoder: string, remux?: boolean }`. Remux is opt-in and uses `encoder: "copy"` in the response. The server rechecks compatibility against the staged source. An incompatible selection is rejected or, if the catalog is stale, returns `remux_requires_conversion` while polling. Subtitle `-1` selects the same-basename external WebVTT file. Other advertised negative track IDs select external language files. Returns 202 with processing state or 409 when capacity is occupied.
 - `GET /api/v1/playback-sessions/{session}`: preparing/ready/failed state, actual encoder, encode seconds, manifest URL.
 - `GET|HEAD /api/v1/playback-sessions/{session}/files/{file}`: private, no-store manifest/variant/segment/caption bytes. Supports byte ranges. Every request revalidates the login, user, session ownership and current media ACL. A guessed session ID is insufficient; another login must explicitly acquire its own authorized lease before using it.
 - `DELETE /api/v1/playback-sessions/{session}`: cancel, wait for process termination, remove generated cache. CSRF protection applies to mutations, just as to existing endpoints.

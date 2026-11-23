@@ -83,6 +83,70 @@ it('labels real tracks, disables bitmap captions and exposes only authorized enc
   expect(document.querySelector('script')).toBeNull();
   expect(screen.getByLabelText('Encoder preference').children).toHaveLength(1);
 });
+it('offers original-quality HLS for an eligible audio track and requests stream copy', async () => {
+  const Hls = (await import('hls.js')).default;
+  vi.spyOn(Hls, 'isSupported').mockReturnValue(true);
+  const id = 'c'.repeat(32);
+  const manifest = `/api/v1/playback-sessions/${id}/files/master.m3u8`;
+  vi.mocked(api).mockImplementation(async (path, method) => {
+    if (path.endsWith('/playback-options'))
+      return {
+        tracks: [
+          { index: 1, type: 'audio', codec: 'pcm_s16le' },
+          { index: 2, type: 'audio', codec: 'aac' },
+        ],
+        externalWebVtt: false,
+        encoders: ['libx264', 'h264_nvenc'],
+        conversionNotice: 'Conversion limits',
+        remuxAvailable: false,
+        remuxAudioTracks: [2],
+      };
+    if (method === 'POST')
+      return {
+        id,
+        state: 'ready',
+        encoder: 'copy',
+        manifest,
+        encodeSeconds: 1,
+      };
+  });
+  const onSource = vi.fn();
+  render(
+    <PlaybackSettings
+      id={1}
+      video={createRef()}
+      source="/api/media/1/stream"
+      onSource={onSource}
+      onCaption={vi.fn()}
+    />,
+  );
+  const details = screen
+    .getByText('Quality, audio and subtitles')
+    .closest('details')!;
+  details.open = true;
+  fireEvent(details, new Event('toggle'));
+  await screen.findByRole('option', { name: /aac/ });
+  const label = 'Prepare HLS at original quality';
+  expect(screen.queryByRole('button', { name: label })).not.toBeInTheDocument();
+  fireEvent.change(screen.getByLabelText('Audio track'), {
+    target: { value: '2' },
+  });
+  fireEvent.change(screen.getByLabelText('Encoder preference'), {
+    target: { value: 'h264_nvenc' },
+  });
+  fireEvent.click(screen.getByRole('button', { name: label }));
+  expect(api).toHaveBeenCalledWith('/v1/media/1/playback-sessions', 'POST', {
+    audioTrack: 2,
+    subtitleTrack: null,
+    encoder: 'libx264',
+    remux: true,
+  });
+  await waitFor(() => expect(onSource).toHaveBeenCalledWith(manifest));
+  expect(screen.getByRole('status')).toHaveTextContent(
+    'Original-quality HLS: ready',
+  );
+  expect(screen.queryByLabelText('Playback quality')).not.toBeInTheDocument();
+});
 it('announces the audio and subtitle choices for the prepared session and clears them on Direct Play', async () => {
   const Hls = (await import('hls.js')).default;
   vi.spyOn(Hls, 'isSupported').mockReturnValue(true);

@@ -616,12 +616,16 @@ fn playback_file(value: &str) -> bool {
     ) {
         return true;
     }
-    ["360p_", "480p_", "720p_"].iter().any(|prefix| {
-        value
-            .strip_prefix(prefix)
-            .and_then(|v| v.strip_suffix(".ts"))
-            .is_some_and(|v| (5..=10).contains(&v.len()) && v.bytes().all(|c| c.is_ascii_digit()))
-    })
+    ["360p_", "480p_", "720p_", "original_"]
+        .iter()
+        .any(|prefix| {
+            value
+                .strip_prefix(prefix)
+                .and_then(|v| v.strip_suffix(".ts"))
+                .is_some_and(|v| {
+                    (5..=10).contains(&v.len()) && v.bytes().all(|c| c.is_ascii_digit())
+                })
+        })
 }
 fn bridge_origin(headers: &HeaderMap) -> Option<&str> {
     headers
@@ -970,6 +974,10 @@ mod tests {
         }
         assert!(!super::playback_file("source.bin"));
         assert!(super::playback_file("720p_00001.ts"));
+        assert!(super::valid_playlist(
+            "#EXTM3U\n#EXTINF:4.0,\noriginal_00000.ts\n#EXT-X-ENDLIST\n"
+        ));
+        assert!(!super::playback_file("original_00000.ts/extra"));
         assert!(!super::playback_file("720p_../../secret.ts"));
     }
 
