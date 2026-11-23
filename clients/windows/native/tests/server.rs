@@ -158,6 +158,19 @@ async fn real_server_cookie_login_ranges_resume_conflicts_revocation_and_disconn
         .unwrap();
     assert_eq!(catalog["items"][0]["series"], "Synthetic series");
     assert_eq!(catalog["items"][0]["episodeCount"], 1);
+    let fits = first
+        .request(
+            "GET",
+            "/api/v1/time-budget?minutes=5&speed=1&includeStarted=false",
+            None,
+        )
+        .await
+        .unwrap();
+    let matches = fits["items"].as_array().unwrap();
+    assert_eq!(matches.len(), 1);
+    assert_eq!(matches[0]["id"], id);
+    assert_eq!(matches[0]["series"], "Synthetic series");
+    assert!(matches[0]["remainingSeconds"].as_f64().unwrap() > 0.0);
     let preference = first
         .request("GET", "/api/v1/preferences/episodes", None)
         .await
