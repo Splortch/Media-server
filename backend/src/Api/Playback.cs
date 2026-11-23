@@ -13,8 +13,8 @@ public record PlaybackOptions(
     Rendition[] Qualities,
     string[] Encoders,
     string ConversionNotice,
-    bool RemuxAvailable,
-    int[] RemuxAudioTracks
+    bool RemuxAvailable = false,
+    int[]? RemuxAudioTracks = null
 );
 
 public static class PlaybackApi

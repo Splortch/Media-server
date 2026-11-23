@@ -4335,8 +4335,9 @@ export interface components {
             qualities: components["schemas"]["Rendition"][];
             encoders: string[];
             conversionNotice: string;
+            /** @default false */
             remuxAvailable: boolean;
-            remuxAudioTracks: number[];
+            remuxAudioTracks?: null | number[];
         };
         PlaybackPlan: {
             mode: string;

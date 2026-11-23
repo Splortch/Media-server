@@ -16,7 +16,7 @@ type Options = {
   color?: { hdr: boolean };
   conversionNotice: string;
   remuxAvailable?: boolean;
-  remuxAudioTracks?: number[];
+  remuxAudioTracks?: number[] | null;
 };
 type Session = {
   id: string;
@@ -56,7 +56,7 @@ function validOptions(value: Options): Options {
     ) ||
     (value.remuxAvailable !== undefined &&
       typeof value.remuxAvailable !== 'boolean') ||
-    (value.remuxAudioTracks !== undefined &&
+    (value.remuxAudioTracks != null &&
       (!Array.isArray(value.remuxAudioTracks) ||
         value.remuxAudioTracks.length > 256 ||
         value.remuxAudioTracks.some(

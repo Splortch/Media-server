@@ -5515,9 +5515,7 @@
           "externalWebVtt",
           "qualities",
           "encoders",
-          "conversionNotice",
-          "remuxAvailable",
-          "remuxAudioTracks"
+          "conversionNotice"
         ],
         "type": "object",
         "properties": {
@@ -5556,10 +5554,14 @@
             "type": "string"
           },
           "remuxAvailable": {
-            "type": "boolean"
+            "type": "boolean",
+            "default": false
           },
           "remuxAudioTracks": {
-            "type": "array",
+            "type": [
+              "null",
+              "array"
+            ],
             "items": {
               "type": "integer",
               "format": "int32"
