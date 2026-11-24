@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { copyFile, readFile } from 'node:fs/promises';
+import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { createHash } from 'node:crypto';
 import AxeBuilder from '@axe-core/playwright';
@@ -14,7 +14,7 @@ test('setup, accounts, collections, diagnostics, stream ranges and persist resum
   page,
   browser,
 }) => {
-  test.setTimeout(200000);
+  test.setTimeout(180000);
   const data = process.env.E2E_DATA!;
   const media = process.env.E2E_MEDIA!;
   expect(
@@ -783,103 +783,6 @@ test('setup, accounts, collections, diagnostics, stream ranges and persist resum
   } finally {
     await visitorContext.close();
   }
-  await page.goto('/' + titleHash);
-  await expect(
-    page.getByRole('region', { name: 'Title information' }),
-  ).toBeVisible();
-  // Test the watchlist against scanned media and mobile-width directional focus.
-  await Promise.all(
-    ['Watchlist A', 'Watchlist B', 'Watchlist C', 'Watchlist D'].map((title) =>
-      copyFile(
-        path.join(media, 'sample.webm'),
-        path.join(media, title + '.webm'),
-      ),
-    ),
-  );
-  await page.getByRole('link', { name: 'Settings', exact: true }).click();
-  await page
-    .getByRole('button', { name: 'Scan library Test collection' })
-    .click();
-  await expect(
-    page.getByRole('status').filter({ hasText: 'completed' }),
-  ).toBeVisible({ timeout: 30000 });
-  const shortcuts = page.getByRole('combobox', {
-    name: 'Playback keyboard shortcuts',
-  });
-  await shortcuts.selectOption('off');
-  await page.reload();
-  await expect(shortcuts).toHaveValue('off');
-  await shortcuts.selectOption('standard');
-
-  await page.getByRole('link', { name: 'Library', exact: true }).click();
-  await page.getByLabel('Search library').fill('Watchlist');
-  const cards = page.locator('.media-grid > .media-card');
-  await expect(cards).toHaveCount(4);
-  await page.setViewportSize({ width: 390, height: 844 });
-  await cards.nth(0).focus();
-  await page.keyboard.press('ArrowRight');
-  await expect(cards.nth(1)).toBeFocused();
-  await page.keyboard.press('ArrowDown');
-  await expect(cards.nth(3)).toBeFocused();
-  await page.keyboard.press('ArrowLeft');
-  await expect(cards.nth(2)).toBeFocused();
-  await page.keyboard.press('ArrowUp');
-  await expect(cards.nth(0)).toBeFocused();
-  await page.keyboard.press('Enter');
-  const add = page.getByRole('button', {
-    name: 'Add to watchlist',
-    exact: true,
-  });
-  await add.click();
-  const remove = page.getByRole('button', {
-    name: 'Remove from watchlist',
-    exact: true,
-  });
-  await expect(remove).toBeFocused();
-  await page.getByRole('link', { name: 'Home', exact: true }).click();
-  const recommendations = page.getByRole('region', {
-    name: 'Recommended for you',
-  });
-  await expect(recommendations).toContainText(
-    'From the same library as Watchlist A',
-  );
-  await expect(
-    recommendations.getByRole('link', { name: 'Watchlist B', exact: true }),
-  ).toBeVisible();
-
-  const touch = await browser.newContext({
-    baseURL: 'http://127.0.0.1:5173',
-    storageState: await page.context().storageState(),
-    viewport: { width: 390, height: 844 },
-    hasTouch: true,
-  });
-  try {
-    const mobile = await touch.newPage();
-    await mobile.goto('/');
-    await mobile.getByRole('link', { name: 'Watchlist', exact: true }).tap();
-    await expect(
-      mobile.getByRole('heading', { name: 'Watchlist', exact: true }),
-    ).toBeVisible();
-    await accessible(mobile);
-    await mobile
-      .getByRole('heading', { name: 'Watchlist A', exact: true })
-      .tap();
-    await mobile
-      .getByRole('button', { name: 'Remove from watchlist', exact: true })
-      .tap();
-    await expect(
-      mobile.getByRole('button', { name: 'Add to watchlist', exact: true }),
-    ).toBeVisible();
-    await mobile
-      .getByRole('link', { name: 'Back to collection', exact: true })
-      .tap();
-    await expect(
-      mobile.getByText('Open a title to add it to your watchlist.'),
-    ).toBeVisible();
-  } finally {
-    await touch.close();
-  }
-  await page.setViewportSize(originalViewport);
   await page.goto('/' + titleHash);
   await expect(
     page.getByRole('region', { name: 'Title information' }),

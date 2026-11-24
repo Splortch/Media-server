@@ -882,7 +882,10 @@ export default function App() {
                 {playFrom === undefined &&
                   showWatchlist &&
                   !route.startsWith('series/') && (
-                    <WatchlistButton mediaId={item.id} key={item.id} />
+                    <WatchlistButton
+                      mediaId={item.id}
+                      key={`watchlist-${item.id}`}
+                    />
                   )}
                 {user?.role === 'Admin' && (
                   <details className="title-admin">
