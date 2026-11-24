@@ -6,7 +6,20 @@ import NextEpisodePrompt from './NextEpisodePrompt';
 import Bookmarks, { type BookmarkRequest } from './Bookmarks';
 import PlaybackEntrance from './PlaybackEntrance';
 import PlaybackSettings, { type PlaybackTransport } from './PlaybackSettings';
+import type { ShortcutMode } from '../services/playbackShortcuts';
 import { api, type Media } from '../services/api';
+const navigationKeys = {
+  ' ': 'Space',
+  arrowleft: 'ArrowLeft',
+  arrowright: 'ArrowRight',
+  arrowup: 'ArrowUp',
+  arrowdown: 'ArrowDown',
+  home: 'Home',
+  end: 'End',
+};
+const standardKeys = { ...navigationKeys, k: 'K', f: 'F', m: 'M' };
+const emptyKeys = {};
+
 export default function Player({
   item,
   resume,
@@ -23,11 +36,13 @@ export default function Player({
   previewUrl,
   onNextEpisode,
   autoplayPreference,
+  shortcutMode = 'standard',
 }: {
   item: Media;
   previewUrl?: PreviewResolver;
   onNextEpisode?: (id: number) => Promise<void>;
   autoplayPreference?: string;
+  shortcutMode?: ShortcutMode;
   onReturnToDetails?: () => Promise<void> | void;
   bookmarkRequest?: BookmarkRequest;
   bookmarkStart?: number;
@@ -283,6 +298,13 @@ export default function Player({
     await write;
   }
 
+  const shortcuts =
+    shortcutMode === 'off'
+      ? emptyKeys
+      : shortcutMode === 'navigation'
+        ? navigationKeys
+        : standardKeys;
+
   return (
     <section aria-label="Video player" className="player-wrap">
       {onReturnToDetails && (
@@ -318,7 +340,7 @@ export default function Player({
         ref={surfaceRef}
         tabIndex={0}
         aria-label="Playback controls"
-        aria-keyshortcuts="Space K F M ArrowLeft ArrowRight ArrowUp ArrowDown Home End"
+        aria-keyshortcuts={Object.values(shortcuts).join(' ') || undefined}
         onPointerMove={revealControls}
         onPointerDown={revealControls}
         onKeyDown={(event) => {
@@ -327,26 +349,12 @@ export default function Player({
             event.ctrlKey ||
             event.altKey ||
             event.metaKey ||
-            (event.target instanceof HTMLElement &&
-              event.target.closest('button,input,select,textarea'))
+            event.shiftKey ||
+            event.target !== event.currentTarget
           )
             return;
           const key = event.key.toLowerCase();
-          if (
-            ![
-              ' ',
-              'k',
-              'f',
-              'm',
-              'arrowleft',
-              'arrowright',
-              'arrowup',
-              'arrowdown',
-              'home',
-              'end',
-            ].includes(key)
-          )
-            return;
+          if (!Object.hasOwn(shortcuts, key)) return;
           event.preventDefault();
           event.stopPropagation();
           revealControls();

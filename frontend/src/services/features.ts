@@ -7,6 +7,7 @@ export type Feature = Omit<
   key:
     | 'smart-collections'
     | 'watch-history'
+    | 'watchlist'
     | 'movie-requests'
     | 'downloads'
     | 'library-provenance';
@@ -35,6 +36,7 @@ export function parseFeatures(value: unknown): FeatureState {
       [
         'smart-collections',
         'watch-history',
+        'watchlist',
         'movie-requests',
         'downloads',
         'library-provenance',

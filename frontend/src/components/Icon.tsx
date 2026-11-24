@@ -5,6 +5,7 @@ const paths = {
   library: 'M4 4h5v16H4zM13 4h5v16h-5zM3 8h7M12 8h7',
   settings:
     'M9 3h6l1 3 3 1 2 5-2 5-3 1-1 3H9l-1-3-3-1-2-5 2-5 3-1Z M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0',
+  watchlist: 'M6 3h12v18l-6-4-6 4V3Z',
   history: 'M3 11a9 9 0 1 1 2.6 7.4M3 4v7h7M12 7v5l3 2',
   search: 'M16 10a6 6 0 1 1-12 0 6 6 0 0 1 12 0m-1.5 4.5L21 21',
   arrow: 'M4 12h16m-6-6 6 6-6 6',

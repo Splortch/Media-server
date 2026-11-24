@@ -34,6 +34,7 @@ public static class Features
         new("library-provenance", "Library explanations and match reports", true),
         new("smart-collections", "Smart collections", true),
         new("watch-history", "Watch history navigation", false),
+        new("watchlist", "Watchlist and recommendations", false),
     ];
     private static string[] Keys => Registry.Select(x => x.Key).ToArray();
 

@@ -800,6 +800,24 @@ namespace Infrastructure.Migrations
                     b.ToTable("History");
                 });
 
+            modelBuilder.Entity("MediaServer.Core.WatchlistEntry", b =>
+                {
+                    b.Property<int>("UserId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("MediaItemId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateTime>("AddedAt")
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("UserId", "MediaItemId");
+
+                    b.HasIndex("MediaItemId");
+
+                    b.ToTable("Watchlist");
+                });
+
             modelBuilder.Entity("MediaServer.Core.DownloadJob", b =>
                 {
                     b.HasOne("MediaServer.Core.User", null)
@@ -996,6 +1014,21 @@ namespace Infrastructure.Migrations
                 });
 
             modelBuilder.Entity("MediaServer.Core.WatchHistory", b =>
+                {
+                    b.HasOne("MediaServer.Core.MediaItem", null)
+                        .WithMany()
+                        .HasForeignKey("MediaItemId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("MediaServer.Core.User", null)
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("MediaServer.Core.WatchlistEntry", b =>
                 {
                     b.HasOne("MediaServer.Core.MediaItem", null)
                         .WithMany()
