@@ -112,7 +112,8 @@ claims of bit-for-bit reproducibility. Builds are unsigned and no stable release
 
 The image retains project, browser and upstream package notices. Each release includes its
 installed package/source-version inventory, FFmpeg license configuration, and
-`Container-Corresponding-Source.tar.gz`. A separate Docker stage downloads the exact Ubuntu
+`Container-Corresponding-Source.tar.gz`. The Docker setup ZIP contains the container SPDX
+inventory and FFmpeg build details in `inventory/`. A separate Docker stage downloads the exact Ubuntu
 source packages identified by the installed GPL/LGPL package notices (and any package with
 missing notice metadata), including original source and Debian/Ubuntu changes. Publication
 fails if a required source cannot be obtained. The source archive stays outside the runtime

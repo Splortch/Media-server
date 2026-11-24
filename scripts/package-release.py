@@ -129,7 +129,11 @@ volumes:
   server-data:
 ''', encoding='utf-8')
     (setup / '.env.example').write_text('MEDIA_PATH=/absolute/path/to/media\n', encoding='utf-8')
-    (setup / 'README.md').write_text('Copy .env.example to .env and set MEDIA_PATH. Run `docker compose up -d`, then `docker compose exec media-server cat /data/setup-token`. Open http://127.0.0.1:5050 and use /media when adding a library. The media mount is read-only. Private GHCR packages require docker login. Back up server-data before updates.\n', encoding='utf-8')
+    (setup / 'README.md').write_text('Copy .env.example to .env and set MEDIA_PATH. Run `docker compose up -d`, then `docker compose exec media-server cat /data/setup-token`. Open http://127.0.0.1:5050 and use /media when adding a library. The media mount is read-only. Private GHCR packages require docker login. Back up server-data before updates. The inventory directory describes the installed system packages and FFmpeg build.\n', encoding='utf-8')
+    inventory = setup / 'inventory'
+    inventory.mkdir()
+    for name in ('CONTAINER-SBOM.spdx.json', 'FFMPEG-BUILD.txt'):
+        shutil.copyfile(downloads / 'release-container' / name, inventory / name)
     archive(setup, output / (setup.name + '.zip'))
     for name in ('CONTAINER-PACKAGES.txt', 'FFMPEG-LICENSE.txt', 'Container-Corresponding-Source.tar.gz'):
         shutil.copyfile(downloads / 'release-container' / name, output / name)

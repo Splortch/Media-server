@@ -11,9 +11,9 @@ else
 fi
 apt-get update
 # Exact source package versions come from the installed binary package metadata.
-dpkg-query -W -f='${binary:Package}\t${source:Package}\t${source:Version}\n' > /corresponding-source/installed-packages.tsv
+sh /installed-packages.sh > /corresponding-source/installed-packages.tsv
 TAB=$(printf '\t')
-while IFS="$TAB" read -r binary source version; do
+while IFS="$TAB" read -r binary binary_version source version architecture; do
     package=${binary%%:*}
     copyright="/usr/share/doc/$package/copyright"
     if [ -f "$copyright" ]; then
@@ -29,4 +29,7 @@ done < /corresponding-source/installed-packages.tsv | sort -u > /corresponding-s
 sh /download-sources.sh /corresponding-source/source-packages.txt /corresponding-source/packages
 printf '%s\n' 'Exact Ubuntu source packages (.dsc, original source and Debian/Ubuntu changes) are in packages/. Use dpkg-source -x package.dsc to extract, then the included debian/rules and build dependencies to rebuild. Installed package/source versions and copyright notices are included. The Media Server source is the release tag in the repository; project and browser component notices are also retained in the image under /app/licenses. Microsoft .NET runtime notices remain in the upstream base image.' > /corresponding-source/README.txt
 cd /
-tar -czf /Container-Corresponding-Source.tar.gz corresponding-source
+# Put the small manifest first so release validation can compare it without unpacking source archives.
+tar -czf /Container-Corresponding-Source.tar.gz \
+    corresponding-source/installed-packages.tsv corresponding-source/source-packages.txt \
+    corresponding-source/README.txt corresponding-source/licenses corresponding-source/packages

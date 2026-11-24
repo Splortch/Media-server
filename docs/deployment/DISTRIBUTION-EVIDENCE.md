@@ -165,6 +165,30 @@ artifact signature/checksum verification and whole-build reproducibility are not
 covered by these classpath locks. Inventory archive hashes remain observed evidence,
 not verification against a trusted checksum policy.
 
+## Container system package inventory
+
+The Docker Compose setup ZIP includes `inventory/CONTAINER-SBOM.spdx.json`
+and `inventory/FFMPEG-BUILD.txt`. The SPDX inventory lists installed Ubuntu
+binary packages with architecture and exact source package versions, plus
+the .NET shared runtimes reported by the built image. Its document namespace
+identifies the image's Docker configuration digest. The FFmpeg report
+records the binary version, build flags and library versions.
+
+The separately downloadable `CONTAINER-PACKAGES.txt` lists binary name,
+binary version, source name, source version and architecture in that order.
+`FFMPEG-LICENSE.txt` contains the installed FFmpeg binary's license output.
+The source archive retains installed copyright notices and the corresponding
+sources. Release assembly checks that the package manifest at the start of
+the source archive matches the image before shipping the evidence. The
+release checksum for the setup ZIP covers both files inside its inventory.
+
+To inspect a locally built image, run
+`python3 scripts/container-inventory.py media-server:ci /tmp/container-inventory`.
+This covers the system package layer and shared runtimes. The managed application
+and bundled browser dependencies have their own native-server inventory.
+License conclusions and complete per-file image reconstruction remain outside
+the scope of this package inventory.
+
 ## Remaining acceptance work
 
 Issue #2 remains open for a full distribution review:
@@ -172,8 +196,6 @@ Issue #2 remains open for a full distribution review:
 - Add WebView/native SDK dependency inventories and review missing declarations
   or notices flagged by the Android and desktop Rust/Tauri inventories.
 - Review every redistributed license, notice and corresponding-source obligation.
-- Retain the container's exact installed package list, FFmpeg license/build output
-  and corresponding-source bundle; these already have a separate release path.
 - Perform clean physical-machine install and rollback checks; hosted installer
   tests are automated runner evidence, not personal-device certification.
 - Establish artifact signing. Checksums detect corruption, not publisher identity.
