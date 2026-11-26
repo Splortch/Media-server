@@ -144,6 +144,24 @@ public sealed class GuestTests
             HttpStatusCode.Forbidden,
             (await guest.GetAsync(prefix + $"/media/{publicId}/bookmarks")).StatusCode
         );
+        foreach (
+            var path in new[]
+            {
+                "/watchlist",
+                "/watchlist/recommendations",
+                $"/watchlist/{publicId}",
+            }
+        )
+        {
+            Assert.Equal(
+                HttpStatusCode.Forbidden,
+                (await guest.GetAsync(prefix + path)).StatusCode
+            );
+        }
+        Assert.Equal(
+            HttpStatusCode.Forbidden,
+            (await guest.PutAsync(prefix + $"/watchlist/{publicId}", null)).StatusCode
+        );
         Assert.Empty(
             (await guest.GetFromJsonAsync<JsonElement>(prefix + "/progress")).EnumerateArray()
         );

@@ -50,6 +50,7 @@ beforeEach(() => {
       return { items: [media], nextCursor: null };
     if (path === '/media/7') return media;
     if (path === '/media/7/metadata') return null;
+    if (path === '/media/7/episodes') return { nextEpisode: null };
     if (path === '/v1/media/7/tracks')
       return {
         tracks: [
@@ -148,6 +149,7 @@ it('keeps explicit playback available when track metadata cannot be loaded', asy
   expect(document.querySelector('video')).toBeNull();
   fireEvent.click(screen.getByRole('button', { name: 'Play from beginning' }));
   expect(await screen.findByLabelText('Own video')).toBeInTheDocument();
+  await waitFor(() => expect(api).toHaveBeenCalledWith('/media/7/episodes'));
 });
 
 it('selects the next identified episode without streaming and returns to the original filtered card', async () => {

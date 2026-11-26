@@ -190,6 +190,13 @@ public class WatchHistory
     public DateTime? CompletedAt { get; set; }
 }
 
+public class WatchlistEntry
+{
+    public int UserId { get; set; }
+    public int MediaItemId { get; set; }
+    public DateTime AddedAt { get; set; }
+}
+
 public class SmartCollection
 {
     public int Id { get; set; }

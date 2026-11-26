@@ -3,6 +3,7 @@ import { useEffect, useState, type FormEvent } from 'react';
 import Accounts from '../features/admin/Accounts';
 import Customize from '../features/Customize';
 import ThemePicker from '../components/ThemePicker';
+import PlaybackShortcutPicker from '../components/PlaybackShortcutPicker';
 import RemoteAccessStatus from '../features/admin/RemoteAccessStatus';
 import {
   featureVisible,
@@ -22,9 +23,11 @@ export default function Settings({
   features = unavailableFeatures,
   onFeaturesChanged = () => {},
   initialSection,
+  shortcutPreferenceKey,
 }: {
   admin?: boolean;
   initialSection?: string;
+  shortcutPreferenceKey?: string;
   features?: FeatureState;
   onFeaturesChanged?: (state: FeatureState) => void;
 }) {
@@ -274,6 +277,9 @@ export default function Settings({
         >
           <h2>Appearance</h2>
           <ThemePicker />
+          {shortcutPreferenceKey && (
+            <PlaybackShortcutPicker preferenceKey={shortcutPreferenceKey} />
+          )}
         </section>
         <section
           id="settings-account"

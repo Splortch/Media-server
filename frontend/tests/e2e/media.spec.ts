@@ -742,10 +742,16 @@ test('setup, accounts, collections, diagnostics, stream ranges and persist resum
       .getByRole('button', { name: 'Continue as guest', exact: true })
       .click();
     await expect(
+      visitor.getByRole('link', { name: 'Library', exact: true }),
+    ).toBeVisible();
+    await expect(
       visitor.getByRole('link', { name: 'Settings', exact: true }),
     ).toHaveCount(0);
     await expect(
       visitor.getByRole('link', { name: 'Watch history', exact: true }),
+    ).toHaveCount(0);
+    await expect(
+      visitor.getByRole('link', { name: 'Watchlist', exact: true }),
     ).toHaveCount(0);
     await visitor.getByRole('link', { name: 'Library', exact: true }).click();
     await visitor.getByRole('heading', { name: 'sample', exact: true }).click();

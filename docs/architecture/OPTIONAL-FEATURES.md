@@ -10,6 +10,7 @@ The first registry contains shipped functionality only:
 | `library-provenance` | Enabled, shown | Hide/show explanations and report creation | Admin may disable explanations, reports and review; saved reports retained |
 | `smart-collections` | Enabled, shown | Hide/show the library filter and collection settings | Admin may disable new collection creation and collection-filter queries |
 | `watch-history` | Shown | Hide/show the navigation entry | No server-wide switch; hiding is not private playback and does not delete or disable watch history |
+| `watchlist` | Shown | Hide/show the navigation entry, title actions and home recommendations | No server-wide switch; personal hiding preserves saved titles |
 
 Use **Settings → Customize**. Reset restores personal visibility defaults only;
 it never overrides an administrator's policy. The server policy section is a
@@ -58,6 +59,24 @@ and Android core browsing/playback do not depend on this capability endpoint.
 Add a registry entry and enforcement/tests when a future module actually ships.
 Do not gate security checks behind optional flags. Activity/requests/profiles and
 other roadmap items keep their own authorization, privacy and retention rules.
+
+## Watchlist and recommendations (#14)
+
+Signed-in viewers and administrators can save a movie or individual episode
+from its title page. The Watchlist page lists saved titles from newest to oldest
+and follows current library and rating permissions. Saves are durable account
+data shared by signed-in devices. A scan that permanently removes a media item
+also removes its watchlist entries.
+
+Home recommends up to eight unwatched, unsaved titles from the same library as
+the newest visible saved title. The row names that title and sorts suggestions
+by title and media ID. It uses local library and playback data. Guests have no
+watchlist or recommendations.
+
+**Settings → Appearance** offers Standard, Space/arrows/Home/End and Off for
+web playback shortcuts. The preference is stored per account on the current
+browser. Inside a library or watchlist grid, the arrow keys move focus between
+visible cards. Tab navigation and touch activation use the usual links.
 
 ## Movie requests (#54)
 

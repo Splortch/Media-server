@@ -1808,3 +1808,22 @@ textarea {
 .match-report-investigation dd {
   overflow-wrap: anywhere;
 }
+
+.watchlist-action {
+  margin-block: 1rem;
+}
+
+.recommendation-list {
+  padding-inline-start: 1.25rem;
+}
+
+.recommendation-list a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  text-decoration: underline;
+}
+
+#settings-appearance .theme-picker + .theme-picker {
+  margin-top: 1.25rem;
+}

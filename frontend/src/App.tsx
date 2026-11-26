@@ -5,6 +5,7 @@ import {
   useState,
   useCallback,
   type FormEvent,
+  type KeyboardEvent,
 } from 'react';
 import {
   api,
@@ -29,7 +30,61 @@ import Settings from './pages/Settings';
 import Experimental from './pages/Experimental';
 import Requests from './pages/Requests';
 import { History, type Collection } from './features/Personal';
+import {
+  WatchlistButton,
+  WatchlistRecommendations,
+  type WatchlistPage,
+} from './features/Watchlist';
+import {
+  loadPlaybackShortcuts,
+  playbackShortcutKey,
+} from './services/playbackShortcuts';
+
 type User = { name: string; role: string };
+
+function navigateMediaGrid(event: KeyboardEvent<HTMLDivElement>) {
+  if (
+    event.altKey ||
+    event.ctrlKey ||
+    event.metaKey ||
+    event.shiftKey ||
+    !['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(event.key)
+  )
+    return;
+  const grid = event.currentTarget;
+  const links = Array.from(
+    grid.querySelectorAll<HTMLAnchorElement>(':scope > a'),
+  );
+  const index = links.indexOf(event.target as HTMLAnchorElement);
+  if (index < 0) return;
+  const columns = links.filter(
+    (link) => link.offsetTop === links[0].offsetTop,
+  ).length;
+  const column = index % columns;
+  const rowStart = index - column;
+  let next;
+  switch (event.key) {
+    case 'ArrowLeft':
+      next = column > 0 ? links[index - 1] : undefined;
+      break;
+    case 'ArrowRight':
+      next = column + 1 < columns ? links[index + 1] : undefined;
+      break;
+    case 'ArrowUp':
+      next = links[index - columns];
+      break;
+    case 'ArrowDown':
+      next =
+        rowStart + columns < links.length
+          ? links[Math.min(index + columns, links.length - 1)]
+          : undefined;
+      break;
+  }
+  if (next) {
+    event.preventDefault();
+    next.focus();
+  }
+}
 export default function App() {
   const mainRef = useRef<HTMLElement>(null);
   const authHeading = useRef<HTMLHeadingElement>(null);
@@ -38,7 +93,10 @@ export default function App() {
   >('loading');
   const [guestAvailable, setGuestAvailable] = useState(false);
   const [user, setUser] = useState<User>();
+  const guest = user?.role === 'Guest';
+  const shortcutKey = playbackShortcutKey(user?.name ?? 'guest');
   const [features, setFeatures] = useState<FeatureState>(unavailableFeatures);
+  const showWatchlist = featureVisible(features, 'watchlist');
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   const [route, setRoute] = useState(location.hash.slice(1) || 'home');
@@ -190,7 +248,12 @@ export default function App() {
       if (location.hash !== `#media/${nextPlayback.current}`)
         nextPlayback.current = undefined;
       requestEpoch.current++;
-      setRoute(location.hash.slice(1) || 'home');
+      const nextRoute = location.hash.slice(1) || 'home';
+      setRoute(nextRoute);
+      if (nextRoute === 'watchlist') {
+        setItems([]);
+        setNextCursor(null);
+      }
       setLoading(true);
       setError('');
       setItem(undefined);
@@ -207,6 +270,13 @@ export default function App() {
   }, [endSession]);
   const pageUrl = (cursor?: string) =>
     `/catalog?limit=60&prefix=${encodeURIComponent(debouncedQuery)}${collection ? '&collectionId=' + collection : ''}${cursor ? '&cursor=' + encodeURIComponent(cursor) : ''}`;
+  async function getPage(cursor?: string) {
+    if (route === 'watchlist') {
+      const query = cursor ? '?cursor=' + encodeURIComponent(cursor) : '';
+      return api<WatchlistPage>('/watchlist' + query);
+    }
+    return api<{ items: Media[]; nextCursor: string | null }>(pageUrl(cursor));
+  }
   useEffect(() => {
     if (phase !== 'ready') return;
     let active = true;
@@ -226,10 +296,12 @@ export default function App() {
         let next: string | null = null;
         if (route.startsWith('media/') || route.startsWith('series/'))
           detail = await api<Media>('/media/' + route.split('/')[1]);
-        else if (route === 'home' || route === 'library') {
-          const page = await api<{ items: Media[]; nextCursor: string | null }>(
-            pageUrl(),
-          );
+        else if (
+          route === 'home' ||
+          route === 'library' ||
+          (route === 'watchlist' && !guest)
+        ) {
+          const page = await getPage();
           visible = page.items;
           next = page.nextCursor;
         }
@@ -272,7 +344,7 @@ export default function App() {
     };
     // The URL builder uses only these query inputs.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [phase, route, debouncedQuery, collection]);
+  }, [phase, route, debouncedQuery, collection, guest]);
   useEffect(() => {
     if (!item) return;
     let active = true;
@@ -294,9 +366,7 @@ export default function App() {
     const epoch = requestEpoch.current;
     setMoreBusy(true);
     try {
-      const page = await api<{ items: Media[]; nextCursor: string | null }>(
-        pageUrl(nextCursor),
-      );
+      const page = await getPage(nextCursor);
       const ids = page.items.map((x) => x.id);
       const p = ids.length
         ? await api<Progress[]>('/progress?mediaIds=' + ids.join(','))
@@ -331,7 +401,7 @@ export default function App() {
         } else (detailHeading.current ?? mainRef.current)?.focus();
         focusedRoute.current = key;
       }
-      document.title = `${route === 'requests' ? 'Movie requests' : route === 'experimental' ? 'Experimental' : route === 'settings' || route.startsWith('settings/') ? 'Settings' : route === 'history' ? 'Watch history' : item?.title || (route === 'library' ? 'Library' : 'Home')} · Media Server`;
+      document.title = `${route === 'requests' ? 'Movie requests' : route === 'experimental' ? 'Experimental' : route === 'settings' || route.startsWith('settings/') ? 'Settings' : route === 'history' ? 'Watch history' : route === 'watchlist' ? 'Watchlist' : item?.title || (route === 'library' ? 'Library' : 'Home')} · Media Server`;
     } else if (phase === 'setup' || phase === 'login') {
       if (focusedRoute.current !== key) {
         authHeading.current?.focus();
@@ -399,7 +469,7 @@ export default function App() {
   const position = (id: number) =>
     progress.find((p) => p.mediaItemId === id)?.seconds || 0;
   const cards = (list: Media[]) => (
-    <div className="media-grid">
+    <div className="media-grid" onKeyDown={navigateMediaGrid}>
       {list.map((m, i) => (
         <a
           className={`media-card tone-${i % 4}`}
@@ -630,6 +700,15 @@ export default function App() {
               <span>Downloads</span>
             </a>
           )}
+          {showWatchlist && (
+            <a
+              aria-current={route === 'watchlist' ? 'page' : undefined}
+              className={route === 'watchlist' ? 'active' : ''}
+              href="#watchlist"
+            >
+              <Icon name="watchlist" /> <span>Watchlist</span>
+            </a>
+          )}
           {featureVisible(features, 'watch-history') && (
             <a
               aria-current={route === 'history' ? 'page' : undefined}
@@ -675,11 +754,13 @@ export default function App() {
                       ? 'Server settings'
                       : route === 'history'
                         ? 'Watch history'
-                        : route === 'library'
-                          ? 'Media library'
-                          : route.startsWith('media/')
-                            ? 'Now showing'
-                            : 'Home'}
+                        : route === 'watchlist'
+                          ? 'Watchlist'
+                          : route === 'library'
+                            ? 'Media library'
+                            : route.startsWith('media/')
+                              ? 'Now showing'
+                              : 'Home'}
             </span>
           </div>
           <span className="alpha">EARLY ALPHA</span>
@@ -726,12 +807,34 @@ export default function App() {
               admin={user?.role === 'Admin'}
               features={features}
               onFeaturesChanged={changeFeatures}
+              shortcutPreferenceKey={shortcutKey}
               initialSection={
                 route.startsWith('settings/')
                   ? route.slice('settings/'.length)
                   : undefined
               }
             />
+          ) : route === 'watchlist' ? (
+            <section>
+              <h1>Watchlist</h1>
+              {guest ? (
+                <p>Sign in to save titles to your personal watchlist.</p>
+              ) : (
+                !loading &&
+                (items.length
+                  ? cards(items)
+                  : !error && <p>Open a title to add it to your watchlist.</p>)
+              )}
+              {!guest && !loading && nextCursor && (
+                <button
+                  className="secondary load-more"
+                  disabled={moreBusy}
+                  onClick={() => void loadMore()}
+                >
+                  {moreBusy ? 'Loading more…' : 'Load more saved titles'}
+                </button>
+              )}
+            </section>
           ) : route === 'history' ? (
             user?.role === 'Guest' ? (
               <p>Guest sessions do not save watch history.</p>
@@ -776,6 +879,14 @@ export default function App() {
                 ) : (
                   <h1>{item.title}</h1>
                 )}
+                {playFrom === undefined &&
+                  showWatchlist &&
+                  !route.startsWith('series/') && (
+                    <WatchlistButton
+                      mediaId={item.id}
+                      key={`watchlist-${item.id}`}
+                    />
+                  )}
                 {user?.role === 'Admin' && (
                   <details className="title-admin">
                     <summary>Manage content rating</summary>
@@ -806,6 +917,9 @@ export default function App() {
                     key={item.id}
                     item={item}
                     startPlaying
+                    shortcutMode={
+                      guest ? 'standard' : loadPlaybackShortcuts(shortcutKey)
+                    }
                     autoplayPreference={`media-server.autoplay:${location.origin}:${user?.name ?? 'guest'}`}
                     onNextEpisode={async (id) => {
                       nextPlayback.current = id;
@@ -898,6 +1012,13 @@ export default function App() {
                   </div>
                   {cards(watching)}
                 </section>
+              )}
+              {route === 'home' && showWatchlist && (
+                <WatchlistRecommendations
+                  onOpen={(id) =>
+                    setReturnTo({ route, mediaId: id, scroll: window.scrollY })
+                  }
+                />
               )}
               {route === 'home' && (
                 <TimeBudgetPicker

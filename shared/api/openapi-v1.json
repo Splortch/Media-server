@@ -1358,6 +1358,128 @@
         }
       }
     },
+    "/api/v1/watchlist": {
+      "get": {
+        "tags": [
+          "Api"
+        ],
+        "parameters": [
+          {
+            "name": "cursor",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WatchlistPage"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/watchlist/{mediaId}": {
+      "get": {
+        "tags": [
+          "Api"
+        ],
+        "parameters": [
+          {
+            "name": "mediaId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WatchlistStatus"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "Api"
+        ],
+        "parameters": [
+          {
+            "name": "mediaId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "404": {
+            "description": "Not Found"
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Api"
+        ],
+        "parameters": [
+          {
+            "name": "mediaId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          }
+        }
+      }
+    },
+    "/api/v1/watchlist/recommendations": {
+      "get": {
+        "tags": [
+          "Api"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WatchlistRecommendations"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/libraries/{id}": {
       "delete": {
         "tags": [
@@ -6345,6 +6467,59 @@
                 "$ref": "#/components/schemas/WatchSnapshot"
               }
             ]
+          }
+        }
+      },
+      "WatchlistPage": {
+        "required": [
+          "items",
+          "nextCursor"
+        ],
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MediaSummary"
+            }
+          },
+          "nextCursor": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        }
+      },
+      "WatchlistRecommendations": {
+        "required": [
+          "basedOn",
+          "items"
+        ],
+        "type": "object",
+        "properties": {
+          "basedOn": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MediaSummary"
+            }
+          }
+        }
+      },
+      "WatchlistStatus": {
+        "required": [
+          "saved"
+        ],
+        "type": "object",
+        "properties": {
+          "saved": {
+            "type": "boolean"
           }
         }
       },

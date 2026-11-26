@@ -57,6 +57,7 @@ public static partial class Operations
                 api.WithGroupName("client-v1");
             MapAccounts(api, credentials);
             MapSearch(api);
+            MapWatchlist(api);
             MapLibraries(api);
             MapMonitoring(api);
         }

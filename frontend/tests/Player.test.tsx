@@ -400,6 +400,41 @@ it('toggles playback by clicking video and supports seeking and volume shortcuts
   expect(video.currentTime).toBe(10);
 });
 
+it('honors the selected shortcut mode and keeps focused controls independent', () => {
+  const props = {
+    item: {
+      id: 23,
+      title: 'Shortcut fixture',
+      duration: 100,
+      size: 1,
+      container: 'mp4',
+      videoCodec: 'h264',
+      audioCodec: 'aac',
+    },
+    resume: 0,
+    guest: true,
+  };
+  const { rerender } = render(<Player {...props} shortcutMode="off" />);
+  const surface = screen.getByLabelText('Playback controls');
+  const video = screen.getByLabelText('Shortcut fixture') as HTMLVideoElement;
+  Object.defineProperty(video, 'duration', { value: 100 });
+  fireEvent.loadedMetadata(video);
+  expect(surface).not.toHaveAttribute('aria-keyshortcuts');
+  fireEvent.keyDown(surface, { key: 'ArrowRight' });
+  expect(video.currentTime).toBe(0);
+
+  rerender(<Player {...props} shortcutMode="navigation" />);
+  expect(surface.getAttribute('aria-keyshortcuts')?.split(' ')).not.toContain(
+    'M',
+  );
+  fireEvent.keyDown(surface, { key: 'm' });
+  expect(video.muted).toBe(false);
+  fireEvent.keyDown(surface, { key: 'ArrowRight' });
+  expect(video.currentTime).toBe(10);
+  fireEvent.keyDown(screen.getByLabelText('Volume'), { key: 'End' });
+  expect(video.currentTime).toBe(10);
+});
+
 it('hides fullscreen controls when idle and reveals them for movement, pause and keyboard focus', () => {
   vi.useFakeTimers();
   try {
