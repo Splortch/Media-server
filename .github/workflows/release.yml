@@ -242,16 +242,18 @@ jobs:
           curl -fsS http://127.0.0.1:5050/ > /tmp/release-index.html
           grep -q 'id="root"' /tmp/release-index.html
           mkdir -p artifacts/container
-          docker run --rm --entrypoint dpkg-query media-server:release -W -f='${binary:Package}\t${Version}\t${source:Package}\t${source:Version}\n' > artifacts/container/CONTAINER-PACKAGES.txt
-          docker run --rm --entrypoint ffmpeg media-server:release -L > artifacts/container/FFMPEG-LICENSE.txt 2>&1
           docker save media-server:release -o artifacts/container/image.tar
           docker build --target corresponding-source --output type=local,dest=artifacts/container -f docker/Dockerfile --build-arg VERSION="$SERVER_VERSION" .
+          python3 scripts/container-inventory.py media-server:release artifacts/container \
+            --source-bundle artifacts/container/Container-Corresponding-Source.tar.gz
       - uses: actions/upload-artifact@v7
         with:
           name: release-container
           path: |
             artifacts/container/CONTAINER-PACKAGES.txt
             artifacts/container/FFMPEG-LICENSE.txt
+            artifacts/container/FFMPEG-BUILD.txt
+            artifacts/container/CONTAINER-SBOM.spdx.json
             artifacts/container/Container-Corresponding-Source.tar.gz
           if-no-files-found: error
           compression-level: 1

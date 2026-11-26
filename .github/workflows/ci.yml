@@ -58,8 +58,11 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       - run: python3 scripts/check-container-bases.py
+      - run: python3 -m unittest discover -s scripts/tests -p 'test_container_inventory.py'
       - run: docker compose --env-file .env.example config -q
       - run: docker build -f docker/Dockerfile -t media-server:ci .
+      - name: Verify container package and FFmpeg inventory
+        run: python3 scripts/container-inventory.py media-server:ci /tmp/container-inventory
       - name: Smoke-test container
         shell: bash
         run: |

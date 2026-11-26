@@ -59,7 +59,8 @@ class ReleasePackagesTests(unittest.TestCase):
             (native / 'client.msi').write_text('test installer fixture')
             container = downloads / 'release-container'
             container.mkdir()
-            for name in ('CONTAINER-PACKAGES.txt', 'FFMPEG-LICENSE.txt', 'Container-Corresponding-Source.tar.gz'):
+            for name in ('CONTAINER-PACKAGES.txt', 'FFMPEG-LICENSE.txt', 'Container-Corresponding-Source.tar.gz',
+                         'CONTAINER-SBOM.spdx.json', 'FFMPEG-BUILD.txt'):
                 (container / name).write_text('test source fixture')
             android = downloads / 'release-android'
             android.mkdir()
@@ -77,6 +78,8 @@ class ReleasePackagesTests(unittest.TestCase):
                 self.assertIn('ghcr.io/splortch/media-server:v0.2.0-alpha.5', text)
                 self.assertIn('127.0.0.1:5050:5050', text)
                 self.assertIn('/media:ro', text)
+                for name in ('CONTAINER-SBOM.spdx.json', 'FFMPEG-BUILD.txt'):
+                    self.assertIn(f'MediaServer-Docker-v0.2.0-alpha.5/inventory/{name}', archive.namelist())
 
 
 if __name__ == '__main__':
